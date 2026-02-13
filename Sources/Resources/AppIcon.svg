@@ -13,13 +13,28 @@
   <!-- Background -->
   <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
 
-  <!-- Motion trail ghosts (animation feel) -->
+  <!-- Onion skin motion trail — outermost (faintest, oldest frame) -->
   <path d="M 150 700 C 390 180, 634 820, 874 300"
-        fill="none" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="28" stroke-linecap="round"
-        transform="translate(-40, -60)"/>
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.03" stroke-width="20" stroke-linecap="round"
+        transform="translate(-100, -120)"/>
   <path d="M 150 700 C 390 180, 634 820, 874 300"
-        fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="28" stroke-linecap="round"
-        transform="translate(-20, -30)"/>
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="20" stroke-linecap="round"
+        transform="translate(-80, -96)"/>
+  <path d="M 150 700 C 390 180, 634 820, 874 300"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.07" stroke-width="22" stroke-linecap="round"
+        transform="translate(-60, -72)"/>
+  <path d="M 150 700 C 390 180, 634 820, 874 300"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.09" stroke-width="22" stroke-linecap="round"
+        transform="translate(-44, -52)"/>
+  <path d="M 150 700 C 390 180, 634 820, 874 300"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="24" stroke-linecap="round"
+        transform="translate(-30, -36)"/>
+  <path d="M 150 700 C 390 180, 634 820, 874 300"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="26" stroke-linecap="round"
+        transform="translate(-18, -22)"/>
+  <path d="M 150 700 C 390 180, 634 820, 874 300"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="28" stroke-linecap="round"
+        transform="translate(-8, -10)"/>
 
   <!-- Glow behind main curve -->
   <path d="M 150 700 C 390 180, 634 820, 874 300"
