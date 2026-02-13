@@ -10,7 +10,7 @@ let package = Package(
         .iOSApplication(
             name: "LottieDeveloper",
             targets: ["LottieDeveloper"],
-            bundleIdentifier: "com.lottiedeveloper.app",
+            bundleIdentifier: "com.nikapps.lottie.developer",
             teamIdentifier: "",
             displayVersion: "1.0.0",
             bundleVersion: "1",
