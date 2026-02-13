@@ -4,57 +4,17 @@
       <stop offset="0%" stop-color="#6366F1"/>
       <stop offset="100%" stop-color="#4338CA"/>
     </linearGradient>
-    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#A5B4FC" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#6366F1" stop-opacity="0"/>
-    </linearGradient>
-    <linearGradient id="dot" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="100%" stop-color="#C7D2FE"/>
-    </linearGradient>
   </defs>
 
   <!-- Background -->
   <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
 
-  <!-- Subtle top glow -->
-  <rect width="1024" height="512" rx="224" ry="224" fill="url(#glow)"/>
+  <!-- Play triangle -->
+  <polygon points="390,300 390,600 700,450" fill="#FFFFFF"/>
 
-  <!-- Animation path curve -->
-  <path d="M 200 620 C 320 300, 480 300, 512 520 C 544 740, 700 740, 824 420"
-        fill="none" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="28"
-        stroke-linecap="round"/>
-
-  <!-- Dashed trailing path (motion trail) -->
-  <path d="M 200 620 C 320 300, 480 300, 512 520"
-        fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="18"
-        stroke-linecap="round" stroke-dasharray="8 32"/>
-
-  <!-- Main visible path -->
-  <path d="M 512 520 C 544 740, 700 740, 824 420"
-        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="18"
-        stroke-linecap="round"/>
-
-  <!-- Keyframe dots along the path -->
-  <circle cx="200" cy="620" r="18" fill="url(#dot)" opacity="0.4"/>
-  <circle cx="356" cy="400" r="20" fill="url(#dot)" opacity="0.5"/>
-  <circle cx="512" cy="520" r="24" fill="url(#dot)" opacity="0.7"/>
-  <circle cx="668" cy="680" r="22" fill="url(#dot)" opacity="0.8"/>
-
-  <!-- Main animated dot (current position) -->
-  <circle cx="824" cy="420" r="36" fill="#FFFFFF" opacity="0.15"/>
-  <circle cx="824" cy="420" r="28" fill="#FFFFFF"/>
-
-  <!-- Play triangle in center -->
-  <g transform="translate(512, 512)" opacity="0.95">
-    <polygon points="-70,-90 -70,90 80,0" fill="#FFFFFF" rx="12"/>
-  </g>
-
-  <!-- Code brackets -->
-  <g fill="none" stroke="#C7D2FE" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" opacity="0.6">
-    <!-- Left bracket { -->
-    <path d="M 260 340 L 220 370 Q 190 390 220 410 L 260 440"/>
-    <!-- Right bracket } -->
-    <path d="M 764 340 L 804 370 Q 834 390 804 410 L 764 440"/>
-  </g>
+  <!-- Text "Lottie Dev" -->
+  <text x="512" y="780" text-anchor="middle"
+        font-family="SF Pro Display, Helvetica Neue, Arial, sans-serif"
+        font-size="108" font-weight="600" letter-spacing="4"
+        fill="#FFFFFF" opacity="0.9">Lottie Dev</text>
 </svg>
