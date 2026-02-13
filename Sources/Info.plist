@@ -4,5 +4,35 @@
 <dict>
 	<key>ITSAppStoreID</key>
 	<string>6759177169</string>
+
+	<key>CFBundleDisplayName</key>
+	<string>Lottie Dev</string>
+
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.airbnb.lottie</string>
+			<key>UTTypeDescription</key>
+			<string>Lottie Animation</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>lottie</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>
