@@ -14,20 +14,20 @@
   <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
 
   <!-- Glow behind the curve -->
-  <path d="M 140 600 C 340 120, 500 680, 884 200"
+  <path d="M 140 600 C 380 140, 644 660, 884 200"
         fill="none" stroke="#A5B4FC" stroke-opacity="0.25" stroke-width="64" stroke-linecap="round"/>
 
-  <!-- Control point handles -->
-  <line x1="140" y1="600" x2="340" y2="120" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="5"/>
-  <line x1="884" y1="200" x2="500" y2="680" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="5"/>
+  <!-- Control point handles — symmetrical -->
+  <line x1="140" y1="600" x2="380" y2="140" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="6"/>
+  <line x1="884" y1="200" x2="644" y2="660" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="6"/>
 
   <!-- Main S-curve — bold and expressive -->
-  <path d="M 140 600 C 340 120, 500 680, 884 200"
+  <path d="M 140 600 C 380 140, 644 660, 884 200"
         fill="none" stroke="url(#curve-glow)" stroke-width="32" stroke-linecap="round"/>
 
-  <!-- Control point dots -->
-  <circle cx="340" cy="120" r="14" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="4.5"/>
-  <circle cx="500" cy="680" r="14" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="4.5"/>
+  <!-- Control point dots — hollow, symmetrical -->
+  <circle cx="380" cy="140" r="18" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="5"/>
+  <circle cx="644" cy="660" r="18" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="5"/>
 
   <!-- Anchor points -->
   <circle cx="140" cy="600" r="22" fill="#FFFFFF"/>
