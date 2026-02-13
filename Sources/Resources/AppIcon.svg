@@ -9,8 +9,21 @@
   <!-- Background -->
   <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
 
-  <!-- Play triangle -->
-  <polygon points="390,300 390,600 700,450" fill="#FFFFFF"/>
+  <!-- Control point handles (developer: bezier handles) -->
+  <line x1="200" y1="580" x2="380" y2="220" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="6"/>
+  <line x1="824" y1="540" x2="644" y2="220" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="6"/>
+
+  <!-- Main bezier curve (animation path) -->
+  <path d="M 200 580 C 380 220, 644 220, 824 540"
+        fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- Control point dots -->
+  <circle cx="380" cy="220" r="16" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="5"/>
+  <circle cx="644" cy="220" r="16" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="5"/>
+
+  <!-- Anchor points -->
+  <circle cx="200" cy="580" r="20" fill="#FFFFFF"/>
+  <circle cx="824" cy="540" r="20" fill="#FFFFFF"/>
 
   <!-- Text "Lottie Dev" -->
   <text x="512" y="780" text-anchor="middle"
