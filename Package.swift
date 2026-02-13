@@ -11,7 +11,7 @@ let package = Package(
             name: "LottieDeveloper",
             targets: ["LottieDeveloper"],
             bundleIdentifier: "com.nikapps.lottie.developer",
-            teamIdentifier: "",
+            teamIdentifier: "LWV5ZRPC43",
             displayVersion: "1.0.0",
             bundleVersion: "1",
             appIcon: .placeholder(icon: .film),
