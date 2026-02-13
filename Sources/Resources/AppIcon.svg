@@ -14,10 +14,10 @@
   </defs>
 
   <!-- Background -->
-  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
 
   <!-- Subtle dot grid -->
-  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#dots)"/>
+  <rect width="1024" height="1024" fill="url(#dots)"/>
 
   <!-- Wing-flap motion fan — anchors fixed, CPs swing from reverse curve through flat to deep S -->
   <!-- Frame 0 (oldest) — reverse curve -->

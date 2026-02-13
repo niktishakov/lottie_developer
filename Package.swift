@@ -14,7 +14,7 @@ let package = Package(
             teamIdentifier: "LWV5ZRPC43",
             displayVersion: "1.0.0",
             bundleVersion: "1",
-            appIcon: .placeholder(icon: .film),
+            appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.indigo),
             supportedDeviceTypes: [.iPhone, .iPad],
             supportedInterfaceOrientations: [
