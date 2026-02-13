@@ -1,10 +1,13 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 struct AnimationLibraryView: View {
     @Environment(AnimationStore.self) private var store
     @State private var showFileImporter = false
     @State private var showURLImporter = false
+    @State private var showPasteImporter = false
+    @State private var pasteName = ""
     @State private var urlString = ""
     @State private var searchText = ""
     @State private var importError: String?
@@ -55,6 +58,17 @@ struct AnimationLibraryView: View {
                 }
             } message: {
                 Text("Enter the URL of a Lottie JSON file")
+            }
+            .alert("Paste JSON", isPresented: $showPasteImporter) {
+                TextField("Animation name", text: $pasteName)
+                Button("Import") {
+                    importFromClipboard(name: pasteName)
+                }
+                Button("Cancel", role: .cancel) {
+                    pasteName = ""
+                }
+            } message: {
+                Text("Give a name for the animation from clipboard")
             }
             .alert("Error", isPresented: $showError) {
                 Button("OK") {}
@@ -122,6 +136,13 @@ struct AnimationLibraryView: View {
             } label: {
                 Label("Import from URL", systemImage: "link")
             }
+
+            Button {
+                pasteName = ""
+                showPasteImporter = true
+            } label: {
+                Label("Paste from Clipboard", systemImage: "doc.on.clipboard")
+            }
         } label: {
             Label("Add", systemImage: "plus")
         }
@@ -142,6 +163,30 @@ struct AnimationLibraryView: View {
             }
         case .failure(let error):
             importError = error.localizedDescription
+            showError = true
+        }
+    }
+
+    private func importFromClipboard(name: String) {
+        guard let string = UIPasteboard.general.string, !string.isEmpty else {
+            importError = "Clipboard is empty or contains no text"
+            showError = true
+            return
+        }
+
+        guard let data = string.data(using: .utf8),
+              (try? JSONSerialization.jsonObject(with: data)) != nil else {
+            importError = "Clipboard content is not valid JSON"
+            showError = true
+            return
+        }
+
+        let animationName = name.isEmpty ? "Pasted \(Date.now.formatted(date: .abbreviated, time: .shortened))" : name
+
+        do {
+            _ = try store.importAnimation(data: data, name: animationName)
+        } catch {
+            importError = "Failed to save: \(error.localizedDescription)"
             showError = true
         }
     }
