@@ -4,7 +4,7 @@
       <stop offset="0%" stop-color="#6366F1"/>
       <stop offset="100%" stop-color="#4338CA"/>
     </linearGradient>
-    <linearGradient id="curve-glow" x1="0" y1="0" x2="1" y2="0">
+    <linearGradient id="curve-main" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="#C7D2FE"/>
       <stop offset="100%" stop-color="#FFFFFF"/>
     </linearGradient>
@@ -13,71 +13,40 @@
   <!-- Background -->
   <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
 
-  <!-- Glow behind the curve -->
-  <path d="M 140 600 C 380 140, 644 660, 884 200"
-        fill="none" stroke="#A5B4FC" stroke-opacity="0.25" stroke-width="64" stroke-linecap="round"/>
+  <!-- Motion trail ghosts (animation feel) -->
+  <path d="M 150 700 C 390 180, 634 820, 874 300"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="28" stroke-linecap="round"
+        transform="translate(-40, -60)"/>
+  <path d="M 150 700 C 390 180, 634 820, 874 300"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="28" stroke-linecap="round"
+        transform="translate(-20, -30)"/>
+
+  <!-- Glow behind main curve -->
+  <path d="M 150 700 C 390 180, 634 820, 874 300"
+        fill="none" stroke="#A5B4FC" stroke-opacity="0.2" stroke-width="72" stroke-linecap="round"/>
 
   <!-- Control point handles — symmetrical -->
-  <line x1="140" y1="600" x2="380" y2="140" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="6"/>
-  <line x1="884" y1="200" x2="644" y2="660" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="6"/>
+  <line x1="150" y1="700" x2="390" y2="180" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="5"/>
+  <line x1="874" y1="300" x2="634" y2="820" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="5"/>
 
-  <!-- Main S-curve — bold and expressive -->
-  <path d="M 140 600 C 380 140, 644 660, 884 200"
-        fill="none" stroke="url(#curve-glow)" stroke-width="32" stroke-linecap="round"/>
+  <!-- Main S-curve -->
+  <path d="M 150 700 C 390 180, 634 820, 874 300"
+        fill="none" stroke="url(#curve-main)" stroke-width="30" stroke-linecap="round"/>
 
-  <!-- Control point dots — hollow, symmetrical -->
-  <circle cx="380" cy="140" r="18" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="5"/>
-  <circle cx="644" cy="660" r="18" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="5"/>
+  <!-- Keyframe diamonds along the curve -->
+  <rect x="302" y="388" width="14" height="14" rx="2" transform="rotate(45, 309, 395)" fill="#FFFFFF" opacity="0.35"/>
+  <rect x="505" y="503" width="14" height="14" rx="2" transform="rotate(45, 512, 510)" fill="#FFFFFF" opacity="0.45"/>
+  <rect x="698" y="430" width="14" height="14" rx="2" transform="rotate(45, 705, 437)" fill="#FFFFFF" opacity="0.55"/>
 
-  <!-- Anchor points -->
-  <circle cx="140" cy="600" r="22" fill="#FFFFFF"/>
-  <circle cx="884" cy="200" r="22" fill="#FFFFFF"/>
+  <!-- Control point dots — hollow -->
+  <circle cx="390" cy="180" r="18" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="5"/>
+  <circle cx="634" cy="820" r="18" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="5"/>
 
-  <!-- "Lottie Dev" as outlined paths -->
-  <g fill="#FFFFFF" opacity="0.9" transform="translate(155, 710)">
-    <!-- L -->
-    <rect x="0" y="0" width="12" height="70" rx="3"/>
-    <rect x="0" y="58" width="42" height="12" rx="3"/>
+  <!-- Anchor points — solid -->
+  <circle cx="150" cy="700" r="22" fill="#FFFFFF"/>
+  <circle cx="874" cy="300" r="22" fill="#FFFFFF"/>
 
-    <!-- o -->
-    <rect x="60" y="22" width="12" height="48" rx="6"/>
-    <rect x="92" y="22" width="12" height="48" rx="6"/>
-    <rect x="60" y="22" width="44" height="12" rx="6"/>
-    <rect x="60" y="58" width="44" height="12" rx="6"/>
-
-    <!-- t -->
-    <rect x="125" y="5" width="12" height="65" rx="3"/>
-    <rect x="115" y="22" width="32" height="12" rx="3"/>
-
-    <!-- t -->
-    <rect x="165" y="5" width="12" height="65" rx="3"/>
-    <rect x="155" y="22" width="32" height="12" rx="3"/>
-
-    <!-- i -->
-    <rect x="205" y="22" width="12" height="48" rx="3"/>
-    <circle cx="211" cy="8" r="7"/>
-
-    <!-- e -->
-    <rect x="235" y="22" width="12" height="48" rx="6"/>
-    <rect x="235" y="22" width="44" height="12" rx="6"/>
-    <rect x="235" y="40" width="44" height="12" rx="6"/>
-    <rect x="235" y="58" width="44" height="12" rx="6"/>
-
-    <!-- space -->
-
-    <!-- D -->
-    <rect x="320" y="0" width="12" height="70" rx="3"/>
-    <rect x="320" y="0" width="34" height="12" rx="6"/>
-    <rect x="320" y="58" width="34" height="12" rx="6"/>
-    <path d="M 354 12 Q 376 35 354 58" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
-
-    <!-- e -->
-    <rect x="395" y="22" width="12" height="48" rx="6"/>
-    <rect x="395" y="22" width="44" height="12" rx="6"/>
-    <rect x="395" y="40" width="44" height="12" rx="6"/>
-    <rect x="395" y="58" width="44" height="12" rx="6"/>
-
-    <!-- v -->
-    <polygon points="457,22 475,70 493,22 505,22 480,74 470,74 445,22"/>
-  </g>
+  <!-- Leading dot with glow (current animation position) -->
+  <circle cx="874" cy="300" r="44" fill="#FFFFFF" opacity="0.1"/>
+  <circle cx="874" cy="300" r="32" fill="#FFFFFF" opacity="0.06"/>
 </svg>
