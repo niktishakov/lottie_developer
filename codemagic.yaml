@@ -6,7 +6,8 @@ workflows:
     environment:
       groups:
         # Configure in Codemagic UI → Settings → Environment variables
-        # APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_PRIVATE_KEY
+        # APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER,
+        # APP_STORE_CONNECT_PRIVATE_KEY, CERTIFICATE_PRIVATE_KEY
         - app_store_credentials
       vars:
         BUNDLE_ID: "com.nikapps.lottie.developer"
@@ -39,8 +40,34 @@ workflows:
 
       - name: Fetch iOS signing files
         script: |
+          if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+            echo "CERTIFICATE_PRIVATE_KEY is not set"
+            exit 1
+          fi
+
+          CERT_KEY_FILE="$CM_BUILD_DIR/certificate_private_key.pem"
+
+          if printf '%s' "$CERTIFICATE_PRIVATE_KEY" | grep -Eq "BEGIN (RSA )?PRIVATE KEY"; then
+            printf '%s' "$CERTIFICATE_PRIVATE_KEY" > "$CERT_KEY_FILE"
+          else
+            if ! printf '%s' "$CERTIFICATE_PRIVATE_KEY" | base64 --decode > "$CERT_KEY_FILE" 2>/dev/null; then
+              if ! printf '%s' "$CERTIFICATE_PRIVATE_KEY" | base64 -D > "$CERT_KEY_FILE" 2>/dev/null; then
+                echo "CERTIFICATE_PRIVATE_KEY is neither PEM nor valid base64-encoded PEM"
+                exit 1
+              fi
+            fi
+          fi
+
+          if ! grep -Eq "BEGIN (RSA )?PRIVATE KEY" "$CERT_KEY_FILE"; then
+            echo "Decoded CERTIFICATE_PRIVATE_KEY is not a valid PEM private key"
+            exit 1
+          fi
+
+          chmod 600 "$CERT_KEY_FILE"
+
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
+            --certificate-key=@file:"$CERT_KEY_FILE" \
             --create
 
       - name: Add certificates to keychain
