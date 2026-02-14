@@ -32,8 +32,8 @@ struct AnimationLibraryView: View {
                     animationList
                 }
             }
-            .navigationTitle("Lottie Developer")
-            .searchable(text: $searchText, prompt: "Search animations")
+            .navigationTitle(String(localized: "library.title"))
+            .searchable(text: $searchText, prompt: String(localized: "library.search.prompt"))
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     importMenu
@@ -46,34 +46,34 @@ struct AnimationLibraryView: View {
             ) { result in
                 handleFileImport(result)
             }
-            .alert("Import from URL", isPresented: $showURLImporter) {
-                TextField("https://example.com/animation.json", text: $urlString)
+            .alert(String(localized: "library.import.url.title"), isPresented: $showURLImporter) {
+                TextField(String(localized: "library.import.url.placeholder"), text: $urlString)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                Button("Download") {
+                Button(String(localized: "library.import.url.download")) {
                     Task { await downloadFromURL() }
                 }
-                Button("Cancel", role: .cancel) {
+                Button(String(localized: "common.cancel"), role: .cancel) {
                     urlString = ""
                 }
             } message: {
-                Text("Enter the URL of a Lottie JSON file")
+                Text("library.import.url.message")
             }
-            .alert("Paste JSON", isPresented: $showPasteImporter) {
-                TextField("Animation name", text: $pasteName)
-                Button("Import") {
+            .alert(String(localized: "library.import.paste.title"), isPresented: $showPasteImporter) {
+                TextField(String(localized: "library.import.paste.namePlaceholder"), text: $pasteName)
+                Button(String(localized: "library.import.paste.import")) {
                     importFromClipboard(name: pasteName)
                 }
-                Button("Cancel", role: .cancel) {
+                Button(String(localized: "common.cancel"), role: .cancel) {
                     pasteName = ""
                 }
             } message: {
-                Text("Give a name for the animation from clipboard")
+                Text("library.import.paste.message")
             }
-            .alert("Error", isPresented: $showError) {
-                Button("OK") {}
+            .alert(String(localized: "library.error.title"), isPresented: $showError) {
+                Button(String(localized: "library.error.ok")) {}
             } message: {
-                Text(importError ?? "Unknown error")
+                Text(importError ?? String(localized: "library.error.unknown"))
             }
         }
     }
@@ -82,9 +82,9 @@ struct AnimationLibraryView: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label("No Animations", systemImage: "film.stack")
+            Label(String(localized: "library.empty.title"), systemImage: "film.stack")
         } description: {
-            Text("Import Lottie JSON files from Files or a URL to get started.")
+            Text("library.empty.description")
         } actions: {
             importMenu
                 .buttonStyle(.borderedProminent)
@@ -101,7 +101,7 @@ struct AnimationLibraryView: View {
                     Button(role: .destructive) {
                         store.delete(item)
                     } label: {
-                        Label("Delete", systemImage: "trash")
+                        Label(String(localized: "library.row.delete"), systemImage: "trash")
                     }
                 }
                 .swipeActions(edge: .leading) {
@@ -109,7 +109,9 @@ struct AnimationLibraryView: View {
                         store.toggleFavorite(item)
                     } label: {
                         Label(
-                            item.isFavorite ? "Unfavorite" : "Favorite",
+                            item.isFavorite
+                                ? String(localized: "library.row.unfavorite")
+                                : String(localized: "library.row.favorite"),
                             systemImage: item.isFavorite ? "star.slash" : "star.fill"
                         )
                     }
@@ -127,24 +129,24 @@ struct AnimationLibraryView: View {
             Button {
                 showFileImporter = true
             } label: {
-                Label("Import from Files", systemImage: "folder")
+                Label(String(localized: "library.import.files"), systemImage: "folder")
             }
 
             Button {
                 urlString = ""
                 showURLImporter = true
             } label: {
-                Label("Import from URL", systemImage: "link")
+                Label(String(localized: "library.import.url"), systemImage: "link")
             }
 
             Button {
                 pasteName = ""
                 showPasteImporter = true
             } label: {
-                Label("Paste from Clipboard", systemImage: "doc.on.clipboard")
+                Label(String(localized: "library.import.paste"), systemImage: "doc.on.clipboard")
             }
         } label: {
-            Label("Add", systemImage: "plus")
+            Label(String(localized: "library.import.add"), systemImage: "plus")
         }
     }
 
@@ -157,7 +159,7 @@ struct AnimationLibraryView: View {
                 do {
                     _ = try store.importAnimation(from: url)
                 } catch {
-                    importError = "Failed to import \(url.lastPathComponent): \(error.localizedDescription)"
+                    importError = String(localized: "library.error.importFailed \(url.lastPathComponent) \(error.localizedDescription)")
                     showError = true
                 }
             }
@@ -169,31 +171,33 @@ struct AnimationLibraryView: View {
 
     private func importFromClipboard(name: String) {
         guard let string = UIPasteboard.general.string, !string.isEmpty else {
-            importError = "Clipboard is empty or contains no text"
+            importError = String(localized: "library.error.clipboardEmpty")
             showError = true
             return
         }
 
         guard let data = string.data(using: .utf8),
               (try? JSONSerialization.jsonObject(with: data)) != nil else {
-            importError = "Clipboard content is not valid JSON"
+            importError = String(localized: "library.error.invalidJSON")
             showError = true
             return
         }
 
-        let animationName = name.isEmpty ? "Pasted \(Date.now.formatted(date: .abbreviated, time: .shortened))" : name
+        let animationName = name.isEmpty
+            ? String(localized: "library.paste.defaultName \(Date.now.formatted(date: .abbreviated, time: .shortened))")
+            : name
 
         do {
             _ = try store.importAnimation(data: data, name: animationName)
         } catch {
-            importError = "Failed to save: \(error.localizedDescription)"
+            importError = String(localized: "library.error.saveFailed \(error.localizedDescription)")
             showError = true
         }
     }
 
     private func downloadFromURL() async {
         guard let url = URL(string: urlString) else {
-            importError = "Invalid URL"
+            importError = String(localized: "library.error.invalidURL")
             showError = true
             return
         }
@@ -202,11 +206,19 @@ struct AnimationLibraryView: View {
         defer { isDownloading = false }
 
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = 30
+            configuration.timeoutIntervalForResource = 60
+            let session = URLSession(configuration: configuration)
+
+            let (data, _) = try await session.data(from: url)
             let name = url.deletingPathExtension().lastPathComponent
             _ = try store.importAnimation(data: data, name: name)
+        } catch let error as URLError where error.code == .timedOut {
+            importError = String(localized: "library.error.timeout")
+            showError = true
         } catch {
-            importError = "Download failed: \(error.localizedDescription)"
+            importError = String(localized: "library.error.downloadFailed \(error.localizedDescription)")
             showError = true
         }
     }

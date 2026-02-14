@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "LottieDeveloper",
+    defaultLocalization: "en",
     platforms: [
         .iOS(.v26)
     ],
@@ -14,7 +15,7 @@ let package = Package(
             teamIdentifier: "LWV5ZRPC43",
             displayVersion: "1.0.0",
             bundleVersion: "1",
-            appIcon: .placeholder(icon: .film),
+            appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.indigo),
             supportedDeviceTypes: [.iPhone, .iPad],
             supportedInterfaceOrientations: [
@@ -34,7 +35,11 @@ let package = Package(
             dependencies: [
                 .product(name: "Lottie", package: "lottie-ios")
             ],
-            path: "Sources"
+            path: "Sources",
+            resources: [
+                .process("Resources/en.lproj"),
+                .process("Resources/ru.lproj")
+            ]
         )
     ]
 )

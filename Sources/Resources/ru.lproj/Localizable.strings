@@ -1,0 +1,61 @@
+/* AnimationLibraryView */
+"library.title" = "Lottie Developer";
+"library.search.prompt" = "Поиск анимаций";
+"library.empty.title" = "Нет анимаций";
+"library.empty.description" = "Импортируйте Lottie JSON файлы из Файлов или по URL.";
+"library.import.add" = "Добавить";
+"library.import.files" = "Импорт из Файлов";
+"library.import.url" = "Импорт по URL";
+"library.import.paste" = "Вставить из буфера";
+"library.import.url.title" = "Импорт по URL";
+"library.import.url.placeholder" = "https://example.com/animation.json";
+"library.import.url.download" = "Загрузить";
+"library.import.url.message" = "Введите URL Lottie JSON файла";
+"library.import.paste.title" = "Вставить JSON";
+"library.import.paste.namePlaceholder" = "Название анимации";
+"library.import.paste.import" = "Импорт";
+"library.import.paste.message" = "Дайте имя анимации из буфера обмена";
+"library.error.title" = "Ошибка";
+"library.error.ok" = "ОК";
+"library.error.unknown" = "Неизвестная ошибка";
+"library.error.importFailed" = "Не удалось импортировать %@: %@";
+"library.error.clipboardEmpty" = "Буфер обмена пуст или не содержит текста";
+"library.error.invalidJSON" = "Содержимое буфера — не валидный JSON";
+"library.error.invalidLottie" = "Файл не является корректной Lottie анимацией (отсутствуют обязательные поля)";
+"library.error.saveFailed" = "Не удалось сохранить: %@";
+"library.error.downloadFailed" = "Ошибка загрузки: %@";
+"library.error.invalidURL" = "Некорректный URL";
+"library.error.timeout" = "Загрузка прервана по таймауту";
+"library.row.delete" = "Удалить";
+"library.row.favorite" = "В избранное";
+"library.row.unfavorite" = "Из избранного";
+"library.paste.defaultName" = "Вставка %@";
+
+/* AnimationPlayerView */
+"player.progress.playing" = "Воспроизведение";
+"player.progress.paused" = "Пауза";
+"player.range.title" = "Диапазон воспроизведения";
+"player.speed.title" = "Скорость: %@x";
+"player.menu.rename" = "Переименовать";
+"player.menu.addFavorite" = "В избранное";
+"player.menu.removeFavorite" = "Убрать из избранного";
+"player.menu.fileInfo" = "Информация о файле";
+"player.rename.title" = "Переименовать";
+"player.rename.placeholder" = "Имя";
+"player.rename.save" = "Сохранить";
+
+/* FileInfoSheet */
+"fileInfo.title" = "О файле";
+"fileInfo.section.general" = "Общее";
+"fileInfo.name" = "Название";
+"fileInfo.added" = "Добавлено";
+"fileInfo.favorite" = "Избранное";
+"fileInfo.favorite.yes" = "Да";
+"fileInfo.favorite.no" = "Нет";
+"fileInfo.section.file" = "Файл";
+"fileInfo.fileName" = "Имя файла";
+"fileInfo.size" = "Размер";
+"fileInfo.done" = "Готово";
+
+/* Common */
+"common.cancel" = "Отмена";
