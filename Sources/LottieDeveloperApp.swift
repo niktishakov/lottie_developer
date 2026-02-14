@@ -9,5 +9,8 @@ struct LottieDeveloperApp: App {
             AnimationLibraryView()
                 .environment(store)
         }
+        #if targetEnvironment(macCatalyst)
+        .defaultSize(width: 900, height: 700)
+        #endif
     }
 }

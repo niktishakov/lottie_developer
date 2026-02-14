@@ -3,61 +3,85 @@ import SwiftUI
 struct AnimationPlayerView: View {
     let item: AnimationItem
     @Environment(AnimationStore.self) private var store
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var playback = PlaybackState()
     @State private var showRenameAlert = false
     @State private var newName = ""
     @State private var showInfo = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            animationCanvas
-            Divider()
-            controlsPanel
-        }
-        .navigationTitle(item.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button {
-                        newName = item.name
-                        showRenameAlert = true
-                    } label: {
-                        Label(String(localized: "player.menu.rename"), systemImage: "pencil")
-                    }
+        adaptiveLayout
+            .navigationTitle(item.name)
+            #if !targetEnvironment(macCatalyst)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            newName = item.name
+                            showRenameAlert = true
+                        } label: {
+                            Label(String(localized: "player.menu.rename"), systemImage: "pencil")
+                        }
 
-                    Button {
-                        store.toggleFavorite(item)
-                    } label: {
-                        Label(
-                            item.isFavorite
-                                ? String(localized: "player.menu.removeFavorite")
-                                : String(localized: "player.menu.addFavorite"),
-                            systemImage: item.isFavorite ? "star.slash" : "star.fill"
-                        )
-                    }
+                        Button {
+                            store.toggleFavorite(item)
+                        } label: {
+                            Label(
+                                item.isFavorite
+                                    ? String(localized: "player.menu.removeFavorite")
+                                    : String(localized: "player.menu.addFavorite"),
+                                systemImage: item.isFavorite ? "star.slash" : "star.fill"
+                            )
+                        }
 
-                    Button {
-                        showInfo.toggle()
-                    } label: {
-                        Label(String(localized: "player.menu.fileInfo"), systemImage: "info.circle")
-                    }
+                        Button {
+                            showInfo.toggle()
+                        } label: {
+                            Label(String(localized: "player.menu.fileInfo"), systemImage: "info.circle")
+                        }
+                        .keyboardShortcut("i", modifiers: .command)
 
-                    ShareLink(item: store.fileURL(for: item))
-                } label: {
-                    Image(systemName: "ellipsis.circle")
+                        ShareLink(item: store.fileURL(for: item))
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
                 }
             }
-        }
-        .alert(String(localized: "player.rename.title"), isPresented: $showRenameAlert) {
-            TextField(String(localized: "player.rename.placeholder"), text: $newName)
-            Button(String(localized: "player.rename.save")) {
-                store.rename(item, to: newName)
+            .alert(String(localized: "player.rename.title"), isPresented: $showRenameAlert) {
+                TextField(String(localized: "player.rename.placeholder"), text: $newName)
+                Button(String(localized: "player.rename.save")) {
+                    store.rename(item, to: newName)
+                }
+                Button(String(localized: "common.cancel"), role: .cancel) {}
             }
-            Button(String(localized: "common.cancel"), role: .cancel) {}
-        }
-        .sheet(isPresented: $showInfo) {
-            FileInfoSheet(item: item)
+            .sheet(isPresented: $showInfo) {
+                FileInfoSheet(item: item)
+            }
+            .onKeyPress(.space) {
+                playback.isPlaying.toggle()
+                return .handled
+            }
+    }
+
+    // MARK: - Adaptive Layout
+
+    @ViewBuilder
+    private var adaptiveLayout: some View {
+        if horizontalSizeClass == .regular {
+            HStack(spacing: 0) {
+                animationCanvas
+                Divider()
+                controlsPanel
+                    .frame(width: 300)
+            }
+        } else {
+            VStack(spacing: 0) {
+                animationCanvas
+                Divider()
+                controlsPanel
+            }
         }
     }
 
@@ -233,7 +257,9 @@ struct FileInfoSheet: View {
                 }
             }
             .navigationTitle(String(localized: "fileInfo.title"))
+            #if !targetEnvironment(macCatalyst)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(String(localized: "fileInfo.done")) { dismiss() }
