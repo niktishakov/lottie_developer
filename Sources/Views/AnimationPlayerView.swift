@@ -23,14 +23,16 @@ struct AnimationPlayerView: View {
                         newName = item.name
                         showRenameAlert = true
                     } label: {
-                        Label("Rename", systemImage: "pencil")
+                        Label(String(localized: "player.menu.rename"), systemImage: "pencil")
                     }
 
                     Button {
                         store.toggleFavorite(item)
                     } label: {
                         Label(
-                            item.isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                            item.isFavorite
+                                ? String(localized: "player.menu.removeFavorite")
+                                : String(localized: "player.menu.addFavorite"),
                             systemImage: item.isFavorite ? "star.slash" : "star.fill"
                         )
                     }
@@ -38,7 +40,7 @@ struct AnimationPlayerView: View {
                     Button {
                         showInfo.toggle()
                     } label: {
-                        Label("File Info", systemImage: "info.circle")
+                        Label(String(localized: "player.menu.fileInfo"), systemImage: "info.circle")
                     }
 
                     ShareLink(item: store.fileURL(for: item))
@@ -47,12 +49,12 @@ struct AnimationPlayerView: View {
                 }
             }
         }
-        .alert("Rename Animation", isPresented: $showRenameAlert) {
-            TextField("Name", text: $newName)
-            Button("Save") {
+        .alert(String(localized: "player.rename.title"), isPresented: $showRenameAlert) {
+            TextField(String(localized: "player.rename.placeholder"), text: $newName)
+            Button(String(localized: "player.rename.save")) {
                 store.rename(item, to: newName)
             }
-            Button("Cancel", role: .cancel) {}
+            Button(String(localized: "common.cancel"), role: .cancel) {}
         }
         .sheet(isPresented: $showInfo) {
             FileInfoSheet(item: item)
@@ -94,10 +96,13 @@ struct AnimationPlayerView: View {
                     playback.isPlaying = false
                 }
             }
+            .accessibilityLabel(String(localized: "player.progress.playing"))
             HStack {
                 Text("\(Int(playback.currentProgress * 100))%")
                 Spacer()
-                Text(playback.isPlaying ? "Playing" : "Paused")
+                Text(playback.isPlaying
+                    ? String(localized: "player.progress.playing")
+                    : String(localized: "player.progress.paused"))
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -113,6 +118,7 @@ struct AnimationPlayerView: View {
                 Image(systemName: "backward.end.fill")
                     .font(.title3)
             }
+            .accessibilityLabel("Rewind")
 
             Button {
                 playback.isPlaying.toggle()
@@ -120,6 +126,7 @@ struct AnimationPlayerView: View {
                 Image(systemName: playback.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.largeTitle)
             }
+            .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
 
             Button {
                 playback.currentProgress = playback.toProgress
@@ -128,6 +135,7 @@ struct AnimationPlayerView: View {
                 Image(systemName: "forward.end.fill")
                     .font(.title3)
             }
+            .accessibilityLabel("Fast forward")
 
             Button {
                 playback.loopEnabled.toggle()
@@ -136,12 +144,13 @@ struct AnimationPlayerView: View {
                     .font(.title3)
                     .foregroundStyle(playback.loopEnabled ? .indigo : .secondary)
             }
+            .accessibilityLabel(playback.loopEnabled ? "Loop enabled" : "Loop disabled")
         }
     }
 
     private var rangeSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Playback Range")
+            Text("player.range.title")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -155,6 +164,7 @@ struct AnimationPlayerView: View {
                     high: $playback.toProgress,
                     range: 0...1
                 )
+                .accessibilityLabel(String(localized: "player.range.title"))
 
                 Text("\(Int(playback.toProgress * 100))%")
                     .font(.caption.monospacedDigit())
@@ -165,7 +175,7 @@ struct AnimationPlayerView: View {
 
     private var speedSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Speed: \(playback.speed, specifier: "%.2f")x")
+            Text("player.speed.title \(playback.speed.formatted(.number.precision(.fractionLength(0...2))))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -187,6 +197,7 @@ struct AnimationPlayerView: View {
                             .foregroundStyle(playback.speed == speed ? .white : .primary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Speed \(speed)x")
                 }
             }
         }
@@ -203,27 +214,29 @@ struct FileInfoSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("General") {
-                    LabeledContent("Name", value: item.name)
-                    LabeledContent("Added", value: item.dateAdded, format: .dateTime)
-                    LabeledContent("Favorite", value: item.isFavorite ? "Yes" : "No")
+                Section(String(localized: "fileInfo.section.general")) {
+                    LabeledContent(String(localized: "fileInfo.name"), value: item.name)
+                    LabeledContent(String(localized: "fileInfo.added"), value: item.dateAdded, format: .dateTime)
+                    LabeledContent(String(localized: "fileInfo.favorite"), value: item.isFavorite
+                        ? String(localized: "fileInfo.favorite.yes")
+                        : String(localized: "fileInfo.favorite.no"))
                 }
 
-                Section("File") {
-                    LabeledContent("File Name", value: item.fileName)
+                Section(String(localized: "fileInfo.section.file")) {
+                    LabeledContent(String(localized: "fileInfo.fileName"), value: item.fileName)
                     if let attrs = try? FileManager.default.attributesOfItem(
                         atPath: store.fileURL(for: item).path
                     ),
                        let size = attrs[.size] as? Int {
-                        LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
+                        LabeledContent(String(localized: "fileInfo.size"), value: ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
                     }
                 }
             }
-            .navigationTitle("File Info")
+            .navigationTitle(String(localized: "fileInfo.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(String(localized: "fileInfo.done")) { dismiss() }
                 }
             }
         }

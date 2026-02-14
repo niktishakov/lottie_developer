@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "LottieDeveloper",
+    defaultLocalization: "en",
     platforms: [
         .iOS(.v26)
     ],
@@ -34,7 +35,11 @@ let package = Package(
             dependencies: [
                 .product(name: "Lottie", package: "lottie-ios")
             ],
-            path: "Sources"
+            path: "Sources",
+            resources: [
+                .process("Resources/en.lproj"),
+                .process("Resources/ru.lproj")
+            ]
         )
     ]
 )

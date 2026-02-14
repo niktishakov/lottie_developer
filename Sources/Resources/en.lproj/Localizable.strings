@@ -1,0 +1,61 @@
+/* AnimationLibraryView */
+"library.title" = "Lottie Developer";
+"library.search.prompt" = "Search animations";
+"library.empty.title" = "No Animations";
+"library.empty.description" = "Import Lottie JSON files from Files or a URL to get started.";
+"library.import.add" = "Add";
+"library.import.files" = "Import from Files";
+"library.import.url" = "Import from URL";
+"library.import.paste" = "Paste from Clipboard";
+"library.import.url.title" = "Import from URL";
+"library.import.url.placeholder" = "https://example.com/animation.json";
+"library.import.url.download" = "Download";
+"library.import.url.message" = "Enter the URL of a Lottie JSON file";
+"library.import.paste.title" = "Paste JSON";
+"library.import.paste.namePlaceholder" = "Animation name";
+"library.import.paste.import" = "Import";
+"library.import.paste.message" = "Give a name for the animation from clipboard";
+"library.error.title" = "Error";
+"library.error.ok" = "OK";
+"library.error.unknown" = "Unknown error";
+"library.error.importFailed" = "Failed to import %@: %@";
+"library.error.clipboardEmpty" = "Clipboard is empty or contains no text";
+"library.error.invalidJSON" = "Clipboard content is not valid JSON";
+"library.error.invalidLottie" = "File is not a valid Lottie animation (missing required fields)";
+"library.error.saveFailed" = "Failed to save: %@";
+"library.error.downloadFailed" = "Download failed: %@";
+"library.error.invalidURL" = "Invalid URL";
+"library.error.timeout" = "Download timed out";
+"library.row.delete" = "Delete";
+"library.row.favorite" = "Favorite";
+"library.row.unfavorite" = "Unfavorite";
+"library.paste.defaultName" = "Pasted %@";
+
+/* AnimationPlayerView */
+"player.progress.playing" = "Playing";
+"player.progress.paused" = "Paused";
+"player.range.title" = "Playback Range";
+"player.speed.title" = "Speed: %@x";
+"player.menu.rename" = "Rename";
+"player.menu.addFavorite" = "Add to Favorites";
+"player.menu.removeFavorite" = "Remove from Favorites";
+"player.menu.fileInfo" = "File Info";
+"player.rename.title" = "Rename Animation";
+"player.rename.placeholder" = "Name";
+"player.rename.save" = "Save";
+
+/* FileInfoSheet */
+"fileInfo.title" = "File Info";
+"fileInfo.section.general" = "General";
+"fileInfo.name" = "Name";
+"fileInfo.added" = "Added";
+"fileInfo.favorite" = "Favorite";
+"fileInfo.favorite.yes" = "Yes";
+"fileInfo.favorite.no" = "No";
+"fileInfo.section.file" = "File";
+"fileInfo.fileName" = "File Name";
+"fileInfo.size" = "Size";
+"fileInfo.done" = "Done";
+
+/* Common */
+"common.cancel" = "Cancel";

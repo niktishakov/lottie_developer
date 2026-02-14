@@ -1,5 +1,8 @@
 import Foundation
+import OSLog
 import Observation
+
+private let logger = Logger(subsystem: "com.nikapps.lottie.developer", category: "AnimationStore")
 
 @Observable
 final class AnimationStore {
@@ -19,9 +22,40 @@ final class AnimationStore {
         storageDirectory.appendingPathComponent("metadata.json")
     }
 
+    private var metadataBackupURL: URL {
+        storageDirectory.appendingPathComponent("metadata.backup.json")
+    }
+
     init() {
         loadMetadata()
     }
+
+    // MARK: - Lottie Validation
+
+    enum ImportError: LocalizedError {
+        case invalidLottieJSON
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidLottieJSON:
+                return String(localized: "library.error.invalidLottie")
+            }
+        }
+    }
+
+    /// Validates that the given data represents a Lottie animation JSON.
+    /// Checks for required top-level keys: "v" (version), "w" (width), "h" (height), "layers".
+    private func validateLottieJSON(_ data: Data) throws {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["v"] != nil,
+              json["w"] != nil,
+              json["h"] != nil,
+              json["layers"] != nil else {
+            throw ImportError.invalidLottieJSON
+        }
+    }
+
+    // MARK: - Import
 
     func importAnimation(from sourceURL: URL, name: String? = nil) throws -> AnimationItem {
         let animationName = name ?? sourceURL.deletingPathExtension().lastPathComponent
@@ -33,7 +67,10 @@ final class AnimationStore {
             if accessing { sourceURL.stopAccessingSecurityScopedResource() }
         }
 
-        try fileManager.copyItem(at: sourceURL, to: destination)
+        let data = try Data(contentsOf: sourceURL)
+        try validateLottieJSON(data)
+
+        try data.write(to: destination)
 
         let item = AnimationItem(name: animationName, fileName: fileName)
         animations.append(item)
@@ -42,6 +79,8 @@ final class AnimationStore {
     }
 
     func importAnimation(data: Data, name: String) throws -> AnimationItem {
+        try validateLottieJSON(data)
+
         let fileName = "\(UUID().uuidString).json"
         let destination = storageDirectory.appendingPathComponent(fileName)
         try data.write(to: destination)
@@ -83,14 +122,60 @@ final class AnimationStore {
         saveMetadata()
     }
 
+    // MARK: - Metadata Persistence
+
     private func loadMetadata() {
-        guard let data = try? Data(contentsOf: metadataURL),
-              let items = try? JSONDecoder().decode([AnimationItem].self, from: data) else { return }
-        animations = items
+        // Try primary metadata file first
+        if let items = decodeMetadata(from: metadataURL) {
+            animations = items
+            logger.info("Loaded \(items.count) animations from metadata")
+            return
+        }
+
+        // Fall back to backup if primary is corrupted
+        if let items = decodeMetadata(from: metadataBackupURL) {
+            animations = items
+            logger.warning("Primary metadata corrupted, restored \(items.count) animations from backup")
+            // Restore primary from backup
+            saveMetadata()
+            return
+        }
+
+        logger.info("No metadata found — starting with empty library")
+        animations = []
+    }
+
+    private func decodeMetadata(from url: URL) -> [AnimationItem]? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        do {
+            return try JSONDecoder().decode([AnimationItem].self, from: data)
+        } catch {
+            logger.error("Failed to decode metadata at \(url.lastPathComponent): \(error.localizedDescription)")
+            return nil
+        }
     }
 
     private func saveMetadata() {
-        guard let data = try? JSONEncoder().encode(animations) else { return }
-        try? data.write(to: metadataURL)
+        do {
+            let data = try JSONEncoder().encode(animations)
+
+            // Write to a temporary file first, then atomically move
+            let tempURL = storageDirectory.appendingPathComponent("metadata.tmp.json")
+            try data.write(to: tempURL, options: .atomic)
+
+            // Backup current metadata before overwriting
+            if fileManager.fileExists(atPath: metadataURL.path) {
+                try? fileManager.removeItem(at: metadataBackupURL)
+                try? fileManager.copyItem(at: metadataURL, to: metadataBackupURL)
+            }
+
+            // Move temp to primary
+            try? fileManager.removeItem(at: metadataURL)
+            try fileManager.moveItem(at: tempURL, to: metadataURL)
+
+            logger.debug("Saved metadata for \(self.animations.count) animations")
+        } catch {
+            logger.error("Failed to save metadata: \(error.localizedDescription)")
+        }
     }
 }
