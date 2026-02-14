@@ -24,6 +24,38 @@ workflows:
       - name: Set up keychain
         script: keychain initialize
 
+      - name: Normalize App Store Connect private key
+        script: |
+          KEY_INPUT="${APP_STORE_CONNECT_PRIVATE_KEY:-}"
+          if [ -z "$KEY_INPUT" ]; then
+            echo "APP_STORE_CONNECT_PRIVATE_KEY is not set"
+            exit 1
+          fi
+
+          KEY_FILE="$CM_BUILD_DIR/app_store_connect_key.p8"
+
+          if printf '%s' "$KEY_INPUT" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s' "$KEY_INPUT" > "$KEY_FILE"
+          else
+            if ! printf '%s' "$KEY_INPUT" | base64 --decode > "$KEY_FILE" 2>/dev/null; then
+              if ! printf '%s' "$KEY_INPUT" | base64 -D > "$KEY_FILE" 2>/dev/null; then
+                echo "APP_STORE_CONNECT_PRIVATE_KEY is neither PEM nor valid base64-encoded PEM"
+                exit 1
+              fi
+            fi
+          fi
+
+          if ! grep -q "BEGIN PRIVATE KEY" "$KEY_FILE"; then
+            echo "Decoded APP_STORE_CONNECT_PRIVATE_KEY is not a valid PEM private key"
+            exit 1
+          fi
+
+          {
+            echo "APP_STORE_CONNECT_PRIVATE_KEY<<CM_EOF"
+            cat "$KEY_FILE"
+            echo "CM_EOF"
+          } >> "$CM_ENV"
+
       - name: Fetch iOS signing files
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
