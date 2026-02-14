@@ -1,5 +1,6 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
+import AppleProductTypes
 
 let package = Package(
     name: "LottieDeveloper",
@@ -17,7 +18,7 @@ let package = Package(
             bundleVersion: "1",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.indigo),
-            supportedDeviceTypes: [.iPhone, .iPad, .mac],
+            supportedDeviceFamilies: [.phone, .pad, .mac],
             supportedInterfaceOrientations: [
                 .portrait,
                 .landscapeRight,

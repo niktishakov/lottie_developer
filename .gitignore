@@ -6,3 +6,5 @@ xcuserdata/
 DerivedData/
 .index-build/
 Packages/
+cert_key
+cert_key.pub
