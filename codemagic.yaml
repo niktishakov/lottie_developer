@@ -96,8 +96,6 @@ workflows:
             -destination "generic/platform=iOS" \
             -archivePath "$CM_BUILD_DIR/build/ios/LottieDeveloper.xcarchive" \
             -clonedSourcePackagesDirPath "$CM_BUILD_DIR/.packages" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
             clean archive
 
       - name: Export iOS IPA
