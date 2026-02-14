@@ -5,8 +5,8 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        # Configure these in Codemagic UI → Settings → Environment variables
-        - app_store_credentials    # APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_PRIVATE_KEY
+        # Configure in Codemagic UI → Settings → Environment variables
+        - app_store_credentials    # APP_STORE_CONNECT_PRIVATE_KEY
         - certificate_credentials  # CERTIFICATE_PRIVATE_KEY
       vars:
         BUNDLE_ID: "com.nikapps.lottie.developer"
@@ -137,7 +137,7 @@ workflows:
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        key_id: P4VB6CBY2M
+        issuer_id: 2f84ae7d-616e-44e5-9eb0-523eb27a8610
         submit_to_testflight: true
         cancel_previous_submissions: true
