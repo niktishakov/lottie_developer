@@ -3,9 +3,11 @@ workflows:
     name: iOS → TestFlight
     instance_type: mac_mini_m2
     max_build_duration: 60
-    integrations:
-      app_store_connect: app-store-connect
     environment:
+      groups:
+        # Configure in Codemagic UI → Settings → Environment variables
+        # APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_PRIVATE_KEY
+        - app_store_credentials
       vars:
         BUNDLE_ID: "com.nikapps.lottie.developer"
         APP_STORE_APPLE_ID: "6759177169"
@@ -22,6 +24,18 @@ workflows:
     scripts:
       - name: Set up keychain
         script: keychain initialize
+
+      - name: Validate App Store Connect private key format
+        script: |
+          if [ -z "${APP_STORE_CONNECT_PRIVATE_KEY:-}" ]; then
+            echo "APP_STORE_CONNECT_PRIVATE_KEY is not set"
+            exit 1
+          fi
+
+          if ! printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" | grep -q "BEGIN PRIVATE KEY"; then
+            echo "APP_STORE_CONNECT_PRIVATE_KEY must contain raw .p8 PEM content, not base64"
+            exit 1
+          fi
 
       - name: Fetch iOS signing files
         script: |
@@ -89,6 +103,8 @@ workflows:
 
     publishing:
       app_store_connect:
-        auth: integration
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         submit_to_testflight: true
         submit_to_app_store: false
