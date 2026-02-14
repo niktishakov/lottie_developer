@@ -1,0 +1,143 @@
+workflows:
+  release:
+    name: iOS & macOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      groups:
+        # Configure in Codemagic UI → Settings → Environment variables
+        - app_store_credentials    # APP_STORE_CONNECT_PRIVATE_KEY
+        - certificate_credentials  # CERTIFICATE_PRIVATE_KEY
+      vars:
+        BUNDLE_ID: "com.nikapps.lottie.developer"
+        APP_STORE_APPLE_ID: "6759177169"
+        XCODE_SCHEME: "LottieDeveloper"
+        TEAM_ID: "LWV5ZRPC43"
+      xcode: latest
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: "master"
+          include: true
+          source: true
+    scripts:
+      - name: Set up keychain
+        script: keychain initialize
+
+      - name: Fetch iOS signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+
+      - name: Fetch Mac Catalyst signing files
+        script: |
+          app-store-connect fetch-signing-files "maccatalyst.$BUNDLE_ID" \
+            --type MAC_APP_STORE \
+            --platform MAC_OS \
+            --create
+
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+
+      - name: Set up code signing
+        script: xcode-project use-profiles
+
+      - name: Increment build number
+        script: |
+          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")
+          NEW_BUILD=$((LATEST_BUILD + 1))
+          echo "Build number: $NEW_BUILD"
+          sed -i '' "s/bundleVersion: \"[0-9]*\"/bundleVersion: \"$NEW_BUILD\"/" Package.swift
+
+      - name: Resolve package dependencies
+        script: |
+          xcodebuild -resolvePackageDependencies \
+            -scheme "$XCODE_SCHEME" \
+            -clonedSourcePackagesDirPath "$CM_BUILD_DIR/.packages"
+
+      - name: Build iOS archive
+        script: |
+          xcodebuild archive \
+            -scheme "$XCODE_SCHEME" \
+            -destination "generic/platform=iOS" \
+            -archivePath "$CM_BUILD_DIR/build/ios/LottieDeveloper.xcarchive" \
+            -clonedSourcePackagesDirPath "$CM_BUILD_DIR/.packages" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            clean archive
+
+      - name: Export iOS IPA
+        script: |
+          cat > "$CM_BUILD_DIR/build/ios/exportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>${TEAM_ID}</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>uploadSymbols</key>
+              <true/>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$CM_BUILD_DIR/build/ios/LottieDeveloper.xcarchive" \
+            -exportOptionsPlist "$CM_BUILD_DIR/build/ios/exportOptions.plist" \
+            -exportPath "$CM_BUILD_DIR/build/ios/ipa"
+
+      - name: Build Mac Catalyst archive
+        script: |
+          xcodebuild archive \
+            -scheme "$XCODE_SCHEME" \
+            -destination "generic/platform=macOS,variant=Mac Catalyst" \
+            -archivePath "$CM_BUILD_DIR/build/macos/LottieDeveloper.xcarchive" \
+            -clonedSourcePackagesDirPath "$CM_BUILD_DIR/.packages" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            clean archive
+
+      - name: Export Mac Catalyst pkg
+        script: |
+          cat > "$CM_BUILD_DIR/build/macos/exportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>${TEAM_ID}</string>
+              <key>destination</key>
+              <string>export</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>uploadSymbols</key>
+              <true/>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$CM_BUILD_DIR/build/macos/LottieDeveloper.xcarchive" \
+            -exportOptionsPlist "$CM_BUILD_DIR/build/macos/exportOptions.plist" \
+            -exportPath "$CM_BUILD_DIR/build/macos/export"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/macos/export/*.pkg
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: P4VB6CBY2M
+        issuer_id: 2f84ae7d-616e-44e5-9eb0-523eb27a8610
+        submit_to_testflight: true
+        cancel_previous_submissions: true

@@ -48,7 +48,9 @@ struct AnimationLibraryView: View {
             }
             .alert(String(localized: "library.import.url.title"), isPresented: $showURLImporter) {
                 TextField(String(localized: "library.import.url.placeholder"), text: $urlString)
+                    #if !targetEnvironment(macCatalyst)
                     .textInputAutocapitalization(.never)
+                    #endif
                     .autocorrectionDisabled()
                 Button(String(localized: "library.import.url.download")) {
                     Task { await downloadFromURL() }
@@ -117,6 +119,24 @@ struct AnimationLibraryView: View {
                     }
                     .tint(.yellow)
                 }
+                .contextMenu {
+                    Button {
+                        store.toggleFavorite(item)
+                    } label: {
+                        Label(
+                            item.isFavorite
+                                ? String(localized: "library.row.unfavorite")
+                                : String(localized: "library.row.favorite"),
+                            systemImage: item.isFavorite ? "star.slash" : "star.fill"
+                        )
+                    }
+
+                    Button(role: .destructive) {
+                        store.delete(item)
+                    } label: {
+                        Label(String(localized: "library.row.delete"), systemImage: "trash")
+                    }
+                }
             }
         }
         .navigationDestination(for: AnimationItem.self) { item in
@@ -131,6 +151,7 @@ struct AnimationLibraryView: View {
             } label: {
                 Label(String(localized: "library.import.files"), systemImage: "folder")
             }
+            .keyboardShortcut("o", modifiers: .command)
 
             Button {
                 urlString = ""
@@ -138,6 +159,7 @@ struct AnimationLibraryView: View {
             } label: {
                 Label(String(localized: "library.import.url"), systemImage: "link")
             }
+            .keyboardShortcut("u", modifiers: .command)
 
             Button {
                 pasteName = ""
@@ -145,6 +167,7 @@ struct AnimationLibraryView: View {
             } label: {
                 Label(String(localized: "library.import.paste"), systemImage: "doc.on.clipboard")
             }
+            .keyboardShortcut("v", modifiers: [.command, .shift])
         } label: {
             Label(String(localized: "library.import.add"), systemImage: "plus")
         }

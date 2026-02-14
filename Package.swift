@@ -17,7 +17,7 @@ let package = Package(
             bundleVersion: "1",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.indigo),
-            supportedDeviceTypes: [.iPhone, .iPad],
+            supportedDeviceTypes: [.iPhone, .iPad, .mac],
             supportedInterfaceOrientations: [
                 .portrait,
                 .landscapeRight,
