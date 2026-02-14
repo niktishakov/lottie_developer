@@ -140,4 +140,3 @@ workflows:
         key_id: P4VB6CBY2M
         issuer_id: 2f84ae7d-616e-44e5-9eb0-523eb27a8610
         submit_to_testflight: true
-        cancel_previous_submissions: true
