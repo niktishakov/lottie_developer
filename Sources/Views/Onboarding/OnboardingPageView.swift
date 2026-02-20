@@ -75,218 +75,187 @@ struct OnboardingPageView: View {
     }
 
     private var readyDemoContent: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .bottom) {
-                // Тёмный градиентный фон
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.05, green: 0.08, blue: 0.18),
-                        Color(red: 0.02, green: 0.12, blue: 0.22)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+        ZStack {
+            // Тёмный фон (аналог PlayerBackdrop)
+            LinearGradient(
+                colors: [
+                    Color(red: 0.04, green: 0.12, blue: 0.22),
+                    Color(red: 0.02, green: 0.08, blue: 0.16)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
 
-                // Glow-акцент сзади canvas
-                Circle()
-                    .fill(Color.cyan.opacity(0.12))
-                    .frame(width: 320, height: 320)
-                    .blur(radius: 60)
-                    .offset(y: -geo.size.height * 0.1)
+            Circle()
+                .fill(Color.cyan.opacity(0.12))
+                .frame(width: 260, height: 260)
+                .blur(radius: 60)
+                .offset(x: -40, y: -100)
 
-                VStack(spacing: 0) {
-                    // Заголовок
-                    VStack(spacing: 6) {
-                        Text(page.title)
-                            .font(.title2.bold())
-                            .foregroundStyle(.white)
-                            .multilineTextAlignment(.center)
+            VStack(spacing: 0) {
+                // Canvas — берём тот же паттерн что в AnimationPlayerView.animationCanvas
+                ZStack {
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                                .stroke(.white.opacity(0.2), lineWidth: 1)
+                        )
 
-                        Text(page.subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.55))
-                            .multilineTextAlignment(.center)
+                    CheckerboardBackground()
+                        .opacity(0.09)
+                        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+
+                    if let url = demoAnimationURL {
+                        LottieView(fileURL: url, playback: playback)
+                            .padding(20)
+                    } else {
+                        VStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.title2)
+                            Text(L10n.string("onboarding.demo.unavailable"))
+                                .font(.footnote)
+                        }
+                        .foregroundStyle(.white.opacity(0.5))
                     }
-                    .padding(.top, 28)
-                    .padding(.horizontal, 24)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity)
+                .frame(height: 240)
 
-                    // Canvas с анимацией
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                    .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
-                            )
-
-                        // Шахматный фон — признак прозрачности
-                        CheckerboardBackground()
-                            .opacity(0.05)
-                            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-
-                        if let url = demoAnimationURL {
-                            LottieView(fileURL: url, playback: playback)
-                                .padding(20)
-                        } else {
-                            VStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .font(.title2)
-                                Text(L10n.string("onboarding.demo.unavailable"))
-                                    .font(.footnote)
-                            }
-                            .foregroundStyle(.white.opacity(0.5))
-                        }
-
-                        // Progress бар снизу canvas
-                        VStack {
-                            Spacer()
-                            GeometryReader { bar in
-                                ZStack(alignment: .leading) {
-                                    Capsule()
-                                        .fill(Color.white.opacity(0.12))
-                                        .frame(height: 3)
-                                    Capsule()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.cyan, .blue],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                        .frame(width: bar.size.width * playback.currentProgress, height: 3)
-                                }
-                            }
-                            .frame(height: 3)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 14)
-                        }
-                    }
-                    .frame(height: min(geo.size.height * 0.38, 280))
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-
-                    // Контролы плеера
-                    VStack(spacing: 14) {
-                        // Строка: прогресс% + play/pause + скорости
-                        HStack(spacing: 12) {
-                            // Прогресс %
-                            Text("\(Int(playback.currentProgress * 100))%")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.white.opacity(0.5))
-                                .frame(width: 36, alignment: .leading)
-
-                            // Play/Pause
-                            Button {
-                                playback.isPlaying.toggle()
-                                registerDemoInteraction()
-                            } label: {
-                                ZStack {
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.cyan, .blue],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 52, height: 52)
-                                    Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                                        .font(.system(size: 20, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            Spacer()
-
-                            // Скорости
-                            HStack(spacing: 6) {
-                                ForEach(demoSpeeds, id: \.self) { speed in
-                                    Button {
-                                        withAnimation(reduceMotion ? .none : .snappy) {
-                                            playback.speed = speed
-                                        }
-                                        registerDemoInteraction()
-                                    } label: {
-                                        let label = speed == floor(speed)
-                                            ? "\(Int(speed))x"
-                                            : String(format: "%.1fx", speed).replacingOccurrences(of: ",", with: ".")
-                                        Text(label)
-                                            .font(.caption.weight(.semibold))
-                                            .monospacedDigit()
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 7)
-                                            .background(
-                                                playback.speed == speed
-                                                    ? Color.cyan
-                                                    : Color.white.opacity(0.1),
-                                                in: Capsule()
-                                            )
-                                            .foregroundStyle(playback.speed == speed ? .white : .white.opacity(0.7))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-
-                        // Скрабber
+                // Controls — компактная версия controlsPanel
+                VStack(spacing: 12) {
+                    // Progress slider
+                    VStack(alignment: .leading, spacing: 6) {
                         Slider(value: $playback.currentProgress, in: 0...1) { editing in
-                            if editing {
-                                playback.isPlaying = false
-                            } else {
-                                registerDemoInteraction()
-                            }
+                            if editing { playback.isPlaying = false }
+                            else { registerDemoInteraction() }
                         }
                         .tint(.cyan)
+
+                        HStack {
+                            Text("\(Int(playback.currentProgress * 100))%")
+                            Spacer()
+                            Text(playback.isPlaying ? L10n.string("player.progress.playing") : L10n.string("player.progress.paused"))
+                                .contentTransition(.opacity)
+                                .animation(reduceMotion ? .none : .easeInOut(duration: 0.15), value: playback.isPlaying)
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.5))
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 18)
 
-                    Spacer(minLength: 20)
+                    // Transport buttons — те же что в AnimationPlayerView.playbackButtons
+                    HStack(spacing: 12) {
+                        demoTransportButton(systemName: "backward.end.fill", diameter: 40, tint: .white.opacity(0.5)) {
+                            playback.currentProgress = 0
+                            playback.isPlaying = false
+                        }
 
-                    // CTA
-                    VStack(spacing: 12) {
-                        Button {
-                            if purchaseStore.isPro {
-                                onComplete()
-                            } else {
-                                showPaywall = true
+                        demoTransportButton(systemName: playback.isPlaying ? "pause.fill" : "play.fill", diameter: 54, tint: .cyan, emphasized: true) {
+                            playback.isPlaying.toggle()
+                            registerDemoInteraction()
+                        }
+
+                        demoTransportButton(systemName: "forward.end.fill", diameter: 40, tint: .white.opacity(0.5)) {
+                            playback.currentProgress = 1
+                            playback.isPlaying = false
+                        }
+
+                        demoTransportButton(systemName: playback.loopEnabled ? "repeat" : "repeat.1", diameter: 40, tint: playback.loopEnabled ? .orange : .white.opacity(0.5)) {
+                            playback.loopEnabled.toggle()
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    // Speed pills
+                    HStack(spacing: 6) {
+                        ForEach(demoSpeeds, id: \.self) { speed in
+                            Button {
+                                withAnimation(reduceMotion ? .none : .snappy) { playback.speed = speed }
+                                registerDemoInteraction()
+                            } label: {
+                                let label = speed == floor(speed)
+                                    ? "\(Int(speed))x"
+                                    : String(format: "%.1fx", speed).replacingOccurrences(of: ",", with: ".")
+                                Text(label)
+                                    .font(.caption.weight(.semibold))
+                                    .monospacedDigit()
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(playback.speed == speed ? Color.cyan : Color.white.opacity(0.1), in: Capsule())
+                                    .foregroundStyle(playback.speed == speed ? .white : .white.opacity(0.65))
                             }
-                        } label: {
-                            Text(
-                                purchaseStore.isPro
-                                    ? L10n.string("onboarding.demo.cta.continue")
-                                    : L10n.string("onboarding.demo.cta.unlock")
-                            )
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.12), Color.black.opacity(0.06)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+                // CTA
+                VStack(spacing: 8) {
+                    Button {
+                        if purchaseStore.isPro { onComplete() } else { showPaywall = true }
+                    } label: {
+                        Text(purchaseStore.isPro
+                            ? L10n.string("onboarding.demo.cta.continue")
+                            : L10n.string("onboarding.demo.cta.unlock"))
                             .font(.headline)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
+                            .padding(.vertical, 14)
                             .background(
-                                LinearGradient(
-                                    colors: [.cyan, .blue],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                                LinearGradient(colors: [.cyan, .blue], startPoint: .leading, endPoint: .trailing)
                             )
                             .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        }
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
 
-                        Button(L10n.string("onboarding.demo.cta.free")) {
-                            onComplete()
-                        }
+                    Button(L10n.string("onboarding.demo.cta.free")) { onComplete() }
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.35))
                         .buttonStyle(.plain)
                         .padding(.vertical, 4)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 44)
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+                .padding(.bottom, 40)
             }
         }
         .ignoresSafeArea(edges: .bottom)
+    }
+
+    private func demoTransportButton(
+        systemName: String,
+        diameter: CGFloat,
+        tint: Color,
+        emphasized: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: emphasized ? 20 : 16, weight: .semibold))
+                .foregroundStyle(emphasized ? Color.white : tint)
+                .frame(width: diameter, height: diameter)
+                .background(
+                    Group {
+                        if emphasized {
+                            Circle().fill(LinearGradient(colors: [.cyan, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        } else {
+                            Circle().fill(.thinMaterial).overlay(Circle().stroke(tint.opacity(0.35), lineWidth: 1))
+                        }
+                    }
+                )
+        }
+        .buttonStyle(DemoPressScaleStyle(reduceMotion: reduceMotion))
     }
 
     @ViewBuilder
@@ -364,5 +333,17 @@ struct OnboardingPageView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(.cyan)
         }
+    }
+}
+
+private struct DemoPressScaleStyle: ButtonStyle {
+    let reduceMotion: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.88 : 1.0)
+            .animation(
+                configuration.isPressed ? .easeIn(duration: 0.1) : .spring(response: 0.3, dampingFraction: 0.5),
+                value: configuration.isPressed
+            )
     }
 }
