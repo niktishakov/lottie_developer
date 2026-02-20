@@ -39,7 +39,8 @@ let package = Package(
             path: "Sources",
             resources: [
                 .process("Resources/en.lproj"),
-                .process("Resources/ru.lproj")
+                .process("Resources/ru.lproj"),
+                .copy("PrivacyInfo.xcprivacy")
             ]
         )
     ]

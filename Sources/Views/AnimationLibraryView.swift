@@ -3,16 +3,23 @@ import UIKit
 import UniformTypeIdentifiers
 
 struct AnimationLibraryView: View {
+    private enum ClipboardValidationError: Error {
+        case invalidJSON
+    }
+
     @Environment(AnimationStore.self) private var store
+    @Environment(PurchaseStore.self) private var purchaseStore
     @State private var showFileImporter = false
     @State private var showURLImporter = false
     @State private var showPasteImporter = false
+    @State private var showPaywall = false
     @State private var pasteName = ""
     @State private var urlString = ""
     @State private var searchText = ""
     @State private var importError: String?
     @State private var showError = false
     @State private var isDownloading = false
+    @State private var isImporting = false
 
     private var filteredAnimations: [AnimationItem] {
         if searchText.isEmpty {
@@ -32,8 +39,11 @@ struct AnimationLibraryView: View {
                     animationList
                 }
             }
-            .navigationTitle(String(localized: "library.title"))
-            .searchable(text: $searchText, prompt: String(localized: "library.search.prompt"))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .navigationTitle(L10n.string("library.title"))
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: L10n.string("library.search.prompt"))
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     importMenu
@@ -44,38 +54,44 @@ struct AnimationLibraryView: View {
                 allowedContentTypes: [UTType.json, UTType(filenameExtension: "lottie") ?? .json],
                 allowsMultipleSelection: true
             ) { result in
-                handleFileImport(result)
+                Task { await handleFileImport(result) }
             }
-            .alert(String(localized: "library.import.url.title"), isPresented: $showURLImporter) {
-                TextField(String(localized: "library.import.url.placeholder"), text: $urlString)
+            .alert(L10n.string("library.import.url.title"), isPresented: $showURLImporter) {
+                TextField(L10n.string("library.import.url.placeholder"), text: $urlString)
                     #if !targetEnvironment(macCatalyst)
                     .textInputAutocapitalization(.never)
                     #endif
                     .autocorrectionDisabled()
-                Button(String(localized: "library.import.url.download")) {
+                Button(L10n.string("library.import.url.download")) {
                     Task { await downloadFromURL() }
                 }
-                Button(String(localized: "common.cancel"), role: .cancel) {
+                .disabled(urlString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isDownloading || isImporting)
+                Button(L10n.string("common.cancel"), role: .cancel) {
                     urlString = ""
                 }
             } message: {
-                Text("library.import.url.message")
+                Text(L10n.string("library.import.url.message"))
             }
-            .alert(String(localized: "library.import.paste.title"), isPresented: $showPasteImporter) {
-                TextField(String(localized: "library.import.paste.namePlaceholder"), text: $pasteName)
-                Button(String(localized: "library.import.paste.import")) {
-                    importFromClipboard(name: pasteName)
+            .alert(L10n.string("library.import.paste.title"), isPresented: $showPasteImporter) {
+                TextField(L10n.string("library.import.paste.namePlaceholder"), text: $pasteName)
+                Button(L10n.string("library.import.paste.import")) {
+                    Task { await importFromClipboard(name: pasteName) }
                 }
-                Button(String(localized: "common.cancel"), role: .cancel) {
+                .disabled(isImporting || isDownloading)
+                Button(L10n.string("common.cancel"), role: .cancel) {
                     pasteName = ""
                 }
             } message: {
-                Text("library.import.paste.message")
+                Text(L10n.string("library.import.paste.message"))
             }
-            .alert(String(localized: "library.error.title"), isPresented: $showError) {
-                Button(String(localized: "library.error.ok")) {}
+            .alert(L10n.string("library.error.title"), isPresented: $showError) {
+                Button(L10n.string("library.error.ok")) {}
             } message: {
-                Text(importError ?? String(localized: "library.error.unknown"))
+                Text(importError ?? L10n.string("library.error.unknown"))
+            }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
+                    .environment(purchaseStore)
             }
         }
     }
@@ -84,17 +100,36 @@ struct AnimationLibraryView: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label(String(localized: "library.empty.title"), systemImage: "film.stack")
+            VStack(spacing: 10) {
+                Image("AppLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 72, height: 72)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                Text(L10n.string("library.empty.title"))
+                    .font(.title3.weight(.semibold))
+            }
         } description: {
-            Text("library.empty.description")
+            Text(L10n.string("library.empty.description"))
         } actions: {
             importMenu
                 .buttonStyle(.borderedProminent)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 20)
     }
 
     private var animationList: some View {
         List {
+            if shouldShowImportHero {
+                Section {
+                    importHeroCard
+                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                        .listRowBackground(Color.clear)
+                }
+            }
+
             ForEach(filteredAnimations) { item in
                 NavigationLink(value: item) {
                     AnimationRow(item: item)
@@ -103,7 +138,7 @@ struct AnimationLibraryView: View {
                     Button(role: .destructive) {
                         store.delete(item)
                     } label: {
-                        Label(String(localized: "library.row.delete"), systemImage: "trash")
+                        Label(L10n.string("library.row.delete"), systemImage: "trash")
                     }
                 }
                 .swipeActions(edge: .leading) {
@@ -112,8 +147,8 @@ struct AnimationLibraryView: View {
                     } label: {
                         Label(
                             item.isFavorite
-                                ? String(localized: "library.row.unfavorite")
-                                : String(localized: "library.row.favorite"),
+                                ? L10n.string("library.row.unfavorite")
+                                : L10n.string("library.row.favorite"),
                             systemImage: item.isFavorite ? "star.slash" : "star.fill"
                         )
                     }
@@ -125,8 +160,8 @@ struct AnimationLibraryView: View {
                     } label: {
                         Label(
                             item.isFavorite
-                                ? String(localized: "library.row.unfavorite")
-                                : String(localized: "library.row.favorite"),
+                                ? L10n.string("library.row.unfavorite")
+                                : L10n.string("library.row.favorite"),
                             systemImage: item.isFavorite ? "star.slash" : "star.fill"
                         )
                     }
@@ -134,9 +169,15 @@ struct AnimationLibraryView: View {
                     Button(role: .destructive) {
                         store.delete(item)
                     } label: {
-                        Label(String(localized: "library.row.delete"), systemImage: "trash")
+                        Label(L10n.string("library.row.delete"), systemImage: "trash")
                     }
                 }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .overlay {
+            if filteredAnimations.isEmpty {
+                ContentUnavailableView.search(text: searchText)
             }
         }
         .navigationDestination(for: AnimationItem.self) { item in
@@ -144,45 +185,128 @@ struct AnimationLibraryView: View {
         }
     }
 
+    private var shouldShowImportHero: Bool {
+        !purchaseStore.isPro || store.animations.count <= 1
+    }
+
+    private var importHeroCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L10n.string("library.hero.title"))
+                .font(.headline)
+
+            Text(
+                purchaseStore.isPro
+                    ? L10n.string("library.hero.subtitle.pro")
+                    : L10n.string("library.hero.subtitle.free")
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+            Button {
+                requestPrimaryImport()
+            } label: {
+                Text(
+                    purchaseStore.isPro
+                        ? L10n.string("library.hero.cta.pro")
+                        : L10n.string("library.hero.cta.free")
+                )
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [.cyan, .blue],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+        )
+    }
+
     private var importMenu: some View {
         Menu {
             Button {
-                showFileImporter = true
+                requestImportFiles()
             } label: {
-                Label(String(localized: "library.import.files"), systemImage: "folder")
+                Label(L10n.string("library.import.files"), systemImage: "folder")
             }
             .keyboardShortcut("o", modifiers: .command)
 
             Button {
-                urlString = ""
-                showURLImporter = true
+                requestImportFromURL()
             } label: {
-                Label(String(localized: "library.import.url"), systemImage: "link")
+                Label(L10n.string("library.import.url"), systemImage: "link")
             }
             .keyboardShortcut("u", modifiers: .command)
 
             Button {
-                pasteName = ""
-                showPasteImporter = true
+                requestImportFromClipboard()
             } label: {
-                Label(String(localized: "library.import.paste"), systemImage: "doc.on.clipboard")
+                Label(L10n.string("library.import.paste"), systemImage: "doc.on.clipboard")
             }
             .keyboardShortcut("v", modifiers: [.command, .shift])
         } label: {
-            Label(String(localized: "library.import.add"), systemImage: "plus")
+            Label(L10n.string("library.import.add"), systemImage: "plus")
         }
+        .disabled(isImporting || isDownloading)
     }
 
     // MARK: - Import Logic
 
-    private func handleFileImport(_ result: Result<[URL], Error>) {
+    private func requestPrimaryImport() {
+        requestImportFiles()
+    }
+
+    private func requestImportFiles() {
+        guard purchaseStore.isPro else {
+            showPaywall = true
+            return
+        }
+        showFileImporter = true
+    }
+
+    private func requestImportFromURL() {
+        guard purchaseStore.isPro else {
+            showPaywall = true
+            return
+        }
+        urlString = ""
+        showURLImporter = true
+    }
+
+    private func requestImportFromClipboard() {
+        guard purchaseStore.isPro else {
+            showPaywall = true
+            return
+        }
+        pasteName = ""
+        showPasteImporter = true
+    }
+
+    private func handleFileImport(_ result: Result<[URL], Error>) async {
         switch result {
         case .success(let urls):
+            isImporting = true
+            defer { isImporting = false }
+
             for url in urls {
                 do {
-                    _ = try store.importAnimation(from: url)
+                    _ = try await store.importAnimation(from: url)
                 } catch {
-                    importError = String(localized: "library.error.importFailed \(url.lastPathComponent) \(error.localizedDescription)")
+                    importError = L10n.format(
+                        "library.error.importFailed",
+                        url.lastPathComponent,
+                        error.localizedDescription
+                    )
                     showError = true
                 }
             }
@@ -192,35 +316,45 @@ struct AnimationLibraryView: View {
         }
     }
 
-    private func importFromClipboard(name: String) {
+    private func importFromClipboard(name: String) async {
         guard let string = UIPasteboard.general.string, !string.isEmpty else {
-            importError = String(localized: "library.error.clipboardEmpty")
+            importError = L10n.string("library.error.clipboardEmpty")
             showError = true
             return
         }
 
-        guard let data = string.data(using: .utf8),
-              (try? JSONSerialization.jsonObject(with: data)) != nil else {
-            importError = String(localized: "library.error.invalidJSON")
-            showError = true
-            return
-        }
-
+        let timestamp = Date.now.formatted(date: .abbreviated, time: .shortened)
         let animationName = name.isEmpty
-            ? String(localized: "library.paste.defaultName \(Date.now.formatted(date: .abbreviated, time: .shortened))")
+            ? L10n.format("library.paste.defaultName", timestamp)
             : name
 
+        isImporting = true
+        defer { isImporting = false }
+
         do {
-            _ = try store.importAnimation(data: data, name: animationName)
+            let data = try await Task.detached(priority: .userInitiated) {
+                guard let data = string.data(using: .utf8),
+                      (try? JSONSerialization.jsonObject(with: data)) != nil else {
+                    throw ClipboardValidationError.invalidJSON
+                }
+                return data
+            }.value
+
+            _ = try await store.importAnimation(data: data, name: animationName)
+            pasteName = ""
         } catch {
-            importError = String(localized: "library.error.saveFailed \(error.localizedDescription)")
+            if case ClipboardValidationError.invalidJSON = error {
+                importError = L10n.string("library.error.invalidJSON")
+            } else {
+                importError = L10n.format("library.error.saveFailed", error.localizedDescription)
+            }
             showError = true
         }
     }
 
     private func downloadFromURL() async {
         guard let url = URL(string: urlString) else {
-            importError = String(localized: "library.error.invalidURL")
+            importError = L10n.string("library.error.invalidURL")
             showError = true
             return
         }
@@ -236,12 +370,12 @@ struct AnimationLibraryView: View {
 
             let (data, _) = try await session.data(from: url)
             let name = url.deletingPathExtension().lastPathComponent
-            _ = try store.importAnimation(data: data, name: name)
+            _ = try await store.importAnimation(data: data, name: name)
         } catch let error as URLError where error.code == .timedOut {
-            importError = String(localized: "library.error.timeout")
+            importError = L10n.string("library.error.timeout")
             showError = true
         } catch {
-            importError = String(localized: "library.error.downloadFailed \(error.localizedDescription)")
+            importError = L10n.format("library.error.downloadFailed", error.localizedDescription)
             showError = true
         }
     }
@@ -255,26 +389,28 @@ struct AnimationRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "film")
-                .font(.title2)
-                .foregroundStyle(.indigo)
-                .frame(width: 40, height: 40)
-                .background(.indigo.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(width: 34, height: 34)
+                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(item.name)
                         .font(.headline)
+                        .lineLimit(1)
                     if item.isFavorite {
                         Image(systemName: "star.fill")
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundStyle(.yellow)
                     }
                 }
+
                 Text(item.dateAdded, style: .date)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }

@@ -4,10 +4,42 @@ import Observation
 
 private let logger = Logger(subsystem: "com.nikapps.lottie.developer", category: "AnimationStore")
 
+private func decodeMetadataItems(from url: URL) -> [AnimationItem]? {
+    guard let data = try? Data(contentsOf: url) else { return nil }
+    return try? JSONDecoder().decode([AnimationItem].self, from: data)
+}
+
+private func validateLottieJSONData(_ data: Data) throws {
+    guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          json["v"] != nil,
+          json["w"] != nil,
+          json["h"] != nil,
+          json["layers"] != nil else {
+        throw AnimationStore.ImportError.invalidLottieJSON
+    }
+}
+
+private func writeAnimationData(
+    _ data: Data,
+    name: String,
+    to storageDirectory: URL
+) throws -> AnimationItem {
+    try validateLottieJSONData(data)
+
+    let fileName = "\(UUID().uuidString).json"
+    let destination = storageDirectory.appendingPathComponent(fileName)
+    try data.write(to: destination, options: .atomic)
+
+    return AnimationItem(name: name, fileName: fileName)
+}
+
+@MainActor
 @Observable
 final class AnimationStore {
     private(set) var animations: [AnimationItem] = []
     private let fileManager = FileManager.default
+    private var hasLoadedMetadata = false
+    private var isLoadingMetadata = false
 
     var storageDirectory: URL {
         let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -26,9 +58,7 @@ final class AnimationStore {
         storageDirectory.appendingPathComponent("metadata.backup.json")
     }
 
-    init() {
-        loadMetadata()
-    }
+    init() {}
 
     // MARK: - Lottie Validation
 
@@ -38,56 +68,109 @@ final class AnimationStore {
         var errorDescription: String? {
             switch self {
             case .invalidLottieJSON:
-                return String(localized: "library.error.invalidLottie")
+                return L10n.string("library.error.invalidLottie")
             }
         }
     }
 
-    /// Validates that the given data represents a Lottie animation JSON.
-    /// Checks for required top-level keys: "v" (version), "w" (width), "h" (height), "layers".
-    private func validateLottieJSON(_ data: Data) throws {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              json["v"] != nil,
-              json["w"] != nil,
-              json["h"] != nil,
-              json["layers"] != nil else {
-            throw ImportError.invalidLottieJSON
+    // MARK: - Metadata Loading
+
+    func loadMetadataIfNeeded() async {
+        guard !hasLoadedMetadata, !isLoadingMetadata else { return }
+        isLoadingMetadata = true
+
+        let metadataURL = self.metadataURL
+        let metadataBackupURL = self.metadataBackupURL
+
+        let loadResult = await Task.detached(priority: .utility) { () -> ([AnimationItem], Bool)? in
+            if let items = decodeMetadataItems(from: metadataURL) {
+                return (items, false)
+            }
+            if let items = decodeMetadataItems(from: metadataBackupURL) {
+                return (items, true)
+            }
+            return nil
+        }.value
+
+        isLoadingMetadata = false
+        hasLoadedMetadata = true
+
+        guard let (items, restoredFromBackup) = loadResult else {
+            logger.info("No metadata found — starting with empty library")
+            return
+        }
+
+        if animations.isEmpty {
+            animations = items
+        } else if !items.isEmpty {
+            let existingIDs = Set(animations.map(\.id))
+            let missing = items.filter { !existingIDs.contains($0.id) }
+            if !missing.isEmpty {
+                animations.append(contentsOf: missing)
+            }
+        }
+
+        if restoredFromBackup {
+            logger.warning("Primary metadata corrupted, restored \(items.count) animations from backup")
+            saveMetadata()
+        } else {
+            logger.info("Loaded \(items.count) animations from metadata")
+        }
+    }
+
+    // MARK: - Demo Animation
+
+    func loadDemoAnimationIfNeeded() async {
+        let demoKey = "demoAnimationLoaded"
+        guard !UserDefaults.standard.bool(forKey: demoKey) else { return }
+
+        guard let bundleURL = Bundle.main.url(forResource: "demo_animation", withExtension: "json") else {
+            logger.error("Demo animation not found in bundle")
+            return
+        }
+
+        do {
+            let data = try Data(contentsOf: bundleURL)
+            _ = try await importAnimation(data: data, name: "Demo Animation")
+            UserDefaults.standard.set(true, forKey: demoKey)
+            logger.info("Demo animation loaded successfully")
+        } catch {
+            logger.error("Failed to load demo animation: \(error.localizedDescription)")
         }
     }
 
     // MARK: - Import
 
-    func importAnimation(from sourceURL: URL, name: String? = nil) throws -> AnimationItem {
+    func importAnimation(from sourceURL: URL, name: String? = nil) async throws -> AnimationItem {
         let animationName = name ?? sourceURL.deletingPathExtension().lastPathComponent
-        let fileName = "\(UUID().uuidString).json"
-        let destination = storageDirectory.appendingPathComponent(fileName)
+        let storageDirectory = self.storageDirectory
+        let item = try await Task.detached(priority: .userInitiated) {
+            let accessing = sourceURL.startAccessingSecurityScopedResource()
+            defer {
+                if accessing {
+                    sourceURL.stopAccessingSecurityScopedResource()
+                }
+            }
 
-        let accessing = sourceURL.startAccessingSecurityScopedResource()
-        defer {
-            if accessing { sourceURL.stopAccessingSecurityScopedResource() }
-        }
+            let data = try Data(contentsOf: sourceURL, options: .mappedIfSafe)
+            return try writeAnimationData(data, name: animationName, to: storageDirectory)
+        }.value
 
-        let data = try Data(contentsOf: sourceURL)
-        try validateLottieJSON(data)
-
-        try data.write(to: destination)
-
-        let item = AnimationItem(name: animationName, fileName: fileName)
         animations.append(item)
         saveMetadata()
+        hasLoadedMetadata = true
         return item
     }
 
-    func importAnimation(data: Data, name: String) throws -> AnimationItem {
-        try validateLottieJSON(data)
+    func importAnimation(data: Data, name: String) async throws -> AnimationItem {
+        let storageDirectory = self.storageDirectory
+        let item = try await Task.detached(priority: .userInitiated) {
+            try writeAnimationData(data, name: name, to: storageDirectory)
+        }.value
 
-        let fileName = "\(UUID().uuidString).json"
-        let destination = storageDirectory.appendingPathComponent(fileName)
-        try data.write(to: destination)
-
-        let item = AnimationItem(name: name, fileName: fileName)
         animations.append(item)
         saveMetadata()
+        hasLoadedMetadata = true
         return item
     }
 
@@ -120,39 +203,6 @@ final class AnimationStore {
         }
         animations.remove(atOffsets: offsets)
         saveMetadata()
-    }
-
-    // MARK: - Metadata Persistence
-
-    private func loadMetadata() {
-        // Try primary metadata file first
-        if let items = decodeMetadata(from: metadataURL) {
-            animations = items
-            logger.info("Loaded \(items.count) animations from metadata")
-            return
-        }
-
-        // Fall back to backup if primary is corrupted
-        if let items = decodeMetadata(from: metadataBackupURL) {
-            animations = items
-            logger.warning("Primary metadata corrupted, restored \(items.count) animations from backup")
-            // Restore primary from backup
-            saveMetadata()
-            return
-        }
-
-        logger.info("No metadata found — starting with empty library")
-        animations = []
-    }
-
-    private func decodeMetadata(from url: URL) -> [AnimationItem]? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        do {
-            return try JSONDecoder().decode([AnimationItem].self, from: data)
-        } catch {
-            logger.error("Failed to decode metadata at \(url.lastPathComponent): \(error.localizedDescription)")
-            return nil
-        }
     }
 
     private func saveMetadata() {

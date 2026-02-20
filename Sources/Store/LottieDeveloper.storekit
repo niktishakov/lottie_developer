@@ -1,0 +1,125 @@
+{
+  "identifier" : "5A4C9B2E-8E3F-4D1A-B5C7-1F2E3D4A5B6C",
+  "type" : "Configuration",
+  "version" : 3,
+  "products" : [
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : true,
+      "internalID" : "D1E2F3A4-B5C6-7D8E-9F0A-1B2C3D4E5F6A",
+      "localizations" : [
+        {
+          "description" : "Unlock unlimited animation imports",
+          "displayName" : "Lottie Dev Pro — Lifetime",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Разблокируйте неограниченный импорт анимаций",
+          "displayName" : "Lottie Dev Pro — Навсегда",
+          "locale" : "ru"
+        }
+      ],
+      "productID" : "com.nikapps.lottie.developer.pro.lifetime",
+      "referenceName" : "Pro Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "subscriptionGroups" : [
+    {
+      "id" : "A1B2C3D4-E5F6-7A8B-9C0D-1E2F3A4B5C6D",
+      "localizations" : [
+
+      ],
+      "name" : "Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "1.99",
+          "familyShareable" : true,
+          "groupNumber" : 1,
+          "internalID" : "F6A5B4C3-D2E1-0F9E-8D7C-6B5A4F3E2D1C",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited animation imports, billed annually",
+              "displayName" : "Lottie Dev Pro — Annual",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "Неограниченный импорт анимаций, оплата раз в год",
+              "displayName" : "Lottie Dev Pro — Годовая",
+              "locale" : "ru"
+            }
+          ],
+          "productID" : "com.nikapps.lottie.developer.pro.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Annual",
+          "subscriptionGroupID" : "A1B2C3D4-E5F6-7A8B-9C0D-1E2F3A4B5C6D",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6759177169",
+    "_developerTeamID" : "LWV5ZRPC43",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  }
+}

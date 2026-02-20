@@ -2,6 +2,8 @@
 .build/
 .swiftpm/
 *.xcodeproj
+!LottieDeveloper.xcodeproj
+!LottieDeveloper.xcodeproj/**
 xcuserdata/
 DerivedData/
 .index-build/

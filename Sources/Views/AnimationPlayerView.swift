@@ -11,6 +11,7 @@ struct AnimationPlayerView: View {
 
     var body: some View {
         adaptiveLayout
+            .background(PlayerBackdrop().ignoresSafeArea())
             .navigationTitle(item.name)
             #if !targetEnvironment(macCatalyst)
             .navigationBarTitleDisplayMode(.inline)
@@ -22,7 +23,7 @@ struct AnimationPlayerView: View {
                             newName = item.name
                             showRenameAlert = true
                         } label: {
-                            Label(String(localized: "player.menu.rename"), systemImage: "pencil")
+                            Label(L10n.string("player.menu.rename"), systemImage: "pencil")
                         }
 
                         Button {
@@ -30,8 +31,8 @@ struct AnimationPlayerView: View {
                         } label: {
                             Label(
                                 item.isFavorite
-                                    ? String(localized: "player.menu.removeFavorite")
-                                    : String(localized: "player.menu.addFavorite"),
+                                    ? L10n.string("player.menu.removeFavorite")
+                                    : L10n.string("player.menu.addFavorite"),
                                 systemImage: item.isFavorite ? "star.slash" : "star.fill"
                             )
                         }
@@ -39,7 +40,7 @@ struct AnimationPlayerView: View {
                         Button {
                             showInfo.toggle()
                         } label: {
-                            Label(String(localized: "player.menu.fileInfo"), systemImage: "info.circle")
+                            Label(L10n.string("player.menu.fileInfo"), systemImage: "info.circle")
                         }
                         .keyboardShortcut("i", modifiers: .command)
 
@@ -49,12 +50,12 @@ struct AnimationPlayerView: View {
                     }
                 }
             }
-            .alert(String(localized: "player.rename.title"), isPresented: $showRenameAlert) {
-                TextField(String(localized: "player.rename.placeholder"), text: $newName)
-                Button(String(localized: "player.rename.save")) {
+            .alert(L10n.string("player.rename.title"), isPresented: $showRenameAlert) {
+                TextField(L10n.string("player.rename.placeholder"), text: $newName)
+                Button(L10n.string("player.rename.save")) {
                     store.rename(item, to: newName)
                 }
-                Button(String(localized: "common.cancel"), role: .cancel) {}
+                Button(L10n.string("common.cancel"), role: .cancel) {}
             }
             .sheet(isPresented: $showInfo) {
                 FileInfoSheet(item: item)
@@ -62,6 +63,16 @@ struct AnimationPlayerView: View {
             .onKeyPress(.space) {
                 playback.isPlaying.toggle()
                 return .handled
+            }
+            .onChange(of: playback.fromProgress) { _, newValue in
+                if playback.currentProgress < newValue {
+                    playback.currentProgress = newValue
+                }
+            }
+            .onChange(of: playback.toProgress) { _, newValue in
+                if playback.currentProgress > newValue {
+                    playback.currentProgress = newValue
+                }
             }
     }
 
@@ -88,45 +99,82 @@ struct AnimationPlayerView: View {
     // MARK: - Canvas
 
     private var animationCanvas: some View {
-        LottieView(
-            fileURL: store.fileURL(for: item),
-            playback: playback
-        )
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
+        ZStack {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+
             CheckerboardBackground()
-                .opacity(0.05)
-        )
+                .opacity(0.06)
+                .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+
+            LottieView(
+                fileURL: store.fileURL(for: item),
+                playback: playback
+            )
+            .padding(20)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Controls
 
     private var controlsPanel: some View {
-        VStack(spacing: 16) {
-            progressSection
-            playbackButtons
-            rangeSection
-            speedSection
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 14) {
+                controlsCard { progressSection }
+                controlsCard { playbackButtons }
+                controlsCard { rangeSection }
+                controlsCard { speedSection }
+            }
+            .padding(.vertical, 4)
         }
-        .padding()
-        .background(.regularMaterial)
+        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [Color.black.opacity(0.08), Color.black.opacity(0.03)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+    }
+
+    @ViewBuilder
+    private func controlsCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(.white.opacity(0.18), lineWidth: 1)
+                    )
+            )
     }
 
     private var progressSection: some View {
-        VStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.string("player.progress.slider"))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+
             Slider(value: $playback.currentProgress, in: 0...1) { editing in
                 if editing {
                     playback.isPlaying = false
                 }
             }
-            .accessibilityLabel(String(localized: "player.progress.playing"))
+            .accessibilityLabel(L10n.string("player.progress.slider"))
             HStack {
                 Text("\(Int(playback.currentProgress * 100))%")
                 Spacer()
                 Text(playback.isPlaying
-                    ? String(localized: "player.progress.playing")
-                    : String(localized: "player.progress.paused"))
+                    ? L10n.string("player.progress.playing")
+                    : L10n.string("player.progress.paused"))
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -134,48 +182,98 @@ struct AnimationPlayerView: View {
     }
 
     private var playbackButtons: some View {
-        HStack(spacing: 32) {
-            Button {
+        HStack(spacing: 12) {
+            transportButton(
+                systemName: "backward.end.fill",
+                diameter: 44,
+                tint: .secondary
+            ) {
                 playback.currentProgress = playback.fromProgress
                 playback.isPlaying = false
-            } label: {
-                Image(systemName: "backward.end.fill")
-                    .font(.title3)
             }
-            .accessibilityLabel("Rewind")
+            .accessibilityLabel(L10n.string("player.control.rewind"))
 
-            Button {
+            transportButton(
+                systemName: playback.isPlaying ? "pause.fill" : "play.fill",
+                diameter: 58,
+                tint: .cyan,
+                emphasized: true
+            ) {
                 playback.isPlaying.toggle()
-            } label: {
-                Image(systemName: playback.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.largeTitle)
             }
-            .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(
+                L10n.string(playback.isPlaying ? "player.control.pause" : "player.control.play")
+            )
 
-            Button {
+            transportButton(
+                systemName: "forward.end.fill",
+                diameter: 44,
+                tint: .secondary
+            ) {
                 playback.currentProgress = playback.toProgress
                 playback.isPlaying = false
-            } label: {
-                Image(systemName: "forward.end.fill")
-                    .font(.title3)
             }
-            .accessibilityLabel("Fast forward")
+            .accessibilityLabel(L10n.string("player.control.fastForward"))
 
-            Button {
+            transportButton(
+                systemName: playback.loopEnabled ? "repeat" : "repeat.1",
+                diameter: 44,
+                tint: playback.loopEnabled ? .orange : .secondary
+            ) {
                 playback.loopEnabled.toggle()
-            } label: {
-                Image(systemName: playback.loopEnabled ? "repeat" : "repeat.1")
-                    .font(.title3)
-                    .foregroundStyle(playback.loopEnabled ? .indigo : .secondary)
             }
-            .accessibilityLabel(playback.loopEnabled ? "Loop enabled" : "Loop disabled")
+            .accessibilityLabel(
+                L10n.string(
+                    playback.loopEnabled
+                        ? "player.control.loopEnabled"
+                        : "player.control.loopDisabled"
+                )
+            )
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func transportButton(
+        systemName: String,
+        diameter: CGFloat,
+        tint: Color,
+        emphasized: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: emphasized ? 22 : 18, weight: .semibold))
+                .foregroundStyle(emphasized ? Color.white : tint)
+                .frame(width: diameter, height: diameter)
+                .background(
+                    Group {
+                        if emphasized {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.cyan, Color.blue],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        } else {
+                            Circle()
+                                .fill(.thinMaterial)
+                                .overlay(
+                                    Circle()
+                                        .stroke(tint.opacity(0.35), lineWidth: 1)
+                                )
+                        }
+                    }
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     private var rangeSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("player.range.title")
-                .font(.caption)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.string("player.range.title"))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
 
             HStack {
@@ -188,7 +286,7 @@ struct AnimationPlayerView: View {
                     high: $playback.toProgress,
                     range: 0...1
                 )
-                .accessibilityLabel(String(localized: "player.range.title"))
+                .accessibilityLabel(L10n.string("player.range.title"))
 
                 Text("\(Int(playback.toProgress * 100))%")
                     .font(.caption.monospacedDigit())
@@ -199,8 +297,9 @@ struct AnimationPlayerView: View {
 
     private var speedSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("player.speed.title \(playback.speed.formatted(.number.precision(.fractionLength(0...2))))")
-                .font(.caption)
+            let speedText = playback.speed.formatted(.number.precision(.fractionLength(0...2)))
+            Text(L10n.format("player.speed.title", speedText))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
@@ -215,20 +314,49 @@ struct AnimationPlayerView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(
-                                playback.speed == speed ? Color.indigo : Color.secondary.opacity(0.15),
+                                playback.speed == speed
+                                    ? Color.cyan
+                                    : Color.secondary.opacity(0.15),
                                 in: Capsule()
                             )
                             .foregroundStyle(playback.speed == speed ? .white : .primary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Speed \(speed)x")
+                    .accessibilityLabel(
+                        L10n.format(
+                            "player.control.speed",
+                            speed.formatted(.number.precision(.fractionLength(0...2)))
+                        )
+                    )
                 }
             }
-        }
     }
+    }
+
 }
 
 // MARK: - File Info Sheet
+
+private struct PlayerBackdrop: View {
+    var body: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.04, green: 0.12, blue: 0.22).opacity(0.24),
+                Color(red: 0.03, green: 0.18, blue: 0.24).opacity(0.1),
+                Color.clear
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay(alignment: .bottomLeading) {
+            Circle()
+                .fill(.cyan.opacity(0.1))
+                .frame(width: 280, height: 280)
+                .blur(radius: 34)
+                .offset(x: -60, y: 80)
+        }
+    }
+}
 
 struct FileInfoSheet: View {
     let item: AnimationItem
@@ -238,31 +366,31 @@ struct FileInfoSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section(String(localized: "fileInfo.section.general")) {
-                    LabeledContent(String(localized: "fileInfo.name"), value: item.name)
-                    LabeledContent(String(localized: "fileInfo.added"), value: item.dateAdded, format: .dateTime)
-                    LabeledContent(String(localized: "fileInfo.favorite"), value: item.isFavorite
-                        ? String(localized: "fileInfo.favorite.yes")
-                        : String(localized: "fileInfo.favorite.no"))
+                Section(L10n.string("fileInfo.section.general")) {
+                    LabeledContent(L10n.string("fileInfo.name"), value: item.name)
+                    LabeledContent(L10n.string("fileInfo.added"), value: item.dateAdded, format: .dateTime)
+                    LabeledContent(L10n.string("fileInfo.favorite"), value: item.isFavorite
+                        ? L10n.string("fileInfo.favorite.yes")
+                        : L10n.string("fileInfo.favorite.no"))
                 }
 
-                Section(String(localized: "fileInfo.section.file")) {
-                    LabeledContent(String(localized: "fileInfo.fileName"), value: item.fileName)
+                Section(L10n.string("fileInfo.section.file")) {
+                    LabeledContent(L10n.string("fileInfo.fileName"), value: item.fileName)
                     if let attrs = try? FileManager.default.attributesOfItem(
                         atPath: store.fileURL(for: item).path
                     ),
                        let size = attrs[.size] as? Int {
-                        LabeledContent(String(localized: "fileInfo.size"), value: ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
+                        LabeledContent(L10n.string("fileInfo.size"), value: ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
                     }
                 }
             }
-            .navigationTitle(String(localized: "fileInfo.title"))
+            .navigationTitle(L10n.string("fileInfo.title"))
             #if !targetEnvironment(macCatalyst)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "fileInfo.done")) { dismiss() }
+                    Button(L10n.string("fileInfo.done")) { dismiss() }
                 }
             }
         }

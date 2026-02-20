@@ -1,0 +1,52 @@
+name: LottieDeveloper
+options:
+  bundleIdPrefix: com.nikapps.lottie
+settings:
+  base:
+    SWIFT_VERSION: 5.0
+    DEVELOPMENT_TEAM: LWV5ZRPC43
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0.0
+packages:
+  Lottie:
+    url: https://github.com/airbnb/lottie-ios.git
+    from: 4.6.0
+targets:
+  LottieDeveloper:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    info:
+      path: Sources/Info.plist
+      properties:
+        UILaunchScreen: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nikapps.lottie.developer
+        INFOPLIST_KEY_CFBundleDisplayName: Lottie Dev
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+    sources:
+      - path: Sources
+        excludes:
+          - Assets.xcassets
+          - Info.plist
+          - Resources
+      - path: Sources/Assets.xcassets
+        buildPhase: resources
+      - path: Sources/Resources/en.lproj
+        buildPhase: resources
+      - path: Sources/Resources/ru.lproj
+        buildPhase: resources
+      - path: Sources/Resources/demo_animation.json
+        buildPhase: resources
+      - path: Sources/Store/LottieDeveloper.storekit
+        buildPhase: resources
+      - path: Sources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: Lottie
+        product: Lottie
+    scheme:
+      gatherCoverageData: false

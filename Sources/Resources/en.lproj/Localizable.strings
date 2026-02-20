@@ -30,12 +30,27 @@
 "library.row.favorite" = "Favorite";
 "library.row.unfavorite" = "Unfavorite";
 "library.paste.defaultName" = "Pasted %@";
+"library.stats.total" = "Animations";
+"library.stats.favorites" = "Favorites";
+"library.hero.title" = "Import your own Lottie and catch issues before release";
+"library.hero.subtitle.pro" = "Open a JSON file now and validate it frame by frame.";
+"library.hero.subtitle.free" = "Unlock Pro to import from Files, URL, and Clipboard without limits.";
+"library.hero.cta.pro" = "Import from Files";
+"library.hero.cta.free" = "Unlock Pro to Import";
 
 /* AnimationPlayerView */
 "player.progress.playing" = "Playing";
 "player.progress.paused" = "Paused";
+"player.progress.slider" = "Progress";
 "player.range.title" = "Playback Range";
 "player.speed.title" = "Speed: %@x";
+"player.control.rewind" = "Rewind";
+"player.control.pause" = "Pause";
+"player.control.play" = "Play";
+"player.control.fastForward" = "Fast forward";
+"player.control.loopEnabled" = "Loop enabled";
+"player.control.loopDisabled" = "Loop disabled";
+"player.control.speed" = "Speed %@x";
 "player.menu.rename" = "Rename";
 "player.menu.addFavorite" = "Add to Favorites";
 "player.menu.removeFavorite" = "Remove from Favorites";
@@ -59,3 +74,52 @@
 
 /* Common */
 "common.cancel" = "Cancel";
+
+/* Onboarding */
+"onboarding.skip" = "Skip";
+"onboarding.step" = "Step %d of %d";
+"onboarding.next" = "Next";
+"onboarding.page1.title" = "Ship Lottie Without Surprises";
+"onboarding.page1.subtitle" = "Catch broken frames before release and keep QA fast.";
+"onboarding.page1.feature1" = "Open your own JSON in seconds";
+"onboarding.page1.feature2" = "Scrub frame-by-frame with speed control";
+"onboarding.page1.feature3" = "Everything stays local on your device";
+"onboarding.page2.title" = "Debug in Seconds";
+"onboarding.page2.subtitle" = "Pinpoint timing issues and compare playback ranges before handoff.";
+"onboarding.page2.feature1" = "0.25x to 3x speed checks";
+"onboarding.page2.feature2" = "Exact start and end frame ranges";
+"onboarding.page2.feature3" = "Favorites and fast renaming";
+"onboarding.page3.title" = "See It Working First";
+"onboarding.page3.subtitle" = "Try the sample animation with simple controls, then unlock Pro.";
+"onboarding.demo.play" = "Play";
+"onboarding.demo.pause" = "Pause";
+"onboarding.demo.speed" = "Speed";
+"onboarding.demo.progress" = "Progress";
+"onboarding.demo.cta.unlock" = "Unlock Pro";
+"onboarding.demo.cta.continue" = "Continue to Library";
+"onboarding.demo.cta.free" = "Continue Free";
+"onboarding.demo.unavailable" = "Demo animation unavailable";
+
+/* Paywall */
+"paywall.title" = "Lottie Dev Pro";
+"paywall.subtitle" = "Import your own Lottie files and debug before release";
+"paywall.feature.import" = "Unlimited imports from Files, URL, Clipboard";
+"paywall.feature.library" = "Frame-accurate speed and playback range controls";
+"paywall.feature.updates" = "Save favorites, rename files, and keep your QA flow fast";
+"paywall.lifetime" = "Lifetime";
+"paywall.lifetime.description" = "One-time purchase";
+"paywall.lifetime.badge" = "Best Value";
+"paywall.annual" = "Annual";
+"paywall.annual.description" = "Auto-renews yearly";
+"paywall.cta.lifetime" = "Unlock for %@";
+"paywall.cta.annual" = "Subscribe for %@/year";
+"paywall.reassurance" = "No account required. Subscriptions can be managed or cancelled anytime in Apple ID settings.";
+"paywall.restore" = "Restore Purchases";
+"paywall.terms" = "Terms of Use";
+"paywall.privacy" = "Privacy Policy";
+"paywall.legal" = "Payment is charged to Apple ID at confirmation. Subscriptions auto-renew unless cancelled at least 24 hours before renewal.";
+
+/* Legal */
+"legal.terms.content" = "Terms of Use\n\nLast updated: February 2026\n\n1. Acceptance of Terms\nBy downloading or using Lottie Developer (\"the App\"), you agree to these Terms of Use.\n\n2. License\nThe App grants you a limited, non-exclusive, non-transferable license to use the software for personal or professional purposes.\n\n3. In-App Purchases\n• Lottie Dev Pro — Lifetime: A one-time non-consumable purchase that permanently unlocks all Pro features.\n• Lottie Dev Pro — Annual: An auto-renewable subscription billed annually. Payment is charged to your Apple ID account. The subscription automatically renews unless cancelled at least 24 hours before the end of the current period. You can manage and cancel subscriptions in your Apple ID account settings.\n\n4. Refunds\nAll purchases are processed by Apple. Refund requests should be directed to Apple Support.\n\n5. Disclaimer\nThe App is provided \"as is\" without warranties of any kind. We are not liable for any damages arising from the use of the App.\n\n6. Changes\nWe reserve the right to modify these terms at any time. Continued use of the App constitutes acceptance of updated terms.\n\n7. Contact\nFor questions about these terms, contact the developer through the App Store.";
+
+"legal.privacy.content" = "Privacy Policy\n\nLast updated: February 2026\n\n1. Data Collection\nLottie Developer does NOT collect, store, or transmit any personal data. All animation files are stored locally on your device.\n\n2. Analytics\nThe App does not use any analytics services or tracking tools.\n\n3. Third-Party Services\nThe App does not integrate with any third-party data collection services.\n\n4. File Storage\nAll imported Lottie animations are stored exclusively in the app's local Documents directory on your device. No data is uploaded to any server.\n\n5. Network Usage\nThe App only accesses the network when you explicitly import an animation from a URL. No other network requests are made.\n\n6. Children's Privacy\nThe App does not knowingly collect information from children under 13.\n\n7. Changes\nWe may update this Privacy Policy from time to time. Changes will be reflected in the App.\n\n8. Contact\nFor questions about this policy, contact the developer through the App Store.";
