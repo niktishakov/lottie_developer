@@ -5,6 +5,7 @@ struct OnboardingPageView: View {
     let onComplete: () -> Void
 
     @Environment(PurchaseStore.self) private var purchaseStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showPaywall = false
     @State private var playback = PlaybackState()
     @State private var demoInteractions = 0
@@ -18,11 +19,11 @@ struct OnboardingPageView: View {
                 readyDemoContent
             } else {
                 featurePageContent
+                    .padding()
+                    .frame(maxWidth: 500)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .padding()
-        .frame(maxWidth: 500)
-        .frame(maxWidth: .infinity)
         .sheet(isPresented: $showPaywall) {
             PaywallView()
                 .environment(purchaseStore)
@@ -74,113 +75,218 @@ struct OnboardingPageView: View {
     }
 
     private var readyDemoContent: some View {
-        VStack(spacing: 0) {
-            Text(page.title)
-                .font(.title2.bold())
-                .multilineTextAlignment(.center)
-                .padding(.top, 24)
+        GeometryReader { geo in
+            ZStack(alignment: .bottom) {
+                // Тёмный градиентный фон
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.05, green: 0.08, blue: 0.18),
+                        Color(red: 0.02, green: 0.12, blue: 0.22)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
 
-            Text(page.subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8)
-                .padding(.top, 6)
+                // Glow-акцент сзади canvas
+                Circle()
+                    .fill(Color.cyan.opacity(0.12))
+                    .frame(width: 320, height: 320)
+                    .blur(radius: 60)
+                    .offset(y: -geo.size.height * 0.1)
 
-            demoPreviewCard
-                .padding(.top, 16)
+                VStack(spacing: 0) {
+                    // Заголовок
+                    VStack(spacing: 6) {
+                        Text(page.title)
+                            .font(.title2.bold())
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
 
-            // Playback controls overlay
-            HStack {
-                Button {
-                    playback.isPlaying.toggle()
-                    registerDemoInteraction()
-                } label: {
-                    Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.body.weight(.semibold))
-                        .frame(width: 44, height: 44)
-                        .background(Color(uiColor: .secondarySystemBackground), in: Circle())
-                }
-                .buttonStyle(.plain)
+                        Text(page.subtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.55))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 28)
+                    .padding(.horizontal, 24)
 
-                Spacer()
+                    // Canvas с анимацией
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                                    .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
+                            )
 
-                HStack(spacing: 4) {
-                    ForEach(demoSpeeds, id: \.self) { speed in
-                        Button {
-                            withAnimation(.snappy) {
-                                playback.speed = speed
+                        // Шахматный фон — признак прозрачности
+                        CheckerboardBackground()
+                            .opacity(0.05)
+                            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+
+                        if let url = demoAnimationURL {
+                            LottieView(fileURL: url, playback: playback)
+                                .padding(20)
+                        } else {
+                            VStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.title2)
+                                Text(L10n.string("onboarding.demo.unavailable"))
+                                    .font(.footnote)
                             }
-                            registerDemoInteraction()
-                        } label: {
-                            Text("\(speed, specifier: speed == floor(speed) ? "%.0f" : "%.1f")x")
-                                .font(.caption.weight(.semibold))
-                                .monospacedDigit()
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 7)
-                                .background(
-                                    playback.speed == speed
-                                        ? Color.cyan
-                                        : Color(uiColor: .secondarySystemBackground),
-                                    in: Capsule()
-                                )
-                                .foregroundStyle(playback.speed == speed ? .white : .primary)
+                            .foregroundStyle(.white.opacity(0.5))
                         }
+
+                        // Progress бар снизу canvas
+                        VStack {
+                            Spacer()
+                            GeometryReader { bar in
+                                ZStack(alignment: .leading) {
+                                    Capsule()
+                                        .fill(Color.white.opacity(0.12))
+                                        .frame(height: 3)
+                                    Capsule()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.cyan, .blue],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                        .frame(width: bar.size.width * playback.currentProgress, height: 3)
+                                }
+                            }
+                            .frame(height: 3)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 14)
+                        }
+                    }
+                    .frame(height: min(geo.size.height * 0.38, 280))
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+
+                    // Контролы плеера
+                    VStack(spacing: 14) {
+                        // Строка: прогресс% + play/pause + скорости
+                        HStack(spacing: 12) {
+                            // Прогресс %
+                            Text("\(Int(playback.currentProgress * 100))%")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.white.opacity(0.5))
+                                .frame(width: 36, alignment: .leading)
+
+                            // Play/Pause
+                            Button {
+                                playback.isPlaying.toggle()
+                                registerDemoInteraction()
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.cyan, .blue],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 52, height: 52)
+                                    Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            Spacer()
+
+                            // Скорости
+                            HStack(spacing: 6) {
+                                ForEach(demoSpeeds, id: \.self) { speed in
+                                    Button {
+                                        withAnimation(reduceMotion ? .none : .snappy) {
+                                            playback.speed = speed
+                                        }
+                                        registerDemoInteraction()
+                                    } label: {
+                                        let label = speed == floor(speed)
+                                            ? "\(Int(speed))x"
+                                            : String(format: "%.1fx", speed).replacingOccurrences(of: ",", with: ".")
+                                        Text(label)
+                                            .font(.caption.weight(.semibold))
+                                            .monospacedDigit()
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 7)
+                                            .background(
+                                                playback.speed == speed
+                                                    ? Color.cyan
+                                                    : Color.white.opacity(0.1),
+                                                in: Capsule()
+                                            )
+                                            .foregroundStyle(playback.speed == speed ? .white : .white.opacity(0.7))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+
+                        // Скрабber
+                        Slider(value: $playback.currentProgress, in: 0...1) { editing in
+                            if editing {
+                                playback.isPlaying = false
+                            } else {
+                                registerDemoInteraction()
+                            }
+                        }
+                        .tint(.cyan)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 18)
+
+                    Spacer(minLength: 20)
+
+                    // CTA
+                    VStack(spacing: 12) {
+                        Button {
+                            if purchaseStore.isPro {
+                                onComplete()
+                            } else {
+                                showPaywall = true
+                            }
+                        } label: {
+                            Text(
+                                purchaseStore.isPro
+                                    ? L10n.string("onboarding.demo.cta.continue")
+                                    : L10n.string("onboarding.demo.cta.unlock")
+                            )
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                LinearGradient(
+                                    colors: [.cyan, .blue],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+
+                        Button(L10n.string("onboarding.demo.cta.free")) {
+                            onComplete()
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.35))
                         .buttonStyle(.plain)
+                        .padding(.vertical, 4)
                     }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 44)
                 }
             }
-            .padding(.top, 12)
-
-            Slider(value: $playback.currentProgress, in: 0...1) { editing in
-                if editing {
-                    playback.isPlaying = false
-                } else {
-                    registerDemoInteraction()
-                }
-            }
-            .tint(.cyan)
-            .padding(.top, 8)
-
-            Spacer(minLength: 16)
-
-            // CTA section
-            VStack(spacing: 10) {
-                Button {
-                    if purchaseStore.isPro {
-                        onComplete()
-                    } else {
-                        showPaywall = true
-                    }
-                } label: {
-                    Text(
-                        purchaseStore.isPro
-                            ? L10n.string("onboarding.demo.cta.continue")
-                            : L10n.string("onboarding.demo.cta.unlock")
-                    )
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(
-                        LinearGradient(
-                            colors: [.cyan, .blue],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-
-                Button(L10n.string("onboarding.demo.cta.free")) {
-                    onComplete()
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.vertical, 4)
-            }
-            .padding(.bottom, 40)
         }
+        .ignoresSafeArea(edges: .bottom)
     }
 
     @ViewBuilder
@@ -239,7 +345,7 @@ struct OnboardingPageView: View {
         guard !hasAutoPresentedPaywall else { return }
 
         demoInteractions += 1
-        guard demoInteractions >= 2 else { return }
+        guard demoInteractions >= 4 else { return }
 
         hasAutoPresentedPaywall = true
         showPaywall = true

@@ -127,6 +127,7 @@ struct AnimationLibraryView: View {
                     importHeroCard
                         .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                         .listRowBackground(Color.clear)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
 
@@ -175,6 +176,7 @@ struct AnimationLibraryView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: store.animations.count)
         .overlay {
             if filteredAnimations.isEmpty {
                 ContentUnavailableView.search(text: searchText)
@@ -388,11 +390,18 @@ struct AnimationRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "film")
+            Image(systemName: "waveform.circle.fill")
                 .font(.title3)
-                .foregroundStyle(.tint)
-                .frame(width: 34, height: 34)
-                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+                .background(
+                    LinearGradient(
+                        colors: [.cyan.opacity(0.15), .blue.opacity(0.15)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
@@ -403,6 +412,7 @@ struct AnimationRow: View {
                         Image(systemName: "star.fill")
                             .font(.caption2)
                             .foregroundStyle(.yellow)
+                            .animation(.spring(response: 0.3), value: item.isFavorite)
                     }
                 }
 

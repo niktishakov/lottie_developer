@@ -76,7 +76,12 @@ struct OnboardingView: View {
                 }
             }
         }
-        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .background(
+            (currentPage < OnboardingPage.allCases.count - 1
+                ? Color(uiColor: .systemBackground)
+                : Color.clear
+            ).ignoresSafeArea()
+        )
     }
 
     private func complete() {

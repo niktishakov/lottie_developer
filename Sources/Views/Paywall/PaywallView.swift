@@ -78,7 +78,7 @@ struct PaywallView: View {
     private var featureList: some View {
         VStack(alignment: .leading, spacing: 14) {
             featureRow(icon: "square.and.arrow.down.on.square", text: L10n.string("paywall.feature.import"))
-            featureRow(icon: "folder", text: L10n.string("paywall.feature.library"))
+            featureRow(icon: "play.rectangle.on.rectangle", text: L10n.string("paywall.feature.library"))
             featureRow(icon: "arrow.up.circle", text: L10n.string("paywall.feature.updates"))
         }
         .padding(20)
@@ -114,7 +114,9 @@ struct PaywallView: View {
         let isLifetime = product.id == PurchaseStore.lifetimeID
 
         return Button {
-            selectedProduct = product
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedProduct = product
+            }
         } label: {
             VStack(spacing: 8) {
                 if isLifetime {
@@ -187,6 +189,8 @@ struct PaywallView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .disabled(selectedProduct == nil || isPurchasing)
+        .scaleEffect(selectedProduct != nil ? 1.0 : 0.97)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: selectedProduct?.id)
     }
 
     // MARK: - Restore

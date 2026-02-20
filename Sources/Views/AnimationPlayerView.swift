@@ -4,6 +4,7 @@ struct AnimationPlayerView: View {
     let item: AnimationItem
     @Environment(AnimationStore.self) private var store
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var playback = PlaybackState()
     @State private var showRenameAlert = false
     @State private var newName = ""
@@ -108,7 +109,7 @@ struct AnimationPlayerView: View {
                 )
 
             CheckerboardBackground()
-                .opacity(0.06)
+                .opacity(0.09)
                 .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
 
             LottieView(
@@ -175,6 +176,11 @@ struct AnimationPlayerView: View {
                 Text(playback.isPlaying
                     ? L10n.string("player.progress.playing")
                     : L10n.string("player.progress.paused"))
+                    .contentTransition(.opacity)
+                    .animation(
+                        reduceMotion ? .none : .easeInOut(duration: 0.15),
+                        value: playback.isPlaying
+                    )
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -267,7 +273,7 @@ struct AnimationPlayerView: View {
                     }
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressScaleButtonStyle(reduceMotion: reduceMotion))
     }
 
     private var rangeSection: some View {
@@ -355,6 +361,21 @@ private struct PlayerBackdrop: View {
                 .blur(radius: 34)
                 .offset(x: -60, y: 80)
         }
+    }
+}
+
+private struct PressScaleButtonStyle: ButtonStyle {
+    let reduceMotion: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.88 : 1.0)
+            .animation(
+                configuration.isPressed
+                    ? .easeIn(duration: 0.1)
+                    : .spring(response: 0.3, dampingFraction: 0.5),
+                value: configuration.isPressed
+            )
     }
 }
 

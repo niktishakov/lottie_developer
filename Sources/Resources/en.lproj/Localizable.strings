@@ -107,10 +107,10 @@
 "paywall.feature.library" = "Frame-accurate speed and playback range controls";
 "paywall.feature.updates" = "Save favorites, rename files, and keep your QA flow fast";
 "paywall.lifetime" = "Lifetime";
-"paywall.lifetime.description" = "One-time purchase";
+"paywall.lifetime.description" = "Pay once, use forever";
 "paywall.lifetime.badge" = "Best Value";
 "paywall.annual" = "Annual";
-"paywall.annual.description" = "Auto-renews yearly";
+"paywall.annual.description" = "Less than a coffee a year";
 "paywall.cta.lifetime" = "Unlock for %@";
 "paywall.cta.annual" = "Subscribe for %@/year";
 "paywall.reassurance" = "No account required. Subscriptions can be managed or cancelled anytime in Apple ID settings.";

@@ -107,10 +107,10 @@
 "paywall.feature.library" = "Покадровый контроль скорости и диапазона";
 "paywall.feature.updates" = "Избранное, переименование и быстрый QA-процесс";
 "paywall.lifetime" = "Навсегда";
-"paywall.lifetime.description" = "Единоразовая покупка";
+"paywall.lifetime.description" = "Один раз — навсегда";
 "paywall.lifetime.badge" = "Лучшая цена";
 "paywall.annual" = "Годовая";
-"paywall.annual.description" = "Автопродление раз в год";
+"paywall.annual.description" = "Дешевле чашки кофе в год";
 "paywall.cta.lifetime" = "Разблокировать за %@";
 "paywall.cta.annual" = "Подписаться за %@/год";
 "paywall.reassurance" = "Без аккаунта и регистрации. Подписку можно управлять и отменять в настройках Apple ID.";

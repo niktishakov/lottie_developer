@@ -5,6 +5,7 @@ struct RangeSlider: View {
     @Binding var high: Double
     let range: ClosedRange<Double>
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isDraggingLow = false
     @State private var isDraggingHigh = false
 
@@ -28,7 +29,7 @@ struct RangeSlider: View {
                 let highX = ((high - range.lowerBound) / span) * width
 
                 Capsule()
-                    .fill(Color.indigo)
+                    .fill(Color.cyan)
                     .frame(width: max(0, highX - lowX), height: trackHeight)
                     .offset(x: lowX + thumbSize / 2)
 
@@ -37,6 +38,8 @@ struct RangeSlider: View {
                     .fill(.white)
                     .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
                     .frame(width: thumbSize, height: thumbSize)
+                    .scaleEffect(isDraggingLow && !reduceMotion ? 1.2 : 1.0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isDraggingLow)
                     .offset(x: lowX)
                     .gesture(
                         DragGesture()
@@ -54,6 +57,8 @@ struct RangeSlider: View {
                     .fill(.white)
                     .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
                     .frame(width: thumbSize, height: thumbSize)
+                    .scaleEffect(isDraggingHigh && !reduceMotion ? 1.2 : 1.0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isDraggingHigh)
                     .offset(x: highX)
                     .gesture(
                         DragGesture()
