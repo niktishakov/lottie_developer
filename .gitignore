@@ -10,3 +10,7 @@ DerivedData/
 Packages/
 cert_key
 cert_key.pub
+.packages/
+.claude/settings.local.json
+.claude/mcp.json
+.claude/context.env
