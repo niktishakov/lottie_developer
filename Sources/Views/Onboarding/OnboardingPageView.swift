@@ -1,288 +1,595 @@
 import SwiftUI
 
+private struct OnboardingColorOption: Identifiable {
+    let id: String
+    let color: Color
+}
+
+private struct OnboardingVersionItem: Identifiable {
+    let id: Int
+    let titleKey: String
+    let badgeKey: String?
+}
+
 struct OnboardingPageView: View {
     let page: OnboardingPage
+    let isActive: Bool
     let onComplete: () -> Void
+    let onRevealCompletionChanged: (Bool) -> Void
 
     @Environment(PurchaseStore.self) private var purchaseStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showPaywall = false
-    @State private var playback = PlaybackState()
-    @State private var demoInteractions = 0
-    @State private var hasAutoPresentedPaywall = false
 
-    private let demoSpeeds: [Double] = [0.5, 1.0, 2.0]
+    @State private var showPaywall = false
+    @State private var revealStage = 0
+    @State private var revealTask: Task<Void, Never>?
+    @State private var staticPlayback = PlaybackState()
+    @State private var alivePlayback = PlaybackState()
+    @State private var tunePlayback = PlaybackState()
+
+    private let previewSpeedPresets: [Double] = [0.5, 1.0, 1.5, 2.0]
+
+    private let colorOptions: [OnboardingColorOption] = [
+        OnboardingColorOption(id: "ice", color: Color(red: 0.95, green: 0.95, blue: 0.95)),
+        OnboardingColorOption(id: "sky", color: Color(red: 0.53, green: 0.73, blue: 0.98)),
+        OnboardingColorOption(id: "mint", color: Color(red: 0.42, green: 0.88, blue: 0.74)),
+        OnboardingColorOption(id: "amber", color: Color(red: 0.95, green: 0.66, blue: 0.26)),
+        OnboardingColorOption(id: "rose", color: Color(red: 0.95, green: 0.46, blue: 0.55)),
+        OnboardingColorOption(id: "violet", color: Color(red: 0.64, green: 0.57, blue: 0.96)),
+    ]
+
+    private let hullLayers = ["Body", "Body 2", "Body 3", "Body 4", "Body 5"]
+    private let wingLayers = ["1 wing", "2 wing"]
+    private let exhaustLayers = [
+        "Soplo L",
+        "Soplo R",
+        "Soplo Line 1",
+        "Soplo Line 2",
+        "Soplo Line 3",
+        "Soplo Line 4",
+        "Soplo Line 5",
+        "Soplo Line 6",
+        "Soplo Line 7",
+        "Soplo Line 8",
+        "Soplo Line 9",
+        "Soplo Line 10",
+        "Soplo Line 11",
+        "Soplo Line 12",
+        "Soplo Line 13",
+    ]
+
+    private let versionItems: [OnboardingVersionItem] = [
+        OnboardingVersionItem(id: 1, titleKey: "onboarding.version.v1", badgeKey: nil),
+        OnboardingVersionItem(id: 2, titleKey: "onboarding.version.v2", badgeKey: "onboarding.badge.concept"),
+        OnboardingVersionItem(id: 3, titleKey: "onboarding.version.v3", badgeKey: "onboarding.badge.simulation"),
+        OnboardingVersionItem(id: 4, titleKey: "onboarding.version.v4", badgeKey: nil),
+        OnboardingVersionItem(id: 5, titleKey: "onboarding.version.v5", badgeKey: nil),
+    ]
 
     var body: some View {
-        Group {
-            if page == .ready {
-                readyDemoContent
-            } else {
-                featurePageContent
-                    .padding()
-                    .frame(maxWidth: 500)
-                    .frame(maxWidth: .infinity)
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 18) {
+                headerSection
+                visualSection
+
+                if !page.features.isEmpty {
+                    featuresSection
+                }
+
+                if page == .versionedResult {
+                    finalCTASection
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, page == .versionedResult ? 24 : (page.usesInteractiveLottie ? 104 : 96))
+            .frame(maxWidth: .infinity, alignment: .top)
         }
-        .sheet(isPresented: $showPaywall) {
-            PaywallView()
+        .safeAreaPadding(.top)
+        .sheet(isPresented: $showPaywall, onDismiss: {
+            onComplete()
+        }) {
+            PaywallView(onDismissToLibrary: onComplete)
                 .environment(purchaseStore)
         }
         .onAppear {
-            guard page == .ready else { return }
-            resetDemoPlayback()
-            resetDemoConversionState()
+            if isActive {
+                activatePage()
+            }
+        }
+        .onChange(of: isActive) { _, active in
+            if active {
+                activatePage()
+            } else {
+                revealTask?.cancel()
+            }
+        }
+        .onDisappear {
+            revealTask?.cancel()
         }
     }
 
-    private var featurePageContent: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            iconSection
+    private var headerSection: some View {
+        VStack(spacing: 10) {
+            if let badgeText = headerBadgeText {
+                badgePill(badgeText)
+                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
+            }
 
             Text(page.title)
-                .font(.title.bold())
+                .font(.title2.bold())
+                .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
 
             Text(page.subtitle)
                 .font(.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.66))
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-
-            if !page.features.isEmpty {
-                VStack(alignment: .leading, spacing: 14) {
-                    ForEach(page.features) { feature in
-                        HStack(spacing: 14) {
-                            Image(systemName: feature.icon)
-                                .font(.title3)
-                                .foregroundStyle(.cyan)
-                                .frame(width: 32)
-                            Text(feature.title)
-                                .font(.subheadline)
-                        }
-                    }
-                }
-                .padding(.horizontal, 40)
-                .padding(.top, 8)
-            }
-
-            Spacer()
-            Spacer()
-                .frame(height: 60)
         }
-    }
-
-    private var readyDemoContent: some View {
-        ZStack {
-            // Тёмный фон (аналог PlayerBackdrop)
-            LinearGradient(
-                colors: [
-                    Color(red: 0.04, green: 0.12, blue: 0.22),
-                    Color(red: 0.02, green: 0.08, blue: 0.16)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            Circle()
-                .fill(Color.cyan.opacity(0.12))
-                .frame(width: 260, height: 260)
-                .blur(radius: 60)
-                .offset(x: -40, y: -100)
-
-            VStack(spacing: 0) {
-                // Canvas — берём тот же паттерн что в AnimationPlayerView.animationCanvas
-                ZStack {
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                                .stroke(.white.opacity(0.2), lineWidth: 1)
-                        )
-
-                    CheckerboardBackground()
-                        .opacity(0.09)
-                        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-
-                    if let url = demoAnimationURL {
-                        LottieView(fileURL: url, playback: playback)
-                            .padding(20)
-                    } else {
-                        VStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.title2)
-                            Text(L10n.string("onboarding.demo.unavailable"))
-                                .font(.footnote)
-                        }
-                        .foregroundStyle(.white.opacity(0.5))
-                    }
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity)
-                .frame(height: 240)
-
-                // Controls — компактная версия controlsPanel
-                VStack(spacing: 12) {
-                    // Progress slider
-                    VStack(alignment: .leading, spacing: 6) {
-                        Slider(value: $playback.currentProgress, in: 0...1) { editing in
-                            if editing { playback.isPlaying = false }
-                            else { registerDemoInteraction() }
-                        }
-                        .tint(.cyan)
-
-                        HStack {
-                            Text("\(Int(playback.currentProgress * 100))%")
-                            Spacer()
-                            Text(playback.isPlaying ? L10n.string("player.progress.playing") : L10n.string("player.progress.paused"))
-                                .contentTransition(.opacity)
-                                .animation(reduceMotion ? .none : .easeInOut(duration: 0.15), value: playback.isPlaying)
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.5))
-                    }
-
-                    // Transport buttons — те же что в AnimationPlayerView.playbackButtons
-                    HStack(spacing: 12) {
-                        demoTransportButton(systemName: "backward.end.fill", diameter: 40, tint: .white.opacity(0.5)) {
-                            playback.currentProgress = 0
-                            playback.isPlaying = false
-                        }
-
-                        demoTransportButton(systemName: playback.isPlaying ? "pause.fill" : "play.fill", diameter: 54, tint: .cyan, emphasized: true) {
-                            playback.isPlaying.toggle()
-                            registerDemoInteraction()
-                        }
-
-                        demoTransportButton(systemName: "forward.end.fill", diameter: 40, tint: .white.opacity(0.5)) {
-                            playback.currentProgress = 1
-                            playback.isPlaying = false
-                        }
-
-                        demoTransportButton(systemName: playback.loopEnabled ? "repeat" : "repeat.1", diameter: 40, tint: playback.loopEnabled ? .orange : .white.opacity(0.5)) {
-                            playback.loopEnabled.toggle()
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    // Speed pills
-                    HStack(spacing: 6) {
-                        ForEach(demoSpeeds, id: \.self) { speed in
-                            Button {
-                                withAnimation(reduceMotion ? .none : .snappy) { playback.speed = speed }
-                                registerDemoInteraction()
-                            } label: {
-                                let label = speed == floor(speed)
-                                    ? "\(Int(speed))x"
-                                    : String(format: "%.1fx", speed).replacingOccurrences(of: ",", with: ".")
-                                Text(label)
-                                    .font(.caption.weight(.semibold))
-                                    .monospacedDigit()
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(playback.speed == speed ? Color.cyan : Color.white.opacity(0.1), in: Capsule())
-                                    .foregroundStyle(playback.speed == speed ? .white : .white.opacity(0.65))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-                .background(
-                    LinearGradient(
-                        colors: [Color.black.opacity(0.12), Color.black.opacity(0.06)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-
-                // CTA
-                VStack(spacing: 8) {
-                    Button {
-                        if purchaseStore.isPro { onComplete() } else { showPaywall = true }
-                    } label: {
-                        Text(purchaseStore.isPro
-                            ? L10n.string("onboarding.demo.cta.continue")
-                            : L10n.string("onboarding.demo.cta.unlock"))
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(
-                                LinearGradient(colors: [.cyan, .blue], startPoint: .leading, endPoint: .trailing)
-                            )
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-
-                    Button(L10n.string("onboarding.demo.cta.free")) { onComplete() }
-                        .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.35))
-                        .buttonStyle(.plain)
-                        .padding(.vertical, 4)
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-                .padding(.bottom, 40)
-            }
-        }
-        .ignoresSafeArea(edges: .bottom)
-    }
-
-    private func demoTransportButton(
-        systemName: String,
-        diameter: CGFloat,
-        tint: Color,
-        emphasized: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: emphasized ? 20 : 16, weight: .semibold))
-                .foregroundStyle(emphasized ? Color.white : tint)
-                .frame(width: diameter, height: diameter)
-                .background(
-                    Group {
-                        if emphasized {
-                            Circle().fill(LinearGradient(colors: [.cyan, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
-                        } else {
-                            Circle().fill(.thinMaterial).overlay(Circle().stroke(tint.opacity(0.35), lineWidth: 1))
-                        }
-                    }
-                )
-        }
-        .buttonStyle(DemoPressScaleStyle(reduceMotion: reduceMotion))
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
-    private var demoPreviewCard: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemBackground))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.cyan.opacity(0.25), lineWidth: 1)
-                )
+    private var visualSection: some View {
+        switch page {
+        case .importStaticSvg:
+            importSourceVisual
+        case .aiInteractionConcept:
+            aiDirectionVisual
+        case .rocketComesAlive:
+            conversionVisual
+        case .previewAndTune:
+            previewAndTuneVisual
+        case .versionedResult:
+            versionedResultVisual
+        }
+    }
 
-            if let demoAnimationURL {
-                LottieView(fileURL: demoAnimationURL, playback: playback)
-                    .padding(14)
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.title2)
-                    Text(L10n.string("onboarding.demo.unavailable"))
-                        .font(.footnote)
+    private var featuresSection: some View {
+        panel {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(page.features) { feature in
+                    HStack(spacing: 12) {
+                        Image(systemName: feature.icon)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.cyan)
+                            .frame(width: 18)
+
+                        Text(feature.title)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.88))
+                    }
                 }
-                .foregroundStyle(.secondary)
             }
         }
-        .frame(maxHeight: 220)
-        .aspectRatio(1.2, contentMode: .fit)
+    }
+
+    private var importSourceVisual: some View {
+        panel {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label(L10n.string("onboarding.import.card.title"), systemImage: "square.and.arrow.down")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+
+                    Spacer()
+
+                    if revealStage >= 1 {
+                        Text(L10n.string("onboarding.import.fileBadge"))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.cyan)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(.cyan.opacity(0.16), in: Capsule())
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    }
+                }
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.white.opacity(0.05))
+
+                    if revealStage >= 2 {
+                        staticRocketView
+                            .transition(.opacity)
+                    } else {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.white.opacity(0.08))
+                            .padding(20)
+                    }
+                }
+                .frame(height: 250)
+
+                if revealStage >= 3 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(.green)
+                        Text(L10n.string("onboarding.import.parseReady"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            }
+        }
+    }
+
+    private var aiDirectionVisual: some View {
+        VStack(spacing: 12) {
+            panel {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label(L10n.string("onboarding.ai.prompt.title"), systemImage: "text.bubble")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+
+                    Text(L10n.string("onboarding.ai.prompt.value"))
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.82))
+
+                    if revealStage >= 1 {
+                        HStack(spacing: 8) {
+                            chip(L10n.string("onboarding.ai.chip.loop"))
+                            chip(L10n.string("onboarding.ai.chip.timing"))
+                            chip(L10n.string("onboarding.ai.chip.style"))
+                        }
+                        .transition(.opacity)
+                    }
+                }
+            }
+
+            Image(systemName: "arrow.down")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.cyan.opacity(0.8))
+                .opacity(revealStage >= 2 ? 1.0 : 0.25)
+                .animation(reduceMotion ? .none : .easeInOut(duration: 0.2), value: revealStage)
+
+            if revealStage >= 2 {
+                panel {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(L10n.string("onboarding.ai.draft.title"), systemImage: "sparkles.rectangle.stack")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+
+                        Text(L10n.string("onboarding.ai.draft.line1"))
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.84))
+
+                        Text(L10n.string("onboarding.ai.draft.line2"))
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.62))
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+    }
+
+    private var conversionVisual: some View {
+        panel {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    chip(L10n.string("onboarding.convert.strip.source"))
+                    Image(systemName: "arrow.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.55))
+                    chip(L10n.string("onboarding.convert.strip.output"))
+                }
+
+                if revealStage >= 1 {
+                    chip(L10n.string("onboarding.convert.compiled"), tint: .mint)
+                        .transition(.opacity)
+                }
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.white.opacity(0.05))
+
+                    if revealStage >= 2 {
+                        animatedRocketView
+                            .transition(.opacity)
+                    } else {
+                        staticRocketView
+                            .transition(.opacity)
+                    }
+                }
+                .frame(height: 260)
+
+                if revealStage >= 3 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.circle.fill")
+                            .foregroundStyle(.cyan)
+                        Text(L10n.string("onboarding.convert.playbackStarted"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.86))
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            }
+        }
+    }
+
+    private var previewAndTuneVisual: some View {
+        VStack(spacing: 14) {
+            panel {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.white.opacity(0.05))
+
+                    if let url = demoAnimationURL {
+                        LottieView(
+                            fileURL: url,
+                            playback: tunePlayback,
+                            colorOverrides: tuneColorOverrides
+                        )
+                        .padding(10)
+                    } else {
+                        unavailableState(key: "onboarding.demo.unavailable")
+                    }
+                }
+                .frame(height: 250)
+            }
+
+            panel {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 10) {
+                        Button {
+                            tunePlayback.isPlaying.toggle()
+                        } label: {
+                            Label(
+                                tunePlayback.isPlaying
+                                    ? L10n.string("onboarding.control.pause")
+                                    : L10n.string("onboarding.control.play"),
+                                systemImage: tunePlayback.isPlaying ? "pause.fill" : "play.fill"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.cyan, in: Capsule())
+                            .foregroundStyle(.white)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            tunePlayback.loopEnabled.toggle()
+                        } label: {
+                            Label(
+                                tunePlayback.loopEnabled
+                                    ? L10n.string("onboarding.control.loopOn")
+                                    : L10n.string("onboarding.control.loopOff"),
+                                systemImage: tunePlayback.loopEnabled ? "repeat" : "repeat.1"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.white.opacity(0.12), in: Capsule())
+                            .foregroundStyle(.white.opacity(0.88))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(L10n.string("onboarding.control.speed"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.74))
+
+                        Slider(
+                            value: Binding(
+                                get: { tunePlayback.speed },
+                                set: { tunePlayback.speed = $0 }
+                            ),
+                            in: 0.25...3.0,
+                            step: 0.05
+                        )
+                        .tint(.cyan)
+
+                        HStack(spacing: 8) {
+                            ForEach(previewSpeedPresets, id: \.self) { speed in
+                                Button {
+                                    tunePlayback.speed = speed
+                                } label: {
+                                    Text(speedLabel(speed))
+                                        .font(.caption2.weight(.semibold))
+                                        .monospacedDigit()
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            tunePlayback.speed == speed
+                                                ? Color.cyan
+                                                : Color.white.opacity(0.12),
+                                            in: Capsule()
+                                        )
+                                        .foregroundStyle(.white)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            Spacer()
+
+                            Text(speedLabel(tunePlayback.speed))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.white.opacity(0.74))
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(L10n.string("onboarding.control.colors"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.74))
+
+                        colorControlRow(
+                            title: L10n.string("onboarding.control.color.hull"),
+                            selectedColor: tunePlayback.selectedHullColor,
+                            onSelect: { tunePlayback.selectedHullColor = $0 }
+                        )
+
+                        colorControlRow(
+                            title: L10n.string("onboarding.control.color.wings"),
+                            selectedColor: tunePlayback.selectedWingColor,
+                            onSelect: { tunePlayback.selectedWingColor = $0 }
+                        )
+
+                        colorControlRow(
+                            title: L10n.string("onboarding.control.color.exhaust"),
+                            selectedColor: tunePlayback.selectedExhaustColor,
+                            onSelect: { tunePlayback.selectedExhaustColor = $0 }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private var versionedResultVisual: some View {
+        VStack(spacing: 14) {
+            panel {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(L10n.string("onboarding.version.timeline.title"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+
+                    ForEach(versionItems) { item in
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(item.id == versionItems.count ? Color.cyan : Color.white.opacity(0.35))
+                                .frame(width: 8, height: 8)
+
+                            Text(L10n.string(item.titleKey))
+                                .font(.caption.weight(item.id == versionItems.count ? .semibold : .regular))
+                                .foregroundStyle(.white.opacity(item.id == versionItems.count ? 0.95 : 0.74))
+
+                            Spacer()
+
+                            if let badgeKey = item.badgeKey {
+                                badgePill(L10n.string(badgeKey), compact: true)
+                            }
+                        }
+                    }
+                }
+            }
+
+            panel {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(L10n.string("onboarding.version.share.title"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+
+                    if let shareURL = demoAnimationURL {
+                        ShareLink(
+                            item: shareURL,
+                            preview: SharePreview(L10n.string("onboarding.version.share.preview"))
+                        ) {
+                            Label(L10n.string("onboarding.version.share.action"), systemImage: "square.and.arrow.up")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 11)
+                                .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .foregroundStyle(.white)
+                        }
+                    } else {
+                        unavailableState(key: "onboarding.demo.unavailable")
+                    }
+                }
+            }
+
+            panel {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(L10n.string("onboarding.version.sync.title"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+
+                        Spacer()
+
+                        badgePill(L10n.string("onboarding.badge.syncConcept"), compact: true)
+                    }
+
+                    Text(L10n.string("onboarding.version.sync.subtitle"))
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.72))
+                }
+            }
+        }
+    }
+
+    private var finalCTASection: some View {
+        Button {
+            if purchaseStore.isPro {
+                onComplete()
+            } else {
+                showPaywall = true
+            }
+        } label: {
+            Text(L10n.string(purchaseStore.isPro ? "onboarding.demo.cta.continue" : "onboarding.demo.cta.unlock"))
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        colors: [.cyan, .blue],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .padding(.top, 4)
+    }
+
+    private var staticRocketView: some View {
+        Group {
+            if let url = staticRocketURL {
+                LottieView(fileURL: url, playback: staticPlayback)
+                    .padding(10)
+            } else {
+                unavailableState(key: "onboarding.import.preview.unavailable")
+            }
+        }
+    }
+
+    private var animatedRocketView: some View {
+        Group {
+            if let url = demoAnimationURL {
+                LottieView(fileURL: url, playback: alivePlayback)
+                    .padding(10)
+            } else {
+                unavailableState(key: "onboarding.demo.unavailable")
+            }
+        }
+    }
+
+    private var tuneColorOverrides: [String: Color] {
+        var overrides: [String: Color] = [:]
+
+        for layer in hullLayers {
+            overrides["\(layer).**.Color"] = tunePlayback.selectedHullColor
+        }
+
+        for layer in wingLayers {
+            overrides["\(layer).**.Color"] = tunePlayback.selectedWingColor
+        }
+
+        for layer in exhaustLayers {
+            overrides["\(layer).**.Color"] = tunePlayback.selectedExhaustColor
+        }
+
+        return overrides
+    }
+
+    private var headerBadgeText: String? {
+        guard let badge = page.badgeTitle else { return nil }
+        if page == .aiInteractionConcept {
+            return revealStage >= 3 ? badge : nil
+        }
+        return badge
+    }
+
+    private var staticRocketURL: URL? {
+        #if SWIFT_PACKAGE
+        Bundle.module.url(forResource: "rocket_static_simplified", withExtension: "json")
+        #else
+        Bundle.main.url(forResource: "rocket_static_simplified", withExtension: "json")
+        #endif
     }
 
     private var demoAnimationURL: URL? {
@@ -293,57 +600,247 @@ struct OnboardingPageView: View {
         #endif
     }
 
-    private func resetDemoPlayback() {
-        playback.isPlaying = true
-        playback.speed = 1.0
-        playback.loopEnabled = true
-        playback.currentProgress = 0.0
-        playback.fromProgress = 0.0
-        playback.toProgress = 1.0
+    private func activatePage() {
+        revealTask?.cancel()
+
+        switch page {
+        case .importStaticSvg:
+            resetStaticPlayback()
+            onRevealCompletionChanged(false)
+            revealStage = 0
+            revealTask = Task { await runImportReveal() }
+
+        case .aiInteractionConcept:
+            onRevealCompletionChanged(false)
+            revealStage = 0
+            revealTask = Task { await runAIReveal() }
+
+        case .rocketComesAlive:
+            resetStaticPlayback()
+            resetAlivePlayback()
+            onRevealCompletionChanged(false)
+            revealStage = 0
+            revealTask = Task { await runAliveReveal() }
+
+        case .previewAndTune:
+            resetTunePlayback()
+            revealStage = 0
+            onRevealCompletionChanged(true)
+
+        case .versionedResult:
+            revealStage = 0
+            onRevealCompletionChanged(true)
+        }
     }
 
-    private func resetDemoConversionState() {
-        demoInteractions = 0
-        hasAutoPresentedPaywall = false
+    private func runImportReveal() async {
+        do {
+            try await pause(milliseconds: 350)
+            await setRevealStage(1)
+
+            try await pause(milliseconds: 550)
+            await setRevealStage(2)
+
+            try await pause(milliseconds: 400)
+            await setRevealStage(3)
+
+            await MainActor.run { onRevealCompletionChanged(true) }
+        } catch {
+            return
+        }
     }
 
-    private func registerDemoInteraction() {
-        guard page == .ready else { return }
-        guard !purchaseStore.isPro else { return }
-        guard !showPaywall else { return }
-        guard !hasAutoPresentedPaywall else { return }
+    private func runAIReveal() async {
+        do {
+            try await pause(milliseconds: 500)
+            await setRevealStage(1)
 
-        demoInteractions += 1
-        guard demoInteractions >= 4 else { return }
+            try await pause(milliseconds: 600)
+            await setRevealStage(2)
 
-        hasAutoPresentedPaywall = true
-        showPaywall = true
+            try await pause(milliseconds: 500)
+            await setRevealStage(3)
+
+            await MainActor.run { onRevealCompletionChanged(true) }
+        } catch {
+            return
+        }
+    }
+
+    private func runAliveReveal() async {
+        do {
+            try await pause(milliseconds: 700)
+            await setRevealStage(1)
+
+            try await pause(milliseconds: 500)
+            await setRevealStage(2)
+
+            try await pause(milliseconds: 600)
+            await MainActor.run {
+                alivePlayback.currentProgress = 0
+                alivePlayback.isPlaying = true
+            }
+            await setRevealStage(3)
+
+            await MainActor.run { onRevealCompletionChanged(true) }
+        } catch {
+            return
+        }
+    }
+
+    private func pause(milliseconds: UInt64) async throws {
+        try await Task.sleep(nanoseconds: milliseconds * 1_000_000)
+    }
+
+    @MainActor
+    private func setRevealStage(_ stage: Int) {
+        withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.25)) {
+            revealStage = stage
+        }
+    }
+
+    private func resetStaticPlayback() {
+        staticPlayback.isPlaying = false
+        staticPlayback.loopEnabled = false
+        staticPlayback.speed = 1.0
+        staticPlayback.fromProgress = 0
+        staticPlayback.toProgress = 1
+        staticPlayback.currentProgress = 0
+    }
+
+    private func resetAlivePlayback() {
+        alivePlayback.isPlaying = false
+        alivePlayback.loopEnabled = true
+        alivePlayback.speed = 1.0
+        alivePlayback.fromProgress = 0
+        alivePlayback.toProgress = 1
+        alivePlayback.currentProgress = 0
+    }
+
+    private func resetTunePlayback() {
+        tunePlayback.isPlaying = true
+        tunePlayback.loopEnabled = true
+        tunePlayback.speed = 1.0
+        tunePlayback.fromProgress = 0
+        tunePlayback.toProgress = 1
+        tunePlayback.currentProgress = 0
+        tunePlayback.selectedHullColor = PlaybackState.defaultHullColor
+        tunePlayback.selectedWingColor = PlaybackState.defaultWingColor
+        tunePlayback.selectedExhaustColor = PlaybackState.defaultExhaustColor
     }
 
     @ViewBuilder
-    private var iconSection: some View {
-        if page.usesAppLogo {
-            Image("AppLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 100, height: 100)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        } else {
-            Image(systemName: page.iconName)
-                .font(.system(size: 64))
-                .foregroundStyle(.cyan)
+    private func panel<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.white.opacity(0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(.white.opacity(0.14), lineWidth: 1)
+                    )
+            )
+    }
+
+    private func chip(_ title: String, tint: Color = .cyan) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(tint.opacity(0.14), in: Capsule())
+    }
+
+    private func badgePill(_ title: String, compact: Bool = false) -> some View {
+        Text(title)
+            .font(compact ? .caption2.weight(.semibold) : .caption.weight(.semibold))
+            .foregroundStyle(.cyan)
+            .padding(.horizontal, compact ? 8 : 10)
+            .padding(.vertical, compact ? 3 : 5)
+            .background(.cyan.opacity(0.16), in: Capsule())
+    }
+
+    @ViewBuilder
+    private func unavailableState(key: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.title2)
+            Text(L10n.string(key))
+                .font(.footnote)
+                .multilineTextAlignment(.center)
+        }
+        .foregroundStyle(.white.opacity(0.55))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func speedLabel(_ speed: Double) -> String {
+        speed == floor(speed) ? "\(Int(speed))x" : String(format: "%.1fx", speed)
+    }
+
+    private func colorControlRow(
+        title: String,
+        selectedColor: Color,
+        onSelect: @escaping (Color) -> Void
+    ) -> some View {
+        HStack {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.82))
+                .frame(width: 62, alignment: .leading)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 8) {
+                ForEach(colorOptions) { option in
+                    Button {
+                        onSelect(option.color)
+                    } label: {
+                        Circle()
+                            .fill(option.color)
+                            .frame(width: 20, height: 20)
+                            .overlay(
+                                Circle()
+                                    .stroke(
+                                        colorsMatch(selectedColor, option.color)
+                                            ? Color.white
+                                            : Color.white.opacity(0.24),
+                                        lineWidth: colorsMatch(selectedColor, option.color) ? 2 : 1
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
-}
 
-private struct DemoPressScaleStyle: ButtonStyle {
-    let reduceMotion: Bool
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.88 : 1.0)
-            .animation(
-                configuration.isPressed ? .easeIn(duration: 0.1) : .spring(response: 0.3, dampingFraction: 0.5),
-                value: configuration.isPressed
-            )
+    private func colorsMatch(_ lhs: Color, _ rhs: Color) -> Bool {
+        #if canImport(UIKit)
+        let left = UIColor(lhs)
+        let right = UIColor(rhs)
+        var lr: CGFloat = 0
+        var lg: CGFloat = 0
+        var lb: CGFloat = 0
+        var la: CGFloat = 0
+        var rr: CGFloat = 0
+        var rg: CGFloat = 0
+        var rb: CGFloat = 0
+        var ra: CGFloat = 0
+
+        guard left.getRed(&lr, green: &lg, blue: &lb, alpha: &la),
+              right.getRed(&rr, green: &rg, blue: &rb, alpha: &ra)
+        else {
+            return false
+        }
+
+        return abs(lr - rr) < 0.01
+            && abs(lg - rg) < 0.01
+            && abs(lb - rb) < 0.01
+            && abs(la - ra) < 0.01
+        #else
+        return false
+        #endif
     }
 }

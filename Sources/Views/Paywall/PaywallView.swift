@@ -2,6 +2,10 @@ import SwiftUI
 import StoreKit
 
 struct PaywallView: View {
+    /// Когда передан из онбординга — вызывается при dismiss/покупке для завершения онбординга.
+    /// Когда nil (вызов из библиотеки) — используется стандартный dismiss().
+    var onDismissToLibrary: (() -> Void)?
+
     @Environment(PurchaseStore.self) private var purchaseStore
     @Environment(\.dismiss) private var dismiss
     @State private var selectedProduct: Product?
@@ -9,30 +13,47 @@ struct PaywallView: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var showLegal: LegalPage?
+    @State private var logoPlayback = PlaybackState()
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 28) {
+                VStack(spacing: 24) {
                     headerSection
                     featureList
                     pricingOptions
                     purchaseButton
                     reassuranceNote
                     restoreButton
+
+                    if onDismissToLibrary != nil {
+                        continueForFreeButton
+                    }
+
                     legalFooter
                 }
-                .padding(24)
-                .frame(maxWidth: 500)
+                .padding(.horizontal, 24)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
+                .frame(maxWidth: 520)
                 .frame(maxWidth: .infinity)
             }
-            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .background(paywallBackground.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.string("common.cancel")) { dismiss() }
+                    Button {
+                        dismissPaywall()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .accessibilityLabel(L10n.string("common.cancel"))
+                        .foregroundStyle(.white.opacity(0.85))
                 }
             }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .alert(L10n.string("library.error.title"), isPresented: $showError) {
                 Button(L10n.string("library.error.ok")) {}
             } message: {
@@ -48,6 +69,7 @@ struct PaywallView: View {
             selectedProduct = purchaseStore.products.first {
                 $0.id == PurchaseStore.lifetimeID
             }
+            configureLogoPlayback()
         }
         .interactiveDismissDisabled(isPurchasing)
     }
@@ -55,22 +77,52 @@ struct PaywallView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            Image("AppLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 72, height: 72)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        VStack(spacing: 14) {
+            animatedLogoBadge
 
             Text(L10n.string("paywall.title"))
                 .font(.title2.bold())
+                .foregroundStyle(.white)
 
             Text(L10n.string("paywall.subtitle"))
                 .font(.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.66))
                 .multilineTextAlignment(.center)
         }
         .padding(.top, 8)
+    }
+
+    private var animatedLogoBadge: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.cyan.opacity(0.3),
+                            Color.blue.opacity(0.4),
+                            Color(red: 0.07, green: 0.14, blue: 0.28)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            if let url = demoAnimationURL {
+                LottieView(fileURL: url, playback: logoPlayback)
+                    .padding(8)
+            } else {
+                Image("AppLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(10)
+            }
+        }
+        .frame(width: 92, height: 92)
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(.white.opacity(0.2), lineWidth: 1)
+        )
+        .shadow(color: .cyan.opacity(0.25), radius: 16, y: 8)
     }
 
     // MARK: - Features
@@ -82,20 +134,19 @@ struct PaywallView: View {
             featureRow(icon: "arrow.up.circle", text: L10n.string("paywall.feature.updates"))
         }
         .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        )
+        .background(cardBackground)
     }
 
     private func featureRow(icon: String, text: String) -> some View {
-        HStack(spacing: 14) {
+        HStack(alignment: .top, spacing: 14) {
             Image(systemName: icon)
                 .font(.title3)
                 .foregroundStyle(.cyan)
-                .frame(width: 28)
+                .frame(width: 30)
+
             Text(text)
                 .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.9))
         }
     }
 
@@ -132,24 +183,34 @@ struct PaywallView: View {
                     ? L10n.string("paywall.lifetime")
                     : L10n.string("paywall.annual"))
                     .font(.headline)
+                    .foregroundStyle(.white)
 
                 Text(product.displayPrice)
                     .font(.title2.bold())
+                    .foregroundStyle(.white)
 
                 Text(isLifetime
                     ? L10n.string("paywall.lifetime.description")
                     : L10n.string("paywall.annual.description"))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.6))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(.white.opacity(isSelected ? 0.14 : 0.08))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(isSelected ? Color.cyan : .clear, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(
+                                isSelected ? Color.cyan : Color.white.opacity(0.18),
+                                lineWidth: isSelected ? 2 : 1
+                            )
+                    )
+                    .shadow(
+                        color: isSelected ? .cyan.opacity(0.2) : .black.opacity(0.06),
+                        radius: 8,
+                        y: 3
                     )
             )
         }
@@ -187,6 +248,7 @@ struct PaywallView: View {
             )
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: .cyan.opacity(0.28), radius: 10, y: 4)
         }
         .disabled(selectedProduct == nil || isPurchasing)
         .scaleEffect(selectedProduct != nil ? 1.0 : 0.97)
@@ -198,7 +260,7 @@ struct PaywallView: View {
     private var reassuranceNote: some View {
         Text(L10n.string("paywall.reassurance"))
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.white.opacity(0.58))
             .multilineTextAlignment(.center)
             .padding(.horizontal, 8)
     }
@@ -208,14 +270,26 @@ struct PaywallView: View {
             Task {
                 await purchaseStore.restorePurchases()
                 if purchaseStore.isPro {
-                    dismiss()
+                    dismissPaywall()
                 }
             }
         } label: {
             Text(L10n.string("paywall.restore"))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.82))
         }
+        .buttonStyle(.plain)
+    }
+
+    private var continueForFreeButton: some View {
+        Button {
+            dismissPaywall()
+        } label: {
+            Text(L10n.string("onboarding.demo.cta.free"))
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.78))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Legal
@@ -231,13 +305,50 @@ struct PaywallView: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.white.opacity(0.72))
 
             Text(L10n.string("paywall.legal"))
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.white.opacity(0.48))
                 .multilineTextAlignment(.center)
         }
+    }
+
+    // MARK: - Styles
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(.white.opacity(0.08))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(.white.opacity(0.14), lineWidth: 1)
+            )
+    }
+
+    private var paywallBackground: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.04, green: 0.12, blue: 0.22),
+                Color(red: 0.02, green: 0.08, blue: 0.16)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay(alignment: .topLeading) {
+            Circle()
+                .fill(Color.cyan.opacity(0.14))
+                .frame(width: 300, height: 300)
+                .blur(radius: 62)
+                .offset(x: -34, y: -110)
+        }
+    }
+
+    private var demoAnimationURL: URL? {
+        #if SWIFT_PACKAGE
+        Bundle.module.url(forResource: "demo_animation", withExtension: "json")
+        #else
+        Bundle.main.url(forResource: "demo_animation", withExtension: "json")
+        #endif
     }
 
     // MARK: - Actions
@@ -250,11 +361,28 @@ struct PaywallView: View {
         do {
             try await purchaseStore.purchase(product)
             if purchaseStore.isPro {
-                dismiss()
+                dismissPaywall()
             }
         } catch {
             errorMessage = error.localizedDescription
             showError = true
+        }
+    }
+
+    private func configureLogoPlayback() {
+        logoPlayback.isPlaying = true
+        logoPlayback.loopEnabled = true
+        logoPlayback.speed = 0.9
+        logoPlayback.fromProgress = 0
+        logoPlayback.toProgress = 1
+        logoPlayback.currentProgress = 0
+    }
+
+    private func dismissPaywall() {
+        if let onDismissToLibrary {
+            onDismissToLibrary()
+        } else {
+            dismiss()
         }
     }
 }

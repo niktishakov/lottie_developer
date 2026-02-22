@@ -20,7 +20,10 @@ targets:
     info:
       path: Sources/Info.plist
       properties:
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: LaunchFallback
+          UIImageName: LaunchBackground
+          UIImageRespectsSafeAreaInsets: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nikapps.lottie.developer
@@ -40,6 +43,8 @@ targets:
       - path: Sources/Resources/ru.lproj
         buildPhase: resources
       - path: Sources/Resources/demo_animation.json
+        buildPhase: resources
+      - path: Sources/Resources/rocket_static_simplified.json
         buildPhase: resources
       - path: Sources/Store/LottieDeveloper.storekit
         buildPhase: resources

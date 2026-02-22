@@ -1,59 +1,122 @@
-import SwiftUI
+import Foundation
 
 struct OnboardingFeature: Identifiable {
-    let id = UUID()
+    let id: String
     let icon: String
-    let title: String
+    let key: String
+
+    init(icon: String, key: String) {
+        self.id = key
+        self.icon = icon
+        self.key = key
+    }
+
+    var title: String { L10n.string(key) }
 }
 
 enum OnboardingPage: Int, CaseIterable {
-    case toolkit
-    case fineTune
-    case ready
+    case importStaticSvg
+    case aiInteractionConcept
+    case rocketComesAlive
+    case previewAndTune
+    case versionedResult
 
-    var title: String {
+    var titleKey: String {
         switch self {
-        case .toolkit: L10n.string("onboarding.page1.title")
-        case .fineTune: L10n.string("onboarding.page2.title")
-        case .ready: L10n.string("onboarding.page3.title")
+        case .importStaticSvg: "onboarding.page1.title"
+        case .aiInteractionConcept: "onboarding.page2.title"
+        case .rocketComesAlive: "onboarding.page3.title"
+        case .previewAndTune: "onboarding.page4.title"
+        case .versionedResult: "onboarding.page5.title"
         }
     }
 
-    var subtitle: String {
+    var subtitleKey: String {
         switch self {
-        case .toolkit: L10n.string("onboarding.page1.subtitle")
-        case .fineTune: L10n.string("onboarding.page2.subtitle")
-        case .ready: L10n.string("onboarding.page3.subtitle")
+        case .importStaticSvg: "onboarding.page1.subtitle"
+        case .aiInteractionConcept: "onboarding.page2.subtitle"
+        case .rocketComesAlive: "onboarding.page3.subtitle"
+        case .previewAndTune: "onboarding.page4.subtitle"
+        case .versionedResult: "onboarding.page5.subtitle"
         }
     }
 
-    var iconName: String {
+    var badgeKey: String? {
         switch self {
-        case .toolkit: "play.circle.fill"
-        case .fineTune: "slider.horizontal.3"
-        case .ready: "checkmark.circle.fill"
+        case .aiInteractionConcept:
+            "onboarding.badge.concept"
+        case .rocketComesAlive:
+            "onboarding.badge.simulation"
+        default:
+            nil
         }
     }
 
-    var usesAppLogo: Bool {
-        self == .toolkit
+    var featureKeys: [String] {
+        switch self {
+        case .importStaticSvg:
+            [
+                "onboarding.page1.feature1",
+                "onboarding.page1.feature2",
+                "onboarding.page1.feature3",
+            ]
+        case .aiInteractionConcept:
+            [
+                "onboarding.page2.feature1",
+                "onboarding.page2.feature2",
+                "onboarding.page2.feature3",
+            ]
+        case .rocketComesAlive:
+            [
+                "onboarding.page3.feature1",
+                "onboarding.page3.feature2",
+                "onboarding.page3.feature3",
+            ]
+        case .previewAndTune:
+            [
+                "onboarding.page4.feature1",
+                "onboarding.page4.feature2",
+                "onboarding.page4.feature3",
+            ]
+        case .versionedResult:
+            []
+        }
     }
+
+    var usesInteractiveLottie: Bool {
+        self == .previewAndTune
+    }
+
+    var requiresRevealCompletion: Bool {
+        switch self {
+        case .importStaticSvg, .aiInteractionConcept, .rocketComesAlive:
+            true
+        case .previewAndTune, .versionedResult:
+            false
+        }
+    }
+
+    var title: String { L10n.string(titleKey) }
+    var subtitle: String { L10n.string(subtitleKey) }
+    var badgeTitle: String? { badgeKey.map(L10n.string) }
 
     var features: [OnboardingFeature] {
+        zip(featureIcons, featureKeys).map { icon, key in
+            OnboardingFeature(icon: icon, key: key)
+        }
+    }
+
+    private var featureIcons: [String] {
         switch self {
-        case .toolkit:
-            [
-                OnboardingFeature(icon: "folder.badge.plus", title: L10n.string("onboarding.page1.feature1")),
-                OnboardingFeature(icon: "play.circle", title: L10n.string("onboarding.page1.feature2")),
-                OnboardingFeature(icon: "iphone.and.ipad", title: L10n.string("onboarding.page1.feature3")),
-            ]
-        case .fineTune:
-            [
-                OnboardingFeature(icon: "gauge.with.dots.needle.33percent", title: L10n.string("onboarding.page2.feature1")),
-                OnboardingFeature(icon: "arrow.left.and.right", title: L10n.string("onboarding.page2.feature2")),
-                OnboardingFeature(icon: "star", title: L10n.string("onboarding.page2.feature3")),
-            ]
-        case .ready:
+        case .importStaticSvg:
+            ["doc.badge.plus", "square.stack.3d.up", "wand.and.stars"]
+        case .aiInteractionConcept:
+            ["text.bubble", "slider.horizontal.3", "checklist"]
+        case .rocketComesAlive:
+            ["arrow.trianglehead.2.clockwise.rotate.90", "arrow.up.right.circle", "checkmark.shield"]
+        case .previewAndTune:
+            ["repeat", "gauge.with.dots.needle.50percent", "paintpalette"]
+        case .versionedResult:
             []
         }
     }

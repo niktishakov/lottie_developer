@@ -51,6 +51,8 @@
 "player.control.loopEnabled" = "Цикл включен";
 "player.control.loopDisabled" = "Цикл выключен";
 "player.control.speed" = "Скорость %@x";
+"player.control.expandFullscreen" = "Развернуть на весь экран";
+"player.control.closeFullscreen" = "Закрыть полноэкранный режим";
 "player.menu.rename" = "Переименовать";
 "player.menu.addFavorite" = "В избранное";
 "player.menu.removeFavorite" = "Убрать из избранного";

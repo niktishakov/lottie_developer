@@ -20,7 +20,7 @@ struct RangeSlider: View {
             ZStack(alignment: .leading) {
                 // Background track
                 Capsule()
-                    .fill(Color.secondary.opacity(0.2))
+                    .fill(Color.white.opacity(0.16))
                     .frame(height: trackHeight)
                     .padding(.horizontal, thumbSize / 2)
 
@@ -29,14 +29,24 @@ struct RangeSlider: View {
                 let highX = ((high - range.lowerBound) / span) * width
 
                 Capsule()
-                    .fill(Color.cyan)
+                    .fill(
+                        LinearGradient(
+                            colors: [AppTheme.accentStart, AppTheme.accentEnd],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .frame(width: max(0, highX - lowX), height: trackHeight)
                     .offset(x: lowX + thumbSize / 2)
 
                 // Low thumb
                 Circle()
-                    .fill(.white)
-                    .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                    .fill(Color.white.opacity(0.96))
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
                     .frame(width: thumbSize, height: thumbSize)
                     .scaleEffect(isDraggingLow && !reduceMotion ? 1.2 : 1.0)
                     .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isDraggingLow)
@@ -54,8 +64,12 @@ struct RangeSlider: View {
 
                 // High thumb
                 Circle()
-                    .fill(.white)
-                    .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                    .fill(Color.white.opacity(0.96))
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
                     .frame(width: thumbSize, height: thumbSize)
                     .scaleEffect(isDraggingHigh && !reduceMotion ? 1.2 : 1.0)
                     .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isDraggingHigh)

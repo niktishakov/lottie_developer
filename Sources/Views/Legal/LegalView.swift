@@ -23,20 +23,30 @@ struct LegalView: View {
             ScrollView {
                 Text(content)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.textSecondary)
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .appGlassCard(cornerRadius: 20, fillOpacity: 0.08, borderOpacity: 0.16)
+                    .padding(16)
             }
+            .background(AppBackground().ignoresSafeArea())
             .navigationTitle(page.title)
             #if !targetEnvironment(macCatalyst)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .tint(.white)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.string("fileInfo.done")) { dismiss() }
+                    Button(L10n.string("fileInfo.done")) {
+                        dismiss()
+                    }
+                    .foregroundStyle(.cyan)
                 }
             }
         }
+        .preferredColorScheme(.dark)
     }
 
     private var content: String {

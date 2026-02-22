@@ -40,6 +40,8 @@ let package = Package(
             resources: [
                 .process("Resources/en.lproj"),
                 .process("Resources/ru.lproj"),
+                .process("Resources/demo_animation.json"),
+                .process("Resources/rocket_static_simplified.json"),
                 .copy("PrivacyInfo.xcprivacy")
             ]
         )

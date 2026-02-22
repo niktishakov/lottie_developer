@@ -43,13 +43,10 @@ struct AnimationLibraryView: View {
             .background(AppBackground().ignoresSafeArea())
             .navigationTitle(L10n.string("library.title"))
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: L10n.string("library.search.prompt"))
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    importMenu
-                }
+            .safeAreaInset(edge: .bottom) {
+                bottomActionBar
             }
             .fileImporter(
                 isPresented: $showFileImporter,
@@ -146,12 +143,11 @@ struct AnimationLibraryView: View {
     private var animationList: some View {
         List {
             if shouldShowImportHero {
-                Section {
-                    importHeroCard
-                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-                        .listRowBackground(Color.clear)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
+                importHeroCard
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
             ForEach(filteredAnimations) { item in
@@ -213,6 +209,60 @@ struct AnimationLibraryView: View {
         .navigationDestination(for: AnimationItem.self) { item in
             AnimationPlayerView(item: item)
         }
+    }
+
+    private var bottomActionBar: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(AppTheme.textSecondary)
+
+                TextField(L10n.string("library.search.prompt"), text: $searchText)
+                    .font(.body)
+                    .foregroundStyle(AppTheme.textPrimary)
+                    .autocorrectionDisabled()
+                    #if !targetEnvironment(macCatalyst)
+                    .textInputAutocapitalization(.never)
+                    #endif
+
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(AppTheme.textMuted)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(AppTheme.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(AppTheme.border, lineWidth: 1)
+            )
+
+            importMenu
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(AppTheme.surfaceEmphasis)
+                )
+                .overlay(
+                    Circle()
+                        .stroke(AppTheme.border, lineWidth: 1)
+                )
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 6)
+        .background(Color.clear)
     }
 
     private var shouldShowImportHero: Bool {

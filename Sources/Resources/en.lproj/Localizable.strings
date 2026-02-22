@@ -51,6 +51,8 @@
 "player.control.loopEnabled" = "Loop enabled";
 "player.control.loopDisabled" = "Loop disabled";
 "player.control.speed" = "Speed %@x";
+"player.control.expandFullscreen" = "Expand to full screen";
+"player.control.closeFullscreen" = "Close full screen";
 "player.menu.rename" = "Rename";
 "player.menu.addFavorite" = "Add to Favorites";
 "player.menu.removeFavorite" = "Remove from Favorites";
@@ -79,18 +81,78 @@
 "onboarding.skip" = "Skip";
 "onboarding.step" = "Step %d of %d";
 "onboarding.next" = "Next";
-"onboarding.page1.title" = "Ship Lottie Without Surprises";
-"onboarding.page1.subtitle" = "Catch broken frames before release and keep QA fast.";
-"onboarding.page1.feature1" = "Open your own JSON in seconds";
-"onboarding.page1.feature2" = "Scrub frame-by-frame with speed control";
-"onboarding.page1.feature3" = "Everything stays local on your device";
-"onboarding.page2.title" = "Debug in Seconds";
-"onboarding.page2.subtitle" = "Pinpoint timing issues and compare playback ranges before handoff.";
-"onboarding.page2.feature1" = "0.25x to 3x speed checks";
-"onboarding.page2.feature2" = "Exact start and end frame ranges";
-"onboarding.page2.feature3" = "Favorites and fast renaming";
-"onboarding.page3.title" = "See It Working First";
-"onboarding.page3.subtitle" = "Try the sample animation with simple controls, then unlock Pro.";
+"onboarding.badge.concept" = "Concept";
+"onboarding.badge.simulation" = "Simulation";
+"onboarding.badge.syncConcept" = "Sync Concept";
+
+"onboarding.page1.title" = "Import Source SVG";
+"onboarding.page1.subtitle" = "Your pipeline starts with a static vector source.";
+"onboarding.page1.feature1" = "Static SVG baseline";
+"onboarding.page1.feature2" = "Layer structure preserved";
+"onboarding.page1.feature3" = "Ready for motion pass";
+
+"onboarding.page2.title" = "AI Motion Direction";
+"onboarding.page2.subtitle" = "Define intent, timing and style with AI-assisted direction.";
+"onboarding.page2.feature1" = "Prompted motion intent";
+"onboarding.page2.feature2" = "Constraints-first output";
+"onboarding.page2.feature3" = "Deterministic handoff";
+
+"onboarding.page3.title" = "Conversion to Motion JSON";
+"onboarding.page3.subtitle" = "The static source is transformed into runtime-ready motion data.";
+"onboarding.page3.feature1" = "Bodymovin mapping";
+"onboarding.page3.feature2" = "Transform normalization";
+"onboarding.page3.feature3" = "Runtime-safe structure";
+
+"onboarding.page4.title" = "Preview & Tune with lottie-ios";
+"onboarding.page4.subtitle" = "Use runtime controls before handoff.";
+"onboarding.page4.feature1" = "Loop control";
+"onboarding.page4.feature2" = "Speed presets";
+"onboarding.page4.feature3" = "Layer color tuning";
+
+"onboarding.page5.title" = "Versioned Result Ready";
+"onboarding.page5.subtitle" = "Track progression and share the current artifact.";
+
+"onboarding.import.card.title" = "Source Import";
+"onboarding.import.fileBadge" = "rocket.svg";
+"onboarding.import.parseReady" = "Layer map parsed and ready.";
+"onboarding.import.preview.unavailable" = "Static source preview unavailable";
+
+"onboarding.ai.prompt.title" = "Prompt Spec";
+"onboarding.ai.prompt.value" = "Create a confident launch arc with soft easing and clean recovery.";
+"onboarding.ai.chip.loop" = "loop";
+"onboarding.ai.chip.timing" = "timing";
+"onboarding.ai.chip.style" = "style";
+"onboarding.ai.draft.title" = "AI Draft";
+"onboarding.ai.draft.line1" = "Intent locked: launch, hover, settle.";
+"onboarding.ai.draft.line2" = "Constraints-first handoff prepared for runtime tuning.";
+
+"onboarding.convert.strip.source" = "Static SVG";
+"onboarding.convert.strip.output" = "Motion JSON";
+"onboarding.convert.compiled" = "compiled JSON";
+"onboarding.convert.playbackStarted" = "Playback loop started";
+
+"onboarding.control.play" = "Play";
+"onboarding.control.pause" = "Pause";
+"onboarding.control.loopOn" = "Loop On";
+"onboarding.control.loopOff" = "Loop Off";
+"onboarding.control.speed" = "Speed";
+"onboarding.control.colors" = "Layer Colors";
+"onboarding.control.color.hull" = "Hull";
+"onboarding.control.color.wings" = "Wings";
+"onboarding.control.color.exhaust" = "Exhaust";
+
+"onboarding.version.timeline.title" = "Version History";
+"onboarding.version.v1" = "V1 Imported SVG";
+"onboarding.version.v2" = "V2 AI Direction";
+"onboarding.version.v3" = "V3 Motion JSON";
+"onboarding.version.v4" = "V4 Tuned Runtime Preview";
+"onboarding.version.v5" = "V5 Ready to Share";
+"onboarding.version.share.title" = "Share Current Artifact";
+"onboarding.version.share.action" = "Share JSON";
+"onboarding.version.share.preview" = "Rocket Motion JSON";
+"onboarding.version.sync.title" = "Project Sync";
+"onboarding.version.sync.subtitle" = "Cloud sync and team handoff are shown as concept in this walkthrough.";
+
 "onboarding.demo.play" = "Play";
 "onboarding.demo.pause" = "Pause";
 "onboarding.demo.speed" = "Speed";

@@ -9,41 +9,50 @@ private let logger = Logger(subsystem: "com.nikapps.lottie.developer", category:
 @Observable
 final class PurchaseStore {
     static let lifetimeID = "com.nikapps.lottie.developer.pro.lifetime"
-    static let annualID = "com.nikapps.lottie.developer.pro.annual"
+    static let annualID   = "com.nikapps.lottie.developer.pro.annual"
 
     private(set) var products: [Product] = []
     private(set) var purchasedProductIDs: Set<String> = []
     private(set) var isLoading = false
 
-    var isPro: Bool {
-        !purchasedProductIDs.isEmpty
-    }
+    var isPro: Bool { !purchasedProductIDs.isEmpty }
 
-    private var transactionListener: Task<Void, Never>?
+    nonisolated(unsafe) private var transactionListener: Task<Void, Never>?
 
     init() {
         transactionListener = listenForTransactions()
         Task { await updatePurchasedProducts() }
     }
 
+    deinit {
+        transactionListener?.cancel()
+    }
+
     // MARK: - Products
 
     func loadProducts() async {
-        guard products.isEmpty else { return }
+        guard !isLoading, products.isEmpty else { return }
         isLoading = true
         defer { isLoading = false }
 
-        do {
-            let loaded = try await Product.products(for: [
-                Self.lifetimeID,
-                Self.annualID
-            ])
-            // Lifetime first
-            products = loaded.sorted { $0.type == .nonConsumable && $1.type != .nonConsumable }
-            logger.info("Loaded \(loaded.count) products")
-        } catch {
-            logger.error("Failed to load products: \(error.localizedDescription)")
+        let ids = [Self.lifetimeID, Self.annualID]
+        let delays: [Duration] = [.seconds(1), .seconds(2), .seconds(4)]
+
+        for (attempt, delay) in delays.enumerated() {
+            do {
+                let loaded = try await Product.products(for: ids)
+                if !loaded.isEmpty {
+                    products = loaded.sorted { $0.type == .nonConsumable && $1.type != .nonConsumable }
+                    logger.info("Loaded \(loaded.count) products on attempt \(attempt + 1)")
+                    return
+                }
+                logger.warning("Attempt \(attempt + 1): StoreKit returned 0 products")
+            } catch {
+                logger.error("Attempt \(attempt + 1) failed: \(error.localizedDescription)")
+            }
+            try? await Task.sleep(for: delay)
         }
+        logger.error("Failed to load products after \(delays.count) attempts")
     }
 
     // MARK: - Purchase
@@ -76,8 +85,9 @@ final class PurchaseStore {
     // MARK: - Transaction Listener
 
     private func listenForTransactions() -> Task<Void, Never> {
-        Task.detached {
+        Task.detached { [weak self] in
             for await result in Transaction.updates {
+                guard let self else { return }
                 if let transaction = try? await self.checkVerified(result) {
                     await transaction.finish()
                     await self.updatePurchasedProducts()
@@ -107,9 +117,6 @@ final class PurchaseStore {
 
     enum StoreError: LocalizedError {
         case verificationFailed
-
-        var errorDescription: String? {
-            "Transaction verification failed"
-        }
+        var errorDescription: String? { "Transaction verification failed" }
     }
 }
