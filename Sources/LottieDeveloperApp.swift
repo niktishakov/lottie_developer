@@ -8,25 +8,28 @@ struct LottieDeveloperApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if hasCompletedOnboarding {
-                AnimationLibraryView()
-                    .environment(store)
-                    .environment(purchaseStore)
-                    .task {
-                        await store.loadMetadataIfNeeded()
-                        await store.loadDemoAnimationIfNeeded()
-                        await purchaseStore.loadProducts()
-                    }
-            } else {
-                OnboardingView(hasCompletedOnboarding: $hasCompletedOnboarding)
-                    .environment(store)
-                    .environment(purchaseStore)
-                    .task {
-                        await store.loadMetadataIfNeeded()
-                        await store.loadDemoAnimationIfNeeded()
-                        await purchaseStore.loadProducts()
-                    }
+            Group {
+                if hasCompletedOnboarding {
+                    AnimationLibraryView()
+                        .environment(store)
+                        .environment(purchaseStore)
+                        .task {
+                            await store.loadMetadataIfNeeded()
+                            await store.loadDemoAnimationIfNeeded()
+                            await purchaseStore.loadProducts()
+                        }
+                } else {
+                    OnboardingView(hasCompletedOnboarding: $hasCompletedOnboarding)
+                        .environment(store)
+                        .environment(purchaseStore)
+                        .task {
+                            await store.loadMetadataIfNeeded()
+                            await store.loadDemoAnimationIfNeeded()
+                            await purchaseStore.loadProducts()
+                        }
+                }
             }
+            .preferredColorScheme(.dark)
         }
         #if targetEnvironment(macCatalyst)
         .defaultSize(width: 900, height: 700)

@@ -40,10 +40,12 @@ struct AnimationLibraryView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .background(AppBackground().ignoresSafeArea())
             .navigationTitle(L10n.string("library.title"))
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: L10n.string("library.search.prompt"))
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     importMenu
@@ -99,7 +101,7 @@ struct AnimationLibraryView: View {
     // MARK: - Subviews
 
     private var emptyState: some View {
-        ContentUnavailableView {
+        VStack(spacing: 20) {
             VStack(spacing: 10) {
                 Image("AppLogo")
                     .resizable()
@@ -109,13 +111,34 @@ struct AnimationLibraryView: View {
 
                 Text(L10n.string("library.empty.title"))
                     .font(.title3.weight(.semibold))
+                    .foregroundStyle(AppTheme.textPrimary)
             }
-        } description: {
+
             Text(L10n.string("library.empty.description"))
-        } actions: {
-            importMenu
-                .buttonStyle(.borderedProminent)
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.textSecondary)
+                .multilineTextAlignment(.center)
+
+            Button {
+                requestPrimaryImport()
+            } label: {
+                Text(
+                    purchaseStore.isPro
+                        ? L10n.string("library.hero.cta.pro")
+                        : L10n.string("library.hero.cta.free")
+                )
+                    .font(.headline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(AppTheme.accentGradient)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
         }
+        .padding(24)
+        .frame(maxWidth: 420)
+        .appGlassCard(cornerRadius: 24, fillOpacity: 0.09, borderOpacity: 0.18)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 20)
     }
@@ -135,12 +158,16 @@ struct AnimationLibraryView: View {
                 NavigationLink(value: item) {
                     AnimationRow(item: item)
                 }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                .navigationLinkIndicatorVisibility(.hidden)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
                         store.delete(item)
                     } label: {
-                        Label(L10n.string("library.row.delete"), systemImage: "trash")
+                        Label(L10n.string("library.row.delete"), systemImage: "trash.fill")
                     }
+                    .tint(.red)
                 }
                 .swipeActions(edge: .leading) {
                     Button {
@@ -150,10 +177,10 @@ struct AnimationLibraryView: View {
                             item.isFavorite
                                 ? L10n.string("library.row.unfavorite")
                                 : L10n.string("library.row.favorite"),
-                            systemImage: item.isFavorite ? "star.slash" : "star.fill"
+                            systemImage: item.isFavorite ? "star.slash.fill" : "star.fill"
                         )
                     }
-                    .tint(.yellow)
+                    .tint(Color(red: 0.05, green: 0.34, blue: 0.70))
                 }
                 .contextMenu {
                     Button {
@@ -175,7 +202,8 @@ struct AnimationLibraryView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: store.animations.count)
         .overlay {
             if filteredAnimations.isEmpty {
@@ -195,6 +223,7 @@ struct AnimationLibraryView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L10n.string("library.hero.title"))
                 .font(.headline)
+                .foregroundStyle(AppTheme.textPrimary)
 
             Text(
                 purchaseStore.isPro
@@ -202,7 +231,7 @@ struct AnimationLibraryView: View {
                     : L10n.string("library.hero.subtitle.free")
             )
             .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(AppTheme.textSecondary)
 
             Button {
                 requestPrimaryImport()
@@ -215,23 +244,14 @@ struct AnimationLibraryView: View {
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(
-                    LinearGradient(
-                        colors: [.cyan, .blue],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .background(AppTheme.accentGradient)
                 .foregroundStyle(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        )
+        .appGlassCard(cornerRadius: 16, fillOpacity: 0.1, borderOpacity: 0.18)
     }
 
     private var importMenu: some View {
@@ -257,8 +277,11 @@ struct AnimationLibraryView: View {
             }
             .keyboardShortcut("v", modifiers: [.command, .shift])
         } label: {
-            Label(L10n.string("library.import.add"), systemImage: "plus")
+            Image(systemName: "plus")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(AppTheme.textPrimary)
         }
+        .accessibilityLabel(L10n.string("library.import.add"))
         .disabled(isImporting || isDownloading)
     }
 
@@ -407,6 +430,7 @@ struct AnimationRow: View {
                 HStack {
                     Text(item.name)
                         .font(.headline)
+                        .foregroundStyle(AppTheme.textPrimary)
                         .lineLimit(1)
                     if item.isFavorite {
                         Image(systemName: "star.fill")
@@ -418,9 +442,18 @@ struct AnimationRow: View {
 
                 Text(item.dateAdded, style: .date)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.textMuted)
             }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppTheme.textMuted)
         }
-        .padding(.vertical, 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .appGlassCard(cornerRadius: 18, fillOpacity: 0.08, borderOpacity: 0.14)
     }
 }
