@@ -36,7 +36,7 @@
 "library.hero.subtitle.pro" = "Open a JSON file now and validate it frame by frame.";
 "library.hero.subtitle.free" = "Unlock Pro to import from Files, URL, and Clipboard without limits.";
 "library.hero.cta.pro" = "Import from Files";
-"library.hero.cta.free" = "Unlock Pro to Import";
+"library.hero.cta.free" = "Unlock Pro";
 
 /* AnimationPlayerView */
 "player.progress.playing" = "Playing";

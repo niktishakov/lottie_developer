@@ -119,11 +119,13 @@ struct AnimationLibraryView: View {
             Button {
                 requestPrimaryImport()
             } label: {
-                Text(
-                    purchaseStore.isPro
-                        ? L10n.string("library.hero.cta.pro")
-                        : L10n.string("library.hero.cta.free")
-                )
+                Group {
+                    if purchaseStore.isPro {
+                        Text(L10n.string("library.hero.cta.pro"))
+                    } else {
+                        Text(L10n.string("library.hero.cta.free"))
+                    }
+                }
                     .font(.headline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
@@ -143,20 +145,20 @@ struct AnimationLibraryView: View {
     private var animationList: some View {
         List {
             if shouldShowImportHero {
-                importHeroCard
-                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                Section {
+                    importHeroCard
+                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                        .listRowBackground(Color.clear)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
             }
 
             ForEach(filteredAnimations) { item in
                 NavigationLink(value: item) {
                     AnimationRow(item: item)
                 }
-                .navigationLinkIndicatorVisibility(.hidden)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+                .listRowBackground(AppTheme.surfaceEmphasis)
+                .listRowSeparatorTint(AppTheme.borderSoft)
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
                         store.delete(item)
@@ -176,7 +178,7 @@ struct AnimationLibraryView: View {
                             systemImage: item.isFavorite ? "star.slash.fill" : "star.fill"
                         )
                     }
-                    .tint(Color(red: 0.05, green: 0.34, blue: 0.70))
+                    .tint(.yellow)
                 }
                 .contextMenu {
                     Button {
@@ -198,7 +200,7 @@ struct AnimationLibraryView: View {
                 }
             }
         }
-        .listStyle(.plain)
+        .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: store.animations.count)
         .overlay {
@@ -249,15 +251,6 @@ struct AnimationLibraryView: View {
             )
 
             importMenu
-                .frame(width: 44, height: 44)
-                .background(
-                    Circle()
-                        .fill(AppTheme.surfaceEmphasis)
-                )
-                .overlay(
-                    Circle()
-                        .stroke(AppTheme.border, lineWidth: 1)
-                )
         }
         .padding(.horizontal, 16)
         .padding(.top, 6)
@@ -270,10 +263,29 @@ struct AnimationLibraryView: View {
     }
 
     private var importHeroCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.string("library.hero.title"))
-                .font(.headline)
-                .foregroundStyle(AppTheme.textPrimary)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.95))
+                    .padding(6)
+                    .background(
+                        LinearGradient(
+                            colors: [AppTheme.accentStart.opacity(0.42), AppTheme.accentEnd.opacity(0.38)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+
+                Text(L10n.string("library.hero.title"))
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.textPrimary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(
                 purchaseStore.isPro
@@ -281,27 +293,56 @@ struct AnimationLibraryView: View {
                     : L10n.string("library.hero.subtitle.free")
             )
             .font(.subheadline)
-            .foregroundStyle(AppTheme.textSecondary)
+            .foregroundStyle(AppTheme.textPrimary.opacity(0.82))
 
             Button {
                 requestPrimaryImport()
             } label: {
-                Text(
-                    purchaseStore.isPro
-                        ? L10n.string("library.hero.cta.pro")
-                        : L10n.string("library.hero.cta.free")
-                )
+                Group {
+                    if purchaseStore.isPro {
+                        Text(L10n.string("library.hero.cta.pro"))
+                    } else {
+                        Text(L10n.string("library.hero.cta.free"))
+                    }
+                }
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(AppTheme.accentGradient)
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.vertical, 13)
+                .background(
+                    LinearGradient(
+                        colors: [AppTheme.accentStart.opacity(0.86), AppTheme.accentEnd.opacity(0.86)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .foregroundStyle(.white.opacity(0.96))
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .shadow(color: AppTheme.accentEnd.opacity(0.24), radius: 10, x: 0, y: 5)
             }
             .buttonStyle(.plain)
         }
-        .padding(16)
-        .appGlassCard(cornerRadius: 16, fillOpacity: 0.1, borderOpacity: 0.18)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.26), Color.white.opacity(0)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1
+                        )
+                }
+        )
+        .shadow(color: .black.opacity(0.16), radius: 14, x: 0, y: 8)
     }
 
     private var importMenu: some View {
@@ -327,9 +368,19 @@ struct AnimationLibraryView: View {
             }
             .keyboardShortcut("v", modifiers: [.command, .shift])
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(AppTheme.textPrimary)
+            ZStack {
+                Circle()
+                    .fill(AppTheme.surfaceEmphasis)
+
+                Circle()
+                    .stroke(AppTheme.border, lineWidth: 1)
+
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(AppTheme.textPrimary)
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
         }
         .accessibilityLabel(L10n.string("library.import.add"))
         .disabled(isImporting || isDownloading)
@@ -466,7 +517,7 @@ struct AnimationRow: View {
             Image(systemName: "waveform.circle.fill")
                 .font(.title3)
                 .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
+                .frame(width: 34, height: 34)
                 .background(
                     LinearGradient(
                         colors: [.cyan.opacity(0.15), .blue.opacity(0.15)],
@@ -492,18 +543,9 @@ struct AnimationRow: View {
 
                 Text(item.dateAdded, style: .date)
                     .font(.caption)
-                    .foregroundStyle(AppTheme.textMuted)
+                    .foregroundStyle(AppTheme.textSecondary)
             }
-
-            Spacer(minLength: 8)
-
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(AppTheme.textMuted)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .appGlassCard(cornerRadius: 18, fillOpacity: 0.08, borderOpacity: 0.14)
+        .padding(.vertical, 4)
     }
 }
