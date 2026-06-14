@@ -18,6 +18,7 @@ struct EditorView: View {
     @State private var prompt = "Animate this: stagger the elements in with a little overshoot, then add one subtle idle loop so it stays alive."
     @State private var generating = false
     @State private var dropTargeted = false
+    @State private var showAccount = false
 
     private var project: AnimationProject? { store.project(projectID) }
 
@@ -35,6 +36,7 @@ struct EditorView: View {
             }
         }
         .onAppear { loadInitial() }
+        .sheet(isPresented: $showAccount) { AccountView(onClose: { showAccount = false }) }
     }
 
     // MARK: - Main column
@@ -45,6 +47,7 @@ struct EditorView: View {
                 Button { onClose() } label: { Label("Projects", systemImage: "chevron.left") }
                 Text(project.name).font(.headline).lineLimit(1)
                 Spacer()
+                Button { showAccount = true } label: { Label("Account", systemImage: "person.crop.circle") }
                 Button("Replace SVG…") { openSVG() }
                 Toggle("Loop", isOn: $loop)
             }
@@ -81,10 +84,19 @@ struct EditorView: View {
             .frame(minWidth: 360, minHeight: 360)
             .overlay { if dropTargeted { dropHint } }
 
-            Text(status.isEmpty ? "\(project.layerNames.count) layers · \(project.sourceLabel)" : status)
-                .font(.caption).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(status.isEmpty ? "\(project.layerNames.count) layers · \(project.sourceLabel)" : status)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                if status.lowercased().contains("generation failed") {
+                    Button { showAccount = true } label: {
+                        Label("Check account / switch…", systemImage: "person.crop.circle.badge.exclamationmark")
+                    }
+                    .font(.caption)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let report { reportPanel(report) }
         }
