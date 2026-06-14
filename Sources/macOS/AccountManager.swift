@@ -46,10 +46,44 @@ final class AccountManager {
                     : text.trimmingCharacters(in: .whitespacesAndNewlines)
                 return
             }
-            status = parsed
+            // `auth status` в очищенном окружении часто отдаёт только loggedIn/apiProvider.
+            // Профиль (email/организация/план) дочитываем из ~/.claude.json (oauthAccount) —
+            // это метаданные аккаунта, не токены.
+            var merged = parsed
+            if merged.loggedIn {
+                let local = Self.loadLocalAccount()
+                if merged.email == nil { merged.email = local.email }
+                if merged.orgName == nil { merged.orgName = local.org }
+                if merged.subscriptionType == nil { merged.subscriptionType = local.plan }
+            }
+            status = merged
         } catch {
             status = nil
             statusError = error.localizedDescription
+        }
+    }
+
+    /// Читает профиль аккаунта из ~/.claude.json (или $CLAUDE_CONFIG_DIR/.claude.json).
+    private static func loadLocalAccount() -> (email: String?, org: String?, plan: String?) {
+        let fm = FileManager.default
+        var path = (NSHomeDirectory() as NSString).appendingPathComponent(".claude.json")
+        if let dir = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"], !dir.isEmpty {
+            let alt = (dir as NSString).appendingPathComponent(".claude.json")
+            if fm.fileExists(atPath: alt) { path = alt }
+        }
+        guard let data = fm.contents(atPath: path),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let oa = root["oauthAccount"] as? [String: Any] else { return (nil, nil, nil) }
+        let plan = (oa["subscriptionType"] as? String).map { $0.capitalized }
+            ?? prettyBilling(oa["billingType"] as? String)
+        return (oa["emailAddress"] as? String, oa["organizationName"] as? String, plan)
+    }
+
+    private static func prettyBilling(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        switch raw {
+        case "stripe_subscription": return "Subscription"
+        default: return raw.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
 
