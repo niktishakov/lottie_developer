@@ -38,9 +38,10 @@ struct AnimationVersion: Codable, Identifiable, Equatable {
     var layerCount: Int
     var compilerWarnings: Int
     var specJSON: String?    // исходный AnimationSpec (для повторного редактирования/диффа)
+    var isFavourite: Bool
 
     init(id: UUID = UUID(), index: Int, prompt: String, compiledFile: String,
-         layerCount: Int, compilerWarnings: Int, specJSON: String?) {
+         layerCount: Int, compilerWarnings: Int, specJSON: String?, isFavourite: Bool = false) {
         self.id = id
         self.index = index
         self.prompt = prompt
@@ -49,8 +50,22 @@ struct AnimationVersion: Codable, Identifiable, Equatable {
         self.layerCount = layerCount
         self.compilerWarnings = compilerWarnings
         self.specJSON = specJSON
+        self.isFavourite = isFavourite
     }
 
     var label: String { "v\(index)" }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        index = try c.decode(Int.self, forKey: .index)
+        prompt = try c.decode(String.self, forKey: .prompt)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        compiledFile = try c.decode(String.self, forKey: .compiledFile)
+        layerCount = try c.decode(Int.self, forKey: .layerCount)
+        compilerWarnings = try c.decode(Int.self, forKey: .compilerWarnings)
+        specJSON = try c.decodeIfPresent(String.self, forKey: .specJSON)
+        isFavourite = try c.decodeIfPresent(Bool.self, forKey: .isFavourite) ?? false
+    }
 }
 #endif

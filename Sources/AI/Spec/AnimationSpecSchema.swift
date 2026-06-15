@@ -88,7 +88,18 @@ enum AnimationSpecSchema {
                 "toDeg": ["type": "number"],
                 "amount": ["type": "number"],
                 "frequency": ["type": "number"],
-                "repeatCount": ["type": "integer", "minimum": 1]
+                "repeatCount": ["type": "integer", "minimum": 1],
+                "path": [
+                    "type": "array",
+                    "minItems": 2,
+                    "items": [
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": ["type": "number"]
+                    ],
+                    "description": "Control points [[dx,dy], ...] for followPath. Offsets from layer base position."
+                ]
             ]
         ]
     }

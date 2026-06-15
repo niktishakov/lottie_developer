@@ -62,7 +62,8 @@ enum MotionKind: String, Codable, CaseIterable {
     case spin     // непрерывный поворот на 360°×repeatCount
     case float    // мягкое вертикальное покачивание (hover)
     case breathe  // тонкое масштабное «дыхание»
-    case swing    // маятниковое колебание поворота
+    case swing      // маятниковое колебание поворота
+    case followPath // движение вдоль bezier-пути (params.path)
 }
 
 enum Easing: String, Codable, CaseIterable {
@@ -98,6 +99,8 @@ struct MotionParams: Codable, Equatable {
     var frequency: Double?
     /// Число повторов (pulse).
     var repeatCount: Int?
+    /// Контрольные точки пути (followPath): [[x,y], [x,y], ...]. Минимум 2 точки.
+    var path: [[Double]]?
 
     init(
         direction: String? = nil,
@@ -108,7 +111,8 @@ struct MotionParams: Codable, Equatable {
         toDeg: Double? = nil,
         amount: Double? = nil,
         frequency: Double? = nil,
-        repeatCount: Int? = nil
+        repeatCount: Int? = nil,
+        path: [[Double]]? = nil
     ) {
         self.direction = direction
         self.distance = distance
@@ -119,5 +123,6 @@ struct MotionParams: Codable, Equatable {
         self.amount = amount
         self.frequency = frequency
         self.repeatCount = repeatCount
+        self.path = path
     }
 }

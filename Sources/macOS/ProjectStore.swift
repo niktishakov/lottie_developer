@@ -114,6 +114,24 @@ final class ProjectStore {
         return version
     }
 
+    func toggleFavourite(projectID: UUID, versionID: UUID) {
+        guard let idx = projects.firstIndex(where: { $0.id == projectID }) else { return }
+        guard let vIdx = projects[idx].versions.firstIndex(where: { $0.id == versionID }) else { return }
+        projects[idx].versions[vIdx].isFavourite.toggle()
+        projects[idx].updatedAt = Date()
+        save(projects[idx])
+    }
+
+    func deleteVersion(projectID: UUID, versionID: UUID) {
+        guard let idx = projects.firstIndex(where: { $0.id == projectID }) else { return }
+        guard let vIdx = projects[idx].versions.firstIndex(where: { $0.id == versionID }) else { return }
+        let file = projects[idx].versions[vIdx].compiledFile
+        try? fm.removeItem(at: versionURL(projectID, file))
+        projects[idx].versions.remove(at: vIdx)
+        projects[idx].updatedAt = Date()
+        save(projects[idx])
+    }
+
     func rename(projectID: UUID, to newName: String) {
         guard let idx = projects.firstIndex(where: { $0.id == projectID }) else { return }
         projects[idx].name = newName

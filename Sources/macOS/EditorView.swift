@@ -53,7 +53,7 @@ struct EditorView: View {
                 Button { showAccount = true } label: { Label("Account", systemImage: "person.crop.circle") }
                 Button("Replace SVG…") { openSVG() }
                 Button("Paste SVG") { pasteSVGFromClipboard() }
-                    .keyboardShortcut("v")
+                    .keyboardShortcut("v", modifiers: [.command, .shift])
                 Toggle("Loop", isOn: $loop)
             }
 
@@ -164,10 +164,28 @@ struct EditorView: View {
                     versionRow(title: "Static geometry",
                                subtitle: project.sourceLabel,
                                selected: selectedVersionID == nil) { showGeometry() }
-                    ForEach(project.versions.sorted { $0.index > $1.index }) { v in
+                    ForEach(project.versions.sorted { lhs, rhs in
+                        if lhs.isFavourite != rhs.isFavourite { return lhs.isFavourite }
+                        return lhs.index > rhs.index
+                    }) { v in
                         versionRow(title: v.label,
                                    subtitle: "\(v.layerCount) layers · \(v.compilerWarnings) warn\n\(v.prompt)",
-                                   selected: selectedVersionID == v.id) { select(v) }
+                                   selected: selectedVersionID == v.id,
+                                   isFavourite: v.isFavourite) { select(v) }
+                        .contextMenu {
+                            Button {
+                                prompt = v.prompt
+                            } label: {
+                                Label("Copy Prompt", systemImage: "doc.on.doc")
+                            }
+                            Button {
+                                store.toggleFavourite(projectID: projectID, versionID: v.id)
+                            } label: {
+                                Label(v.isFavourite ? "Unfavourite" : "Favourite",
+                                      systemImage: v.isFavourite ? "star.slash" : "star.fill")
+                            }
+                            Button("Delete", role: .destructive) { deleteVersion(v) }
+                        }
                     }
                 }
                 .padding(8)
@@ -182,10 +200,15 @@ struct EditorView: View {
         .background(Color(white: 0.09))
     }
 
-    private func versionRow(title: String, subtitle: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func versionRow(title: String, subtitle: String, selected: Bool, isFavourite: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold))
+                HStack(spacing: 4) {
+                    Text(title).font(.subheadline.weight(.semibold))
+                    if isFavourite {
+                        Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
+                    }
+                }
                 Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -339,6 +362,13 @@ struct EditorView: View {
                     generating = false
                 }
             }
+        }
+    }
+
+    private func deleteVersion(_ v: AnimationVersion) {
+        store.deleteVersion(projectID: projectID, versionID: v.id)
+        if selectedVersionID == v.id {
+            showGeometry()
         }
     }
 

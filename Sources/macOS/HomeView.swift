@@ -24,7 +24,7 @@ struct HomeView: View {
                 Button { showAccount = true } label: { Label("Account", systemImage: "person.crop.circle") }
                 Button { _ = openSVGAsProject() } label: { Label("New from SVG…", systemImage: "square.and.arrow.down") }
                 Button { pasteSVGAsProject() } label: { Label("Paste SVG", systemImage: "doc.on.clipboard") }
-                    .keyboardShortcut("v")
+                    .keyboardShortcut("v", modifiers: [.command, .shift])
                 Button {
                     let p = store.createSampleProject(name: "Untitled \(store.projects.count + 1)")
                     onOpen(p.id)
@@ -69,19 +69,33 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private func previewVersion(for project: AnimationProject) -> AnimationVersion? {
+        project.versions.first(where: { $0.isFavourite }) ?? project.versions.max(by: { $0.index < $1.index })
+    }
+
     private func projectCard(_ project: AnimationProject) -> some View {
         Button {
             onOpen(project.id)
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(white: 0.16))
-                    .frame(height: 110)
-                    .overlay(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(white: 0.16))
+                    if let v = previewVersion(for: project) {
+                        LottiePreviewView(fileURL: store.versionURL(project.id, v.compiledFile), loop: true, speed: 1)
+                            .id(v.id)
+                            .padding(4)
+                    } else if let url = store.geometryPreviewURL(for: project) {
+                        LottiePreviewView(fileURL: url, loop: false, speed: 1)
+                            .padding(4)
+                    } else {
                         Image(systemName: "play.rectangle.on.rectangle")
                             .font(.system(size: 28))
                             .foregroundStyle(.secondary)
-                    )
+                    }
+                }
+                .frame(height: 110)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
                 Text(project.name)
                     .font(.headline)
                     .lineLimit(1)

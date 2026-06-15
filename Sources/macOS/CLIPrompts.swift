@@ -29,7 +29,8 @@ enum CLIPrompts {
         - durationFrames must be 1..600 (= seconds × 60).
         - start/end are in SECONDS.
         - kind ∈ fadeIn, fadeOut, slideIn, slideOut, scaleIn, scaleOut, rotate, pulse, bounce, drawOn, wiggle,
-          spin (continuous 360° loop), float (gentle vertical hover loop), breathe (subtle scale loop), swing (pendulum rotation loop).
+          spin (continuous 360° loop), float (gentle vertical hover loop), breathe (subtle scale loop), swing (pendulum rotation loop),
+          followPath (move layer along a path defined by params.path: [[dx,dy], ...] offsets from base position, min 2 points).
         - easing ∈ linear, easeIn, easeOut, easeInOut, spring, easeOutBack (overshoot), easeInBack, easeInOutBack, anticipate.
         - Animate ONLY these existing layers, by their EXACT names: \(names).
 
