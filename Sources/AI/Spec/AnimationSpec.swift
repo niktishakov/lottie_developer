@@ -64,6 +64,7 @@ enum MotionKind: String, Codable, CaseIterable {
     case breathe  // тонкое масштабное «дыхание»
     case swing      // маятниковое колебание поворота
     case followPath // движение вдоль bezier-пути (params.path)
+    case recolor    // смена цвета fill/stroke (params.color)
 }
 
 enum Easing: String, Codable, CaseIterable {
@@ -101,6 +102,8 @@ struct MotionParams: Codable, Equatable {
     var repeatCount: Int?
     /// Контрольные точки пути (followPath): [[x,y], [x,y], ...]. Минимум 2 точки.
     var path: [[Double]]?
+    /// Hex-цвет (recolor): "#RRGGBB" или "#RGB".
+    var color: String?
 
     init(
         direction: String? = nil,
@@ -112,7 +115,8 @@ struct MotionParams: Codable, Equatable {
         amount: Double? = nil,
         frequency: Double? = nil,
         repeatCount: Int? = nil,
-        path: [[Double]]? = nil
+        path: [[Double]]? = nil,
+        color: String? = nil
     ) {
         self.direction = direction
         self.distance = distance
@@ -124,5 +128,6 @@ struct MotionParams: Codable, Equatable {
         self.frequency = frequency
         self.repeatCount = repeatCount
         self.path = path
+        self.color = color
     }
 }

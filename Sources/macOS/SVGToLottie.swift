@@ -51,9 +51,13 @@ enum SVGToLottie {
 
         guard !layers.isEmpty else { throw SVGError.noDrawables }
 
+        let bbox = layersBoundingBox(layers)
+        let compW = Int(ceil(max(w, bbox.maxX)))
+        let compH = Int(ceil(max(h, bbox.maxY)))
+
         let root: [String: Any] = [
             "v": "5.7.0", "fr": 60, "ip": 0, "op": 1,
-            "w": Int(w.rounded()), "h": Int(h.rounded()),
+            "w": compW, "h": compH,
             "nm": "SVG Import", "ddd": 0, "assets": [], "layers": layers,
         ]
         let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
@@ -348,6 +352,45 @@ enum SVGToLottie {
                 b.maxX = Swift.max(b.maxX, v[0]); b.maxY = Swift.max(b.maxY, v[1])
             }
             return b
+        }
+    }
+
+    private static func layersBoundingBox(_ layers: [[String: Any]]) -> BBox {
+        var result = BBox(minX: 0, minY: 0, maxX: 0, maxY: 0)
+        for layer in layers {
+            let ks = layer["ks"] as? [String: Any] ?? [:]
+            let pos = (ks["p"] as? [String: Any])?["k"] as? [Any] ?? []
+            let anc = (ks["a"] as? [String: Any])?["k"] as? [Any] ?? []
+            let px = (pos.count > 0 ? (pos[0] as? NSNumber)?.doubleValue : nil) ?? 0
+            let py = (pos.count > 1 ? (pos[1] as? NSNumber)?.doubleValue : nil) ?? 0
+            let ax = (anc.count > 0 ? (anc[0] as? NSNumber)?.doubleValue : nil) ?? 0
+            let ay = (anc.count > 1 ? (anc[1] as? NSNumber)?.doubleValue : nil) ?? 0
+            let ox = px - ax
+            let oy = py - ay
+            for shape in layer["shapes"] as? [[String: Any]] ?? [] {
+                collectBounds(shape, ox: ox, oy: oy, bbox: &result)
+            }
+        }
+        return result
+    }
+
+    private static func collectBounds(_ shape: [String: Any], ox: Double, oy: Double, bbox: inout BBox) {
+        let ty = shape["ty"] as? String
+        if ty == "sh" {
+            if let ks = shape["ks"] as? [String: Any],
+               let k = ks["k"] as? [String: Any],
+               let verts = k["v"] as? [[Any]] {
+                for v in verts where v.count >= 2 {
+                    let x = ox + ((v[0] as? NSNumber)?.doubleValue ?? 0)
+                    let y = oy + ((v[1] as? NSNumber)?.doubleValue ?? 0)
+                    bbox.maxX = Swift.max(bbox.maxX, x)
+                    bbox.maxY = Swift.max(bbox.maxY, y)
+                }
+            }
+        } else if ty == "gr" {
+            for item in shape["it"] as? [[String: Any]] ?? [] {
+                collectBounds(item, ox: ox, oy: oy, bbox: &bbox)
+            }
         }
     }
 }

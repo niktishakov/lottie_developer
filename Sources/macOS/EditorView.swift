@@ -20,6 +20,7 @@ struct EditorView: View {
     @State private var dropTargeted = false
     @State private var showAccount = false
     @State private var tokenUsage: TokenUsage?
+    @State private var multiSelection: Set<UUID> = []
     @AppStorage("ai.model") private var modelID = AIModel.defaultID
     @AppStorage("ai.effort") private var effortID = AIEffort.defaultID
 
@@ -157,13 +158,25 @@ struct EditorView: View {
 
     private func versionsSidebar(_ project: AnimationProject) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Versions").font(.headline).padding(12)
+            HStack {
+                Text("Versions").font(.headline)
+                Spacer()
+                if !multiSelection.isEmpty {
+                    Button(role: .destructive) { deleteSelected() } label: {
+                        Label("Delete \(multiSelection.count)", systemImage: "trash")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            .padding(12)
             Divider()
             ScrollView {
                 VStack(spacing: 6) {
                     versionRow(title: "Static geometry",
                                subtitle: project.sourceLabel,
-                               selected: selectedVersionID == nil) { showGeometry() }
+                               selected: selectedVersionID == nil,
+                               multiSelected: false) { showGeometry() }
                     ForEach(project.versions.sorted { lhs, rhs in
                         if lhs.isFavourite != rhs.isFavourite { return lhs.isFavourite }
                         return lhs.index > rhs.index
@@ -171,7 +184,15 @@ struct EditorView: View {
                         versionRow(title: v.label,
                                    subtitle: "\(v.layerCount) layers · \(v.compilerWarnings) warn\n\(v.prompt)",
                                    selected: selectedVersionID == v.id,
-                                   isFavourite: v.isFavourite) { select(v) }
+                                   isFavourite: v.isFavourite,
+                                   multiSelected: multiSelection.contains(v.id)) {
+                            if NSEvent.modifierFlags.contains(.command) {
+                                toggleMultiSelection(v.id)
+                            } else {
+                                multiSelection.removeAll()
+                                select(v)
+                            }
+                        }
                         .contextMenu {
                             Button {
                                 prompt = v.prompt
@@ -183,6 +204,9 @@ struct EditorView: View {
                             } label: {
                                 Label(v.isFavourite ? "Unfavourite" : "Favourite",
                                       systemImage: v.isFavourite ? "star.slash" : "star.fill")
+                            }
+                            if multiSelection.count > 1 {
+                                Button("Delete \(multiSelection.count) selected", role: .destructive) { deleteSelected() }
                             }
                             Button("Delete", role: .destructive) { deleteVersion(v) }
                         }
@@ -200,21 +224,28 @@ struct EditorView: View {
         .background(Color(white: 0.09))
     }
 
-    private func versionRow(title: String, subtitle: String, selected: Bool, isFavourite: Bool = false, action: @escaping () -> Void) -> some View {
+    private func versionRow(title: String, subtitle: String, selected: Bool, isFavourite: Bool = false, multiSelected: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text(title).font(.subheadline.weight(.semibold))
-                    if isFavourite {
-                        Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
-                    }
+            HStack(spacing: 6) {
+                if !multiSelection.isEmpty {
+                    Image(systemName: multiSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.subheadline)
+                        .foregroundStyle(multiSelected ? Color.accentColor : .secondary)
                 }
-                Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(3)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(title).font(.subheadline.weight(.semibold))
+                        if isFavourite {
+                            Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
+                        }
+                    }
+                    Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(3)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(8)
-            .background(RoundedRectangle(cornerRadius: 8).fill(selected ? Color.accentColor.opacity(0.25) : Color(white: 0.14)))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 1.5))
+            .background(RoundedRectangle(cornerRadius: 8).fill(selected ? Color.accentColor.opacity(0.25) : multiSelected ? Color.accentColor.opacity(0.12) : Color(white: 0.14)))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(selected ? Color.accentColor : multiSelected ? Color.accentColor.opacity(0.5) : .clear, lineWidth: 1.5))
         }
         .buttonStyle(.plain)
     }
@@ -365,8 +396,27 @@ struct EditorView: View {
         }
     }
 
+    private func toggleMultiSelection(_ id: UUID) {
+        if multiSelection.contains(id) {
+            multiSelection.remove(id)
+        } else {
+            multiSelection.insert(id)
+        }
+    }
+
+    private func deleteSelected() {
+        for id in multiSelection {
+            store.deleteVersion(projectID: projectID, versionID: id)
+        }
+        if let sel = selectedVersionID, multiSelection.contains(sel) {
+            showGeometry()
+        }
+        multiSelection.removeAll()
+    }
+
     private func deleteVersion(_ v: AnimationVersion) {
         store.deleteVersion(projectID: projectID, versionID: v.id)
+        multiSelection.remove(v.id)
         if selectedVersionID == v.id {
             showGeometry()
         }

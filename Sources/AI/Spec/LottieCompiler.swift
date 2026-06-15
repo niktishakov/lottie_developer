@@ -31,6 +31,8 @@ struct LottieCompiler {
 
         let fps = clamp(spec.fps, AnimationSpec.minFPS, AnimationSpec.maxFPS)
         let duration = clamp(spec.durationFrames, 1, AnimationSpec.maxDurationFrames)
+        let compW = (root["w"] as? NSNumber)?.doubleValue ?? 100
+        let compH = (root["h"] as? NSNumber)?.doubleValue ?? 100
         var warnings: [String] = []
 
         // Индекс слоёв по имени. При дублирующихся именах берём первый и предупреждаем.
@@ -43,6 +45,7 @@ struct LottieCompiler {
         }
 
         var matteInserts: [(layerIdx: Int, matte: [String: Any])] = []
+        var clipInserts: [(layerIdx: Int, matte: [String: Any])] = []
         let maxInd = layers.compactMap { $0["ind"] as? Int }.max() ?? 0
 
         for layerSpec in spec.layers {
@@ -53,6 +56,8 @@ struct LottieCompiler {
 
             var layer = layers[idx]
             var ks = layer["ks"] as? [String: Any] ?? [:]
+            let originalKs = ks
+            var needsClip = false
 
             for primitive in layerSpec.animations {
                 if primitive.kind == .drawOn {
@@ -77,10 +82,12 @@ struct LottieCompiler {
                     applyPrimitive(
                         primitive,
                         ks: &ks,
+                        originalKs: originalKs,
                         layer: &layer,
                         fps: fps,
                         warnings: &warnings,
-                        targetName: layerSpec.target
+                        targetName: layerSpec.target,
+                        needsClip: &needsClip
                     )
                 }
             }
@@ -89,9 +96,20 @@ struct LottieCompiler {
             layer["ip"] = 0
             layer["op"] = duration
             layers[idx] = layer
+
+            let hasDrawOnMatte = matteInserts.contains { $0.layerIdx == idx }
+            if needsClip && !hasDrawOnMatte {
+                let clip = buildClipMatte(
+                    compW: compW, compH: compH,
+                    duration: duration,
+                    matteInd: maxInd + 300 + clipInserts.count
+                )
+                clipInserts.append((layerIdx: idx, matte: clip))
+            }
         }
 
-        for insert in matteInserts.sorted(by: { $0.layerIdx > $1.layerIdx }) {
+        let allInserts = (matteInserts + clipInserts).sorted(by: { $0.layerIdx > $1.layerIdx })
+        for insert in allInserts {
             layers[insert.layerIdx]["tt"] = 1
             layers.insert(insert.matte, at: insert.layerIdx)
         }
@@ -112,10 +130,12 @@ struct LottieCompiler {
     private func applyPrimitive(
         _ primitive: MotionPrimitive,
         ks: inout [String: Any],
+        originalKs: [String: Any],
         layer: inout [String: Any],
         fps: Int,
         warnings: inout [String],
-        targetName: String
+        targetName: String,
+        needsClip: inout Bool
     ) {
         let startFrame = frame(primitive.start, fps: fps)
         var endFrame = frame(primitive.end, fps: fps)
@@ -133,17 +153,19 @@ struct LottieCompiler {
                 kf(startFrame, [100], easing), kf(endFrame, [0])
             ])
         case .slideIn:
-            let base = vectorBase(ks, "p", fallback: [0, 0, 0])
-            let from = offset(base, direction: p.direction, distance: p.distance ?? 100, reversed: true)
+            let base = vectorBase(originalKs, "p", fallback: [0, 0, 0])
+            let from = offset(base, direction: p.direction, distance: p.distance ?? 100, reversed: false)
             setVector(&ks, "p", ix: 2, [
                 kf(startFrame, from, easing), kf(endFrame, base)
             ])
+            needsClip = true
         case .slideOut:
-            let base = vectorBase(ks, "p", fallback: [0, 0, 0])
+            let base = vectorBase(originalKs, "p", fallback: [0, 0, 0])
             let to = offset(base, direction: p.direction, distance: p.distance ?? 100, reversed: false)
             setVector(&ks, "p", ix: 2, [
                 kf(startFrame, base, easing), kf(endFrame, to)
             ])
+            needsClip = true
         case .scaleIn:
             let from = p.from ?? 0
             let to = p.to ?? 100
@@ -157,7 +179,7 @@ struct LottieCompiler {
                 kf(startFrame, [from, from, 100], easing), kf(endFrame, [to, to, 100])
             ])
         case .rotate:
-            let base = scalarBase(ks, "r", fallback: 0)
+            let base = scalarBase(originalKs, "r", fallback: 0)
             let from = p.fromDeg ?? base
             let to = p.toDeg ?? (base + 360)
             setScalar(&ks, "r", ix: 10, [
@@ -170,13 +192,13 @@ struct LottieCompiler {
                 startFrame: startFrame, endFrame: endFrame, peak: peak, repeats: repeats, easing: easing
             ))
         case .bounce:
-            let base = vectorBase(ks, "p", fallback: [0, 0, 0])
+            let base = vectorBase(originalKs, "p", fallback: [0, 0, 0])
             let amount = p.amount ?? 20
             setVector(&ks, "p", ix: 2, bounceKeyframes(
                 base: base, startFrame: startFrame, endFrame: endFrame, amount: amount
             ))
         case .wiggle:
-            let base = vectorBase(ks, "p", fallback: [0, 0, 0])
+            let base = vectorBase(originalKs, "p", fallback: [0, 0, 0])
             let amount = p.amount ?? 10
             let freq = max(1, Int((p.frequency ?? 4).rounded()))
             setVector(&ks, "p", ix: 2, wiggleKeyframes(
@@ -185,13 +207,13 @@ struct LottieCompiler {
         case .drawOn:
             break // drawOn обрабатывается в compile() через track matte
         case .spin:
-            let base = scalarBase(ks, "r", fallback: 0)
+            let base = scalarBase(originalKs, "r", fallback: 0)
             let turns = Double(max(1, p.repeatCount ?? 1))
             setScalar(&ks, "r", ix: 10, [
                 kf(startFrame, [base], .linear), kf(endFrame, [base + 360 * turns])
             ])
         case .float:
-            let base = vectorBase(ks, "p", fallback: [0, 0, 0])
+            let base = vectorBase(originalKs, "p", fallback: [0, 0, 0])
             let amount = p.amount ?? 12
             setVector(&ks, "p", ix: 2, floatKeyframes(base: base, startFrame: startFrame, endFrame: endFrame, amount: amount))
         case .breathe:
@@ -201,17 +223,23 @@ struct LottieCompiler {
                 repeats: max(1, p.repeatCount ?? 1), easing: .easeInOut
             ))
         case .swing:
-            let base = scalarBase(ks, "r", fallback: 0)
+            let base = scalarBase(originalKs, "r", fallback: 0)
             let amount = p.amount ?? 10
             setScalar(&ks, "r", ix: 10, swingKeyframes(base: base, startFrame: startFrame, endFrame: endFrame, amount: amount))
         case .followPath:
-            let base = vectorBase(ks, "p", fallback: [0, 0, 0])
+            let base = vectorBase(originalKs, "p", fallback: [0, 0, 0])
             if let points = p.path, points.count >= 2 {
                 setVector(&ks, "p", ix: 2, followPathKeyframes(
                     base: base, points: points, startFrame: startFrame, endFrame: endFrame, easing: easing
                 ))
             } else {
                 warnings.append("Layer '\(targetName)': followPath needs params.path with ≥2 points — skipped")
+            }
+        case .recolor:
+            if let hex = p.color, let rgba = parseHex(hex) {
+                applyRecolor(layer: &layer, rgba: rgba)
+            } else {
+                warnings.append("Layer '\(targetName)': recolor needs params.color (hex) — skipped")
             }
         }
     }
@@ -387,6 +415,54 @@ struct LottieCompiler {
         ]
     }
 
+    private func buildClipMatte(compW: Double, compH: Double, duration: Int, matteInd: Int) -> [String: Any] {
+        let rect: [String: Any] = [
+            "ty": "rc",
+            "d": 1,
+            "s": ["a": 0, "k": [compW, compH]],
+            "p": ["a": 0, "k": [0, 0]],
+            "r": ["a": 0, "k": 0],
+            "nm": "Clip Rect"
+        ]
+        let fill: [String: Any] = [
+            "ty": "fl",
+            "c": ["a": 0, "k": [1, 1, 1, 1]],
+            "o": ["a": 0, "k": 100],
+            "nm": "Clip Fill"
+        ]
+        let tr: [String: Any] = [
+            "ty": "tr",
+            "p": ["a": 0, "k": [0, 0]],
+            "a": ["a": 0, "k": [0, 0]],
+            "s": ["a": 0, "k": [100, 100]],
+            "r": ["a": 0, "k": 0],
+            "o": ["a": 0, "k": 100]
+        ]
+        let group: [String: Any] = [
+            "ty": "gr",
+            "it": [rect, fill, tr],
+            "nm": "Clip Group"
+        ]
+        return [
+            "ty": 4,
+            "nm": "clip-matte",
+            "shapes": [group],
+            "ip": 0,
+            "op": duration,
+            "st": 0,
+            "sr": 1,
+            "td": 1,
+            "ks": [
+                "o": ["a": 0, "k": 100, "ix": 11],
+                "p": ["a": 0, "k": [compW / 2, compH / 2, 0], "ix": 2],
+                "a": ["a": 0, "k": [0, 0, 0], "ix": 1],
+                "s": ["a": 0, "k": [100, 100, 100], "ix": 6],
+                "r": ["a": 0, "k": 0, "ix": 10]
+            ],
+            "ind": matteInd
+        ]
+    }
+
     private func extractShapePaths(_ shapes: [[String: Any]]) -> [[String: Any]] {
         var result: [[String: Any]] = []
         for s in shapes {
@@ -458,12 +534,32 @@ struct LottieCompiler {
 
     private func setScalar(_ ks: inout [String: Any], _ key: String, ix: Int, _ keyframes: [[String: Any]]) {
         let resolvedIx = existingIx(ks, key) ?? ix
-        ks[key] = ["a": 1, "k": keyframes, "ix": resolvedIx]
+        let merged = mergeKeyframes(existing: ks[key], new: keyframes)
+        ks[key] = ["a": 1, "k": merged, "ix": resolvedIx]
     }
 
     private func setVector(_ ks: inout [String: Any], _ key: String, ix: Int, _ keyframes: [[String: Any]]) {
         let resolvedIx = existingIx(ks, key) ?? ix
-        ks[key] = ["a": 1, "k": keyframes, "ix": resolvedIx]
+        let merged = mergeKeyframes(existing: ks[key], new: keyframes)
+        ks[key] = ["a": 1, "k": merged, "ix": resolvedIx]
+    }
+
+    private func mergeKeyframes(existing: Any?, new: [[String: Any]]) -> [[String: Any]] {
+        guard let ch = existing as? [String: Any],
+              (ch["a"] as? Int) == 1,
+              let old = ch["k"] as? [[String: Any]] else {
+            return new
+        }
+        guard let newStart = new.first?["t"] as? Int else { return new }
+        var base = old.filter { ($0["t"] as? Int ?? 0) < newStart }
+        if !base.isEmpty {
+            var last = base[base.count - 1]
+            last.removeValue(forKey: "o")
+            last.removeValue(forKey: "i")
+            last["h"] = 1
+            base[base.count - 1] = last
+        }
+        return base + new
     }
 
     // MARK: - Keyframe construction
@@ -579,5 +675,53 @@ struct LottieCompiler {
     private func pseudoNoise(_ seed: Int) -> Double {
         let x = Double((seed &* 2654435761) % 10_000) / 10_000.0 // [0,1)
         return x * 2 - 1
+    }
+
+    // MARK: - Recolor
+
+    private func parseHex(_ hex: String) -> [Double]? {
+        var h = hex
+        if h.hasPrefix("#") { h = String(h.dropFirst()) }
+        let chars: [Character]
+        switch h.count {
+        case 3:
+            chars = h.flatMap { [$0, $0] }
+        case 6:
+            chars = Array(h)
+        default:
+            return nil
+        }
+        guard chars.count == 6 else { return nil }
+        let str = String(chars)
+        guard let val = UInt32(str, radix: 16) else { return nil }
+        let r = Double((val >> 16) & 0xFF) / 255.0
+        let g = Double((val >> 8) & 0xFF) / 255.0
+        let b = Double(val & 0xFF) / 255.0
+        return [r, g, b, 1]
+    }
+
+    private func applyRecolor(layer: inout [String: Any], rgba: [Double]) {
+        if var shapes = layer["shapes"] as? [[String: Any]] {
+            recolorShapes(&shapes, rgba: rgba)
+            layer["shapes"] = shapes
+        }
+    }
+
+    private func recolorShapes(_ shapes: inout [[String: Any]], rgba: [Double]) {
+        for i in shapes.indices {
+            let ty = shapes[i]["ty"] as? String
+            if ty == "fl" || ty == "st" {
+                if var c = shapes[i]["c"] as? [String: Any] {
+                    c["a"] = 0
+                    c["k"] = rgba
+                    shapes[i]["c"] = c
+                }
+            } else if ty == "gr" {
+                if var items = shapes[i]["it"] as? [[String: Any]] {
+                    recolorShapes(&items, rgba: rgba)
+                    shapes[i]["it"] = items
+                }
+            }
+        }
     }
 }

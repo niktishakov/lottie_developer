@@ -99,6 +99,11 @@ enum AnimationSpecSchema {
                         "items": ["type": "number"]
                     ],
                     "description": "Control points [[dx,dy], ...] for followPath. Offsets from layer base position."
+                ],
+                "color": [
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Hex color for recolor kind, e.g. \"#FFFFFF\" or \"#FFF\". Applied instantly at start time."
                 ]
             ]
         ]

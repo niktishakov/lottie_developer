@@ -30,7 +30,8 @@ enum CLIPrompts {
         - start/end are in SECONDS.
         - kind ∈ fadeIn, fadeOut, slideIn, slideOut, scaleIn, scaleOut, rotate, pulse, bounce, drawOn, wiggle,
           spin (continuous 360° loop), float (gentle vertical hover loop), breathe (subtle scale loop), swing (pendulum rotation loop),
-          followPath (move layer along a path defined by params.path: [[dx,dy], ...] offsets from base position, min 2 points).
+          followPath (move layer along a path defined by params.path: [[dx,dy], ...] offsets from base position, min 2 points),
+          recolor (instantly change all fill/stroke colors of the layer to params.color, a hex string like "#FF0000" or "#FFF"; applied at start time, end is ignored).
         - easing ∈ linear, easeIn, easeOut, easeInOut, spring, easeOutBack (overshoot), easeInBack, easeInOutBack, anticipate.
         - Animate ONLY these existing layers, by their EXACT names: \(names).
 
@@ -38,8 +39,8 @@ enum CLIPrompts {
         - Stagger entrances by 0.05–0.15s across layers; don't start everything at t=0.
         - Entrances: prefer easeOut or easeOutBack (a little overshoot reads as lively, not stiff).
         - Settles: spring or easeOutBack. Anticipation (anticipate/easeInBack) before a strong move adds energy.
-        - After entrances finish (first ~40% of duration), add a SUBTLE idle loop on a key layer so the scene stays alive:
-          float (amount 8–16), breathe (amount 104–108), swing (amount 4–10°), or spin for rotating accents.
+        - ONLY add idle loops (float, breathe, swing, spin) if the user explicitly asks for them or says "stay alive" / "idle loop".
+          Do NOT add extra animations beyond what was requested.
         - Keep accents subtle; don't overlap many loud loops. One or two tasteful accents beat many.
 
         Output ONLY the JSON object.
