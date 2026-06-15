@@ -23,6 +23,8 @@ struct HomeView: View {
                 Spacer()
                 Button { showAccount = true } label: { Label("Account", systemImage: "person.crop.circle") }
                 Button { _ = openSVGAsProject() } label: { Label("New from SVG…", systemImage: "square.and.arrow.down") }
+                Button { pasteSVGAsProject() } label: { Label("Paste SVG", systemImage: "doc.on.clipboard") }
+                    .keyboardShortcut("v")
                 Button {
                     let p = store.createSampleProject(name: "Untitled \(store.projects.count + 1)")
                     onOpen(p.id)
@@ -125,6 +127,17 @@ struct HomeView: View {
         let id = importSVGAsProject(url: url)
         if let id { onOpen(id) }
         return id
+    }
+
+    private func pasteSVGAsProject() {
+        let pb = NSPasteboard.general
+        guard let str = pb.string(forType: .string),
+              str.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<") else { return }
+        guard let data = str.data(using: .utf8) else { return }
+        guard let result = try? SVGToLottie.convert(svgData: data) else { return }
+        let p = store.createProjectFromSVG(name: "Pasted SVG", svgStaticData: result.data,
+                                            layerNames: result.layerNames, sourceLabel: "clipboard")
+        onOpen(p.id)
     }
 
     @discardableResult

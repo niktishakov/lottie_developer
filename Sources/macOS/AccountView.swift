@@ -73,6 +73,7 @@ struct AccountView: View {
                     row("Email", s.email ?? "—")
                     row("Organization", s.orgName ?? "—")
                     row("Plan", (s.subscriptionType ?? "—").capitalized)
+                    row("Usage", s.billingType ?? "—")
                     HStack(spacing: 6) {
                         Text("Endpoint").foregroundStyle(.secondary).frame(width: 100, alignment: .leading)
                         if s.isFirstParty {

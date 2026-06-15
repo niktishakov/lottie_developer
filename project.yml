@@ -36,6 +36,7 @@ targets:
           - Assets.xcassets
           - Info.plist
           - Resources
+          - macOS
       - path: Sources/Assets.xcassets
         buildPhase: resources
       - path: Sources/Resources/en.lproj
@@ -49,6 +50,33 @@ targets:
       - path: Sources/Store/LottieDeveloper.storekit
         buildPhase: resources
       - path: Sources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: Lottie
+        product: Lottie
+    scheme:
+      gatherCoverageData: false
+  LottieDeveloperMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    info:
+      path: Sources/macOS/Info.plist
+      properties:
+        CFBundleDisplayName: Lottie Dev
+        LSApplicationCategoryType: public.app-category.developer-tools
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nikapps.lottie.developer.mac
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 1
+        ENABLE_HARDENED_RUNTIME: YES
+    sources:
+      - path: Sources/AI/Spec
+      - path: Sources/macOS
+        excludes:
+          - Info.plist
+      - path: Sources/Resources/rocket_static_simplified.json
         buildPhase: resources
     dependencies:
       - package: Lottie

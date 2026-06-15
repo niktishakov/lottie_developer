@@ -14,3 +14,5 @@ cert_key.pub
 .claude/settings.local.json
 .claude/mcp.json
 .claude/context.env
+build/
+build/

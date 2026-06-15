@@ -7,11 +7,18 @@ struct AnimationLibraryView: View {
         case invalidJSON
     }
 
+    private enum SVGImportError: Error {
+        case invalidSVG
+    }
+
     @Environment(AnimationStore.self) private var store
     @Environment(PurchaseStore.self) private var purchaseStore
+    @Environment(RevisionStore.self) private var revisionStore
+    private let canonicalizationService = CanonicalizationService()
     @State private var showFileImporter = false
     @State private var showURLImporter = false
     @State private var showPasteImporter = false
+    @State private var showSourcePicker = false
     @State private var showPaywall = false
     @State private var pasteName = ""
     @State private var urlString = ""
@@ -20,6 +27,18 @@ struct AnimationLibraryView: View {
     @State private var showError = false
     @State private var isDownloading = false
     @State private var isImporting = false
+    @State private var fileImportSourceType: SourceType = .lottieJSON
+
+    private var fileImporterTypes: [UTType] {
+        switch fileImportSourceType {
+        case .lottieJSON:
+            return [UTType.json, UTType(filenameExtension: "lottie") ?? .json]
+        case .svg:
+            return [UTType(filenameExtension: "svg") ?? .xml]
+        case .promptSpec:
+            return [.plainText]
+        }
+    }
 
     private var filteredAnimations: [AnimationItem] {
         if searchText.isEmpty {
@@ -50,7 +69,7 @@ struct AnimationLibraryView: View {
             }
             .fileImporter(
                 isPresented: $showFileImporter,
-                allowedContentTypes: [UTType.json, UTType(filenameExtension: "lottie") ?? .json],
+                allowedContentTypes: fileImporterTypes,
                 allowsMultipleSelection: true
             ) { result in
                 Task { await handleFileImport(result) }
@@ -91,6 +110,34 @@ struct AnimationLibraryView: View {
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
                     .environment(purchaseStore)
+            }
+            .sheet(isPresented: $showSourcePicker) {
+                ImportSourcePickerView(
+                    onImportFromFiles: {
+                        showSourcePicker = false
+                        requestImportFiles()
+                    },
+                    onImportFromURL: {
+                        showSourcePicker = false
+                        requestImportFromURL()
+                    },
+                    onImportFromClipboard: {
+                        showSourcePicker = false
+                        requestImportFromClipboard()
+                    },
+                    onImportSVGFromFiles: {
+                        showSourcePicker = false
+                        requestImportSVGFiles()
+                    },
+                    onImportSVGFromURL: {
+                        showSourcePicker = false
+                        requestImportSVGFromURL()
+                    },
+                    onImportSVGFromClipboard: {
+                        showSourcePicker = false
+                        requestImportSVGFromClipboard()
+                    }
+                )
             }
         }
     }
@@ -209,7 +256,7 @@ struct AnimationLibraryView: View {
             }
         }
         .navigationDestination(for: AnimationItem.self) { item in
-            AnimationPlayerView(item: item)
+            PipelineRunView(item: item)
         }
     }
 
@@ -346,27 +393,8 @@ struct AnimationLibraryView: View {
     }
 
     private var importMenu: some View {
-        Menu {
-            Button {
-                requestImportFiles()
-            } label: {
-                Label(L10n.string("library.import.files"), systemImage: "folder")
-            }
-            .keyboardShortcut("o", modifiers: .command)
-
-            Button {
-                requestImportFromURL()
-            } label: {
-                Label(L10n.string("library.import.url"), systemImage: "link")
-            }
-            .keyboardShortcut("u", modifiers: .command)
-
-            Button {
-                requestImportFromClipboard()
-            } label: {
-                Label(L10n.string("library.import.paste"), systemImage: "doc.on.clipboard")
-            }
-            .keyboardShortcut("v", modifiers: [.command, .shift])
+        Button {
+            showSourcePicker = true
         } label: {
             ZStack {
                 Circle()
@@ -382,6 +410,7 @@ struct AnimationLibraryView: View {
             .frame(width: 44, height: 44)
             .contentShape(Circle())
         }
+        .buttonStyle(.plain)
         .accessibilityLabel(L10n.string("library.import.add"))
         .disabled(isImporting || isDownloading)
     }
@@ -389,7 +418,7 @@ struct AnimationLibraryView: View {
     // MARK: - Import Logic
 
     private func requestPrimaryImport() {
-        requestImportFiles()
+        showSourcePicker = true
     }
 
     private func requestImportFiles() {
@@ -397,6 +426,16 @@ struct AnimationLibraryView: View {
             showPaywall = true
             return
         }
+        fileImportSourceType = .lottieJSON
+        showFileImporter = true
+    }
+
+    private func requestImportSVGFiles() {
+        guard purchaseStore.isPro else {
+            showPaywall = true
+            return
+        }
+        fileImportSourceType = .svg
         showFileImporter = true
     }
 
@@ -405,6 +444,17 @@ struct AnimationLibraryView: View {
             showPaywall = true
             return
         }
+        fileImportSourceType = .lottieJSON
+        urlString = ""
+        showURLImporter = true
+    }
+
+    private func requestImportSVGFromURL() {
+        guard purchaseStore.isPro else {
+            showPaywall = true
+            return
+        }
+        fileImportSourceType = .svg
         urlString = ""
         showURLImporter = true
     }
@@ -414,6 +464,17 @@ struct AnimationLibraryView: View {
             showPaywall = true
             return
         }
+        fileImportSourceType = .lottieJSON
+        pasteName = ""
+        showPasteImporter = true
+    }
+
+    private func requestImportSVGFromClipboard() {
+        guard purchaseStore.isPro else {
+            showPaywall = true
+            return
+        }
+        fileImportSourceType = .svg
         pasteName = ""
         showPasteImporter = true
     }
@@ -426,13 +487,25 @@ struct AnimationLibraryView: View {
 
             for url in urls {
                 do {
-                    _ = try await store.importAnimation(from: url)
+                    switch fileImportSourceType {
+                    case .lottieJSON:
+                        let imported = try await store.importAnimation(from: url)
+                        _ = await revisionStore.ensureRun(for: imported, animationStore: store)
+                    case .svg:
+                        _ = try await importSVGFile(from: url)
+                    case .promptSpec:
+                        throw AnimationStore.ImportError.invalidLottieJSON
+                    }
                 } catch {
-                    importError = L10n.format(
-                        "library.error.importFailed",
-                        url.lastPathComponent,
-                        error.localizedDescription
-                    )
+                    if case SVGImportError.invalidSVG = error {
+                        importError = "Invalid SVG file: \(url.lastPathComponent)"
+                    } else {
+                        importError = L10n.format(
+                            "library.error.importFailed",
+                            url.lastPathComponent,
+                            error.localizedDescription
+                        )
+                    }
                     showError = true
                 }
             }
@@ -458,19 +531,51 @@ struct AnimationLibraryView: View {
         defer { isImporting = false }
 
         do {
-            let data = try await Task.detached(priority: .userInitiated) {
-                guard let data = string.data(using: .utf8),
-                      (try? JSONSerialization.jsonObject(with: data)) != nil else {
-                    throw ClipboardValidationError.invalidJSON
-                }
-                return data
-            }.value
+            switch fileImportSourceType {
+            case .lottieJSON:
+                let data = try await Task.detached(priority: .userInitiated) {
+                    guard let data = string.data(using: .utf8),
+                          (try? JSONSerialization.jsonObject(with: data)) != nil else {
+                        throw ClipboardValidationError.invalidJSON
+                    }
+                    return data
+                }.value
 
-            _ = try await store.importAnimation(data: data, name: animationName)
+                let imported = try await store.importAnimation(data: data, name: animationName)
+                _ = await revisionStore.ensureRun(for: imported, animationStore: store)
+
+            case .svg:
+                let svgData = try await Task.detached(priority: .userInitiated) {
+                    guard let data = string.data(using: .utf8),
+                          string.range(of: "<svg", options: .caseInsensitive) != nil else {
+                        throw SVGImportError.invalidSVG
+                    }
+                    return data
+                }.value
+
+                let previewJSON = try await makeSVGPreviewJSONData(
+                    svgData: svgData,
+                    sourceName: "clipboard.svg"
+                )
+                let imported = try await store.importAnimation(data: previewJSON, name: animationName)
+                _ = try await revisionStore.createRun(
+                    for: imported,
+                    sourceType: .svg,
+                    sourceData: svgData,
+                    sourceFileName: "clipboard.svg",
+                    metadata: ["intake_channel": "clipboard"]
+                )
+
+            case .promptSpec:
+                throw ClipboardValidationError.invalidJSON
+            }
+
             pasteName = ""
         } catch {
             if case ClipboardValidationError.invalidJSON = error {
                 importError = L10n.string("library.error.invalidJSON")
+            } else if case SVGImportError.invalidSVG = error {
+                importError = "Clipboard does not contain valid SVG"
             } else {
                 importError = L10n.format("library.error.saveFailed", error.localizedDescription)
             }
@@ -496,13 +601,100 @@ struct AnimationLibraryView: View {
 
             let (data, _) = try await session.data(from: url)
             let name = url.deletingPathExtension().lastPathComponent
-            _ = try await store.importAnimation(data: data, name: name)
+
+            switch fileImportSourceType {
+            case .lottieJSON:
+                let imported = try await store.importAnimation(data: data, name: name)
+                _ = await revisionStore.ensureRun(for: imported, animationStore: store)
+            case .svg:
+                guard let svgString = String(data: data, encoding: .utf8),
+                      svgString.range(of: "<svg", options: .caseInsensitive) != nil else {
+                    throw SVGImportError.invalidSVG
+                }
+
+                let sourceName = url.lastPathComponent.isEmpty ? "remote.svg" : url.lastPathComponent
+                let previewJSON = try await makeSVGPreviewJSONData(
+                    svgData: data,
+                    sourceName: sourceName
+                )
+                let imported = try await store.importAnimation(data: previewJSON, name: name)
+                _ = try await revisionStore.createRun(
+                    for: imported,
+                    sourceType: .svg,
+                    sourceData: data,
+                    sourceFileName: sourceName,
+                    metadata: [
+                        "intake_channel": "url",
+                        "source_url": url.absoluteString
+                    ]
+                )
+            case .promptSpec:
+                throw AnimationStore.ImportError.invalidLottieJSON
+            }
         } catch let error as URLError where error.code == .timedOut {
             importError = L10n.string("library.error.timeout")
+            showError = true
+        } catch SVGImportError.invalidSVG {
+            importError = "Downloaded payload is not valid SVG"
             showError = true
         } catch {
             importError = L10n.format("library.error.downloadFailed", error.localizedDescription)
             showError = true
+        }
+    }
+
+    private func importSVGFile(from sourceURL: URL) async throws -> AnimationItem {
+        let sourceData = try await Task.detached(priority: .userInitiated) {
+            let accessing = sourceURL.startAccessingSecurityScopedResource()
+            defer {
+                if accessing {
+                    sourceURL.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            let data = try Data(contentsOf: sourceURL, options: .mappedIfSafe)
+            guard let text = String(data: data, encoding: .utf8),
+                  text.range(of: "<svg", options: .caseInsensitive) != nil else {
+                throw SVGImportError.invalidSVG
+            }
+            return data
+        }.value
+
+        let animationName = sourceURL.deletingPathExtension().lastPathComponent
+        let previewJSON = try await makeSVGPreviewJSONData(
+            svgData: sourceData,
+            sourceName: sourceURL.lastPathComponent
+        )
+        let imported = try await store.importAnimation(data: previewJSON, name: animationName)
+        _ = try await revisionStore.createRun(
+            for: imported,
+            sourceType: .svg,
+            sourceData: sourceData,
+            sourceFileName: sourceURL.lastPathComponent,
+            metadata: ["intake_channel": "files"]
+        )
+        return imported
+    }
+
+    private func makeSVGPreviewJSONData(svgData: Data, sourceName: String) async throws -> Data {
+        do {
+            let canvas = try canonicalizationService.extractSVGCanvasSize(svgData: svgData)
+            let pngData = try await SVGSnapshotRenderer.renderPNGData(
+                from: svgData,
+                width: canvas.width,
+                height: canvas.height
+            )
+            return try canonicalizationService.makeDraftDataFromPNG(
+                pngData: pngData,
+                sourceName: sourceName,
+                width: canvas.width,
+                height: canvas.height
+            )
+        } catch {
+            return try canonicalizationService.makeDraftDataFromSVG(
+                svgData: svgData,
+                sourceName: sourceName
+            )
         }
     }
 }

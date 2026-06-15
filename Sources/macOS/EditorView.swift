@@ -19,6 +19,9 @@ struct EditorView: View {
     @State private var generating = false
     @State private var dropTargeted = false
     @State private var showAccount = false
+    @State private var tokenUsage: TokenUsage?
+    @AppStorage("ai.model") private var modelID = AIModel.defaultID
+    @AppStorage("ai.effort") private var effortID = AIEffort.defaultID
 
     private var project: AnimationProject? { store.project(projectID) }
 
@@ -49,6 +52,8 @@ struct EditorView: View {
                 Spacer()
                 Button { showAccount = true } label: { Label("Account", systemImage: "person.crop.circle") }
                 Button("Replace SVG…") { openSVG() }
+                Button("Paste SVG") { pasteSVGFromClipboard() }
+                    .keyboardShortcut("v")
                 Toggle("Loop", isOn: $loop)
             }
 
@@ -62,6 +67,37 @@ struct EditorView: View {
                 TextField("Describe the animation…", text: $prompt, axis: .vertical)
                     .lineLimit(1...3)
                     .textFieldStyle(.roundedBorder)
+                Menu {
+                    ForEach(AIModel.all) { m in
+                        Button {
+                            modelID = m.id
+
+                        } label: {
+                            if modelID == m.id { Label("\(m.label) — \(m.blurb)", systemImage: "checkmark") }
+                            else { Text("\(m.label) — \(m.blurb)") }
+                        }
+                    }
+                } label: {
+                    Label(AIModel.label(for: modelID), systemImage: "cpu")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .disabled(generating)
+                Menu {
+                    ForEach(AIEffort.all) { e in
+                        Button {
+                            effortID = e.id
+                        } label: {
+                            if effortID == e.id { Label(e.label, systemImage: "checkmark") }
+                            else { Text(e.label) }
+                        }
+                    }
+                } label: {
+                    Label(AIEffort.label(for: effortID), systemImage: "gauge.with.dots.needle.67percent")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .disabled(generating)
                 Button {
                     generate()
                 } label: {
@@ -85,10 +121,19 @@ struct EditorView: View {
             .overlay { if dropTargeted { dropHint } }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(status.isEmpty ? "\(project.layerNames.count) layers · \(project.sourceLabel)" : status)
-                    .font(.caption).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
+                HStack(spacing: 8) {
+                    Text(status.isEmpty ? "\(project.layerNames.count) layers · \(project.sourceLabel)" : status)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                    if let tu = tokenUsage {
+                        tokenBadge(tu)
+                            .opacity(generating ? 0.7 : 1)
+                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: generating)
+                    } else if generating {
+                        ProgressView().controlSize(.mini)
+                    }
+                }
                 if status.lowercased().contains("generation failed") {
                     Button { showAccount = true } label: {
                         Label("Check account / switch…", systemImage: "person.crop.circle.badge.exclamationmark")
@@ -197,6 +242,39 @@ struct EditorView: View {
             .allowsHitTesting(false)
     }
 
+    // MARK: - Token badge
+
+    private func tokenBadge(_ tu: TokenUsage) -> some View {
+        HStack(spacing: 4) {
+            if tu.costUSD > 0 {
+                Text(String(format: "$%.4f", tu.costUSD))
+            }
+            if tu.outputTokens > 0 {
+                Text("↑\(formatTokens(tu.outputTokens))")
+            }
+            if tu.inputTokens > 0 || tu.cacheReadTokens > 0 || tu.cacheCreationTokens > 0 {
+                Text("↓\(formatTokens(tu.inputTokens + tu.cacheReadTokens + tu.cacheCreationTokens))")
+            }
+            if !tu.rateLimitStatus.isEmpty {
+                Image(systemName: tu.rateLimitStatus == "allowed" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(tu.rateLimitStatus == "allowed" ? .green : .orange)
+                if let resets = tu.rateLimitResetsAt {
+                    Text("resets \(resets, style: .relative)")
+                }
+            }
+        }
+        .font(.caption2.monospacedDigit())
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(RoundedRectangle(cornerRadius: 4).fill(Color(white: 0.18)))
+    }
+
+    private func formatTokens(_ count: Int) -> String {
+        if count >= 1000 { return String(format: "%.1fk", Double(count) / 1000) }
+        return "\(count)"
+    }
+
     // MARK: - Actions
 
     private func loadInitial() {
@@ -230,11 +308,20 @@ struct EditorView: View {
         }
         let names = project.layerNames
         let request = prompt
+        let model = modelID
+        let effort = effortID
         generating = true
-        status = "Generating with claude (opus)…"
+        tokenUsage = nil
+        let effortNote = effort.isEmpty ? "" : ", \(AIEffort.label(for: effort).lowercased()) effort"
+        status = "Generating with claude (\(AIModel.label(for: model))\(effortNote))…"
         Task {
             do {
-                let (spec, _) = try await CLIProvider().generateSpec(request: request, layerNames: names, durationSeconds: 3)
+                let (spec, _) = try await CLIProvider(model: model, effort: effort)
+                    .generateSpec(request: request, layerNames: names, durationSeconds: 3) { usage in
+                        Task { @MainActor in
+                            tokenUsage = usage
+                        }
+                    }
                 let result = try LottieCompiler().compile(staticLottie: geom, spec: spec)
                 let specJSON = (try? JSONEncoder().encode(spec)).flatMap { String(data: $0, encoding: .utf8) }
                 await MainActor.run {
@@ -274,6 +361,25 @@ struct EditorView: View {
             status = "Replaced geometry: \(result.layerNames.count) named layers\(warn)"
         } catch {
             status = "SVG import failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func pasteSVGFromClipboard() {
+        let pb = NSPasteboard.general
+        guard let str = pb.string(forType: .string),
+              str.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<") else {
+            status = "Clipboard does not contain SVG"; return
+        }
+        guard let data = str.data(using: .utf8) else { status = "Could not read clipboard"; return }
+        do {
+            let result = try SVGToLottie.convert(svgData: data)
+            store.setImportedStatic(projectID: projectID, data: result.data,
+                                    layerNames: result.layerNames, sourceLabel: "clipboard")
+            showGeometry()
+            let warn = result.warnings.isEmpty ? "" : " · \(result.warnings.count) warning(s)"
+            status = "Pasted SVG: \(result.layerNames.count) named layers\(warn)"
+        } catch {
+            status = "SVG paste failed: \(error.localizedDescription)"
         }
     }
 

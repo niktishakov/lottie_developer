@@ -15,7 +15,9 @@ final class PurchaseStore {
     private(set) var purchasedProductIDs: Set<String> = []
     private(set) var isLoading = false
 
-    var isPro: Bool { !purchasedProductIDs.isEmpty }
+    var isPro: Bool {
+        AppDebugFlags.forceProSubscriptionAccess || !purchasedProductIDs.isEmpty
+    }
 
     nonisolated(unsafe) private var transactionListener: Task<Void, Never>?
 

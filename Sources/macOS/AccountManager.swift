@@ -20,8 +20,8 @@ final class AccountManager {
         var email: String?
         var orgName: String?
         var subscriptionType: String?
+        var billingType: String?
 
-        /// Генерация идёт напрямую к Anthropic (а не через сторонний relay).
         var isFirstParty: Bool { (apiProvider ?? "").lowercased() == "firstparty" }
     }
 
@@ -55,6 +55,7 @@ final class AccountManager {
                 if merged.email == nil { merged.email = local.email }
                 if merged.orgName == nil { merged.orgName = local.org }
                 if merged.subscriptionType == nil { merged.subscriptionType = local.plan }
+                if merged.billingType == nil { merged.billingType = local.billing }
             }
             status = merged
         } catch {
@@ -64,7 +65,7 @@ final class AccountManager {
     }
 
     /// Читает профиль аккаунта из ~/.claude.json (или $CLAUDE_CONFIG_DIR/.claude.json).
-    private static func loadLocalAccount() -> (email: String?, org: String?, plan: String?) {
+    private static func loadLocalAccount() -> (email: String?, org: String?, plan: String?, billing: String?) {
         let fm = FileManager.default
         var path = (NSHomeDirectory() as NSString).appendingPathComponent(".claude.json")
         if let dir = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"], !dir.isEmpty {
@@ -73,10 +74,11 @@ final class AccountManager {
         }
         guard let data = fm.contents(atPath: path),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let oa = root["oauthAccount"] as? [String: Any] else { return (nil, nil, nil) }
+              let oa = root["oauthAccount"] as? [String: Any] else { return (nil, nil, nil, nil) }
         let plan = (oa["subscriptionType"] as? String).map { $0.capitalized }
             ?? prettyBilling(oa["billingType"] as? String)
-        return (oa["emailAddress"] as? String, oa["organizationName"] as? String, plan)
+        let billing = prettyBilling(oa["billingType"] as? String)
+        return (oa["emailAddress"] as? String, oa["organizationName"] as? String, plan, billing)
     }
 
     private static func prettyBilling(_ raw: String?) -> String? {
@@ -112,9 +114,10 @@ final class AccountManager {
         let nodeBinDir = (claudePath as NSString).deletingLastPathComponent
         let script = """
         #!/bin/zsh
-        echo "Switching Claude account…"
+        unset ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL
+        echo "Signing in to Claude (subscription)…"
         echo
-        PATH="\(nodeBinDir):$PATH" "\(claudePath)" auth login
+        PATH="\(nodeBinDir):$PATH" "\(claudePath)" auth login --claudeai
         echo
         echo "Done. Close this window and tap Refresh in Lottie Developer."
         """
