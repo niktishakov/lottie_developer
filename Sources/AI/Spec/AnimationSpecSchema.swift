@@ -49,12 +49,17 @@ enum AnimationSpecSchema {
             "properties": [
                 "target": [
                     "type": "string",
-                    "description": "Exact layer name (nm) from the static Lottie."
+                    "description": "Layer name (nm). Supports trailing wildcard: \"item_*\" matches all layers with that prefix."
                 ],
                 "animations": [
                     "type": "array",
                     "minItems": 1,
                     "items": primitiveSchema
+                ],
+                "staggerDelay": [
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Seconds between each matched layer when target uses wildcard. First layer starts at original time, each next adds staggerDelay."
                 ]
             ]
         ]
@@ -103,7 +108,21 @@ enum AnimationSpecSchema {
                 "color": [
                     "type": "string",
                     "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
-                    "description": "Hex color for recolor kind, e.g. \"#FFFFFF\" or \"#FFF\". Applied instantly at start time."
+                    "description": "Hex color. recolor: applied instantly. colorTransition: target color."
+                ],
+                "fromColor": [
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Starting hex color for colorTransition. If omitted, reads current fill/stroke."
+                ],
+                "blurAmount": [
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Gaussian blur radius for blurIn/blurOut (default 20)."
+                ],
+                "axis": [
+                    "enum": ["x", "y"],
+                    "description": "Rotation axis for flip: \"x\" (vertical) or \"y\" (horizontal, default)."
                 ]
             ]
         ]

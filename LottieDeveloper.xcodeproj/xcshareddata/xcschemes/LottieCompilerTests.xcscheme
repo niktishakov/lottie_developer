@@ -15,9 +15,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "B40CA5BCBC82454A87AC206C"
-               BuildableName = "LottieDeveloper.app"
-               BlueprintName = "LottieDeveloper"
+               BlueprintIdentifier = "57A0C7DEDD248AF5B7B19303"
+               BuildableName = "LottieCompilerTests.xctest"
+               BlueprintName = "LottieCompilerTests"
                ReferencedContainer = "container:LottieDeveloper.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -32,9 +32,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B40CA5BCBC82454A87AC206C"
-            BuildableName = "LottieDeveloper.app"
-            BlueprintName = "LottieDeveloper"
+            BlueprintIdentifier = "57A0C7DEDD248AF5B7B19303"
+            BuildableName = "LottieCompilerTests.xctest"
+            BlueprintName = "LottieCompilerTests"
             ReferencedContainer = "container:LottieDeveloper.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -64,16 +64,15 @@
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
+      <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B40CA5BCBC82454A87AC206C"
-            BuildableName = "LottieDeveloper.app"
-            BlueprintName = "LottieDeveloper"
+            BlueprintIdentifier = "57A0C7DEDD248AF5B7B19303"
+            BuildableName = "LottieCompilerTests.xctest"
+            BlueprintName = "LottieCompilerTests"
             ReferencedContainer = "container:LottieDeveloper.xcodeproj">
          </BuildableReference>
-      </BuildableProductRunnable>
+      </MacroExpansion>
       <CommandLineArguments>
       </CommandLineArguments>
    </LaunchAction>
@@ -83,18 +82,17 @@
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B40CA5BCBC82454A87AC206C"
-            BuildableName = "LottieDeveloper.app"
-            BlueprintName = "LottieDeveloper"
-            ReferencedContainer = "container:LottieDeveloper.xcodeproj">
-         </BuildableReference>
-      </BuildableProductRunnable>
       <CommandLineArguments>
       </CommandLineArguments>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "57A0C7DEDD248AF5B7B19303"
+            BuildableName = "LottieCompilerTests.xctest"
+            BlueprintName = "LottieCompilerTests"
+            ReferencedContainer = "container:LottieDeveloper.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">

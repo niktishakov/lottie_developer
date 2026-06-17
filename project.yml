@@ -56,6 +56,8 @@ targets:
         product: Lottie
     scheme:
       gatherCoverageData: false
+      testTargets:
+        - LottieCompilerTests
   LottieDeveloperMac:
     type: application
     platform: macOS
@@ -83,3 +85,17 @@ targets:
         product: Lottie
     scheme:
       gatherCoverageData: false
+  LottieCompilerTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    sources:
+      - path: Tests
+    dependencies:
+      - target: LottieDeveloperMac
+    scheme:
+      testTargets:
+        - LottieCompilerTests

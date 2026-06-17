@@ -138,11 +138,7 @@ struct PipelineRunView: View {
     }
 
     private var previewPanel: some View {
-        AnimationPlayerView(
-            item: item,
-            showsNavigationChrome: false,
-            showsControls: false
-        )
+        AnimationPlayerView(item: item)
         .frame(minHeight: 280)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }

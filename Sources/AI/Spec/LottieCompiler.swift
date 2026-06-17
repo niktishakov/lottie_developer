@@ -49,62 +49,86 @@ struct LottieCompiler {
         let maxInd = layers.compactMap { $0["ind"] as? Int }.max() ?? 0
 
         for layerSpec in spec.layers {
-            guard let idx = indexByName[layerSpec.target] else {
+            let matches: [(name: String, idx: Int)]
+            if layerSpec.target.contains("*") {
+                matches = matchWildcard(layerSpec.target, indexByName: indexByName)
+            } else if let idx = indexByName[layerSpec.target] {
+                matches = [(layerSpec.target, idx)]
+            } else {
+                matches = []
+            }
+
+            if matches.isEmpty {
                 warnings.append("Layer '\(layerSpec.target)' not found — animations skipped")
                 continue
             }
 
-            var layer = layers[idx]
-            var ks = layer["ks"] as? [String: Any] ?? [:]
-            let originalKs = ks
-            var needsClip = false
+            let stagger = layerSpec.staggerDelay ?? 0
 
-            for primitive in layerSpec.animations {
-                if primitive.kind == .drawOn {
-                    let startFrame = frame(primitive.start, fps: fps)
-                    var endFrame = frame(primitive.end, fps: fps)
-                    if endFrame <= startFrame { endFrame = startFrame + 1 }
-                    let shapes = layer["shapes"] as? [[String: Any]] ?? []
+            for (matchIndex, match) in matches.enumerated() {
+                let idx = match.idx
+                let timeOffset = stagger * Double(matchIndex)
 
-                    if containsType(shapes, "st") {
-                        var mutableShapes = shapes
-                        injectTrimOnStrokes(&mutableShapes, startFrame: startFrame, endFrame: endFrame, easing: primitive.easing)
-                        layer["shapes"] = mutableShapes
-                    } else if let matte = buildDrawOnMatte(
-                        targetLayer: layer, shapes: shapes,
-                        startFrame: startFrame, endFrame: endFrame,
-                        easing: primitive.easing, duration: duration,
-                        matteInd: maxInd + 100 + matteInserts.count
-                    ) {
-                        matteInserts.append((layerIdx: idx, matte: matte))
+                var layer = layers[idx]
+                var ks = layer["ks"] as? [String: Any] ?? [:]
+                let originalKs = ks
+                var needsClip = false
+
+                for primitive in layerSpec.animations {
+                    let p = timeOffset > 0
+                        ? MotionPrimitive(kind: primitive.kind,
+                                          start: primitive.start + timeOffset,
+                                          end: primitive.end + timeOffset,
+                                          easing: primitive.easing,
+                                          params: primitive.params)
+                        : primitive
+
+                    if p.kind == .drawOn {
+                        let startFrame = frame(p.start, fps: fps)
+                        var endFrame = frame(p.end, fps: fps)
+                        if endFrame <= startFrame { endFrame = startFrame + 1 }
+                        let shapes = layer["shapes"] as? [[String: Any]] ?? []
+
+                        if containsType(shapes, "st") {
+                            var mutableShapes = shapes
+                            injectTrimOnStrokes(&mutableShapes, startFrame: startFrame, endFrame: endFrame, easing: p.easing)
+                            layer["shapes"] = mutableShapes
+                        } else if let matte = buildDrawOnMatte(
+                            targetLayer: layer, shapes: shapes,
+                            startFrame: startFrame, endFrame: endFrame,
+                            easing: p.easing, duration: duration,
+                            matteInd: maxInd + 100 + matteInserts.count
+                        ) {
+                            matteInserts.append((layerIdx: idx, matte: matte))
+                        }
+                    } else {
+                        applyPrimitive(
+                            p,
+                            ks: &ks,
+                            originalKs: originalKs,
+                            layer: &layer,
+                            fps: fps,
+                            warnings: &warnings,
+                            targetName: match.name,
+                            needsClip: &needsClip
+                        )
                     }
-                } else {
-                    applyPrimitive(
-                        primitive,
-                        ks: &ks,
-                        originalKs: originalKs,
-                        layer: &layer,
-                        fps: fps,
-                        warnings: &warnings,
-                        targetName: layerSpec.target,
-                        needsClip: &needsClip
-                    )
                 }
-            }
 
-            layer["ks"] = ks
-            layer["ip"] = 0
-            layer["op"] = duration
-            layers[idx] = layer
+                layer["ks"] = ks
+                layer["ip"] = 0
+                layer["op"] = duration
+                layers[idx] = layer
 
-            let hasDrawOnMatte = matteInserts.contains { $0.layerIdx == idx }
-            if needsClip && !hasDrawOnMatte {
-                let clip = buildClipMatte(
-                    compW: compW, compH: compH,
-                    duration: duration,
-                    matteInd: maxInd + 300 + clipInserts.count
-                )
-                clipInserts.append((layerIdx: idx, matte: clip))
+                let hasDrawOnMatte = matteInserts.contains { $0.layerIdx == idx }
+                if needsClip && !hasDrawOnMatte {
+                    let clip = buildClipMatte(
+                        compW: compW, compH: compH,
+                        duration: duration,
+                        matteInd: maxInd + 300 + clipInserts.count
+                    )
+                    clipInserts.append((layerIdx: idx, matte: clip))
+                }
             }
         }
 
@@ -167,14 +191,14 @@ struct LottieCompiler {
             ])
             needsClip = true
         case .scaleIn:
-            let from = p.from ?? 0
-            let to = p.to ?? 100
+            let from = normalizeScale(p.from ?? 0)
+            let to = normalizeScale(p.to ?? 100)
             setVector(&ks, "s", ix: 6, [
                 kf(startFrame, [from, from, 100], easing), kf(endFrame, [to, to, 100])
             ])
         case .scaleOut:
-            let from = p.from ?? 100
-            let to = p.to ?? 0
+            let from = normalizeScale(p.from ?? 100)
+            let to = normalizeScale(p.to ?? 0)
             setVector(&ks, "s", ix: 6, [
                 kf(startFrame, [from, from, 100], easing), kf(endFrame, [to, to, 100])
             ])
@@ -186,7 +210,7 @@ struct LottieCompiler {
                 kf(startFrame, [from], easing), kf(endFrame, [to])
             ])
         case .pulse:
-            let peak = p.amount ?? 110
+            let peak = normalizeScale(p.amount ?? 110)
             let repeats = max(1, p.repeatCount ?? 1)
             setVector(&ks, "s", ix: 6, pulseKeyframes(
                 startFrame: startFrame, endFrame: endFrame, peak: peak, repeats: repeats, easing: easing
@@ -217,7 +241,7 @@ struct LottieCompiler {
             let amount = p.amount ?? 12
             setVector(&ks, "p", ix: 2, floatKeyframes(base: base, startFrame: startFrame, endFrame: endFrame, amount: amount))
         case .breathe:
-            let peak = p.amount ?? 106
+            let peak = normalizeScale(p.amount ?? 106)
             setVector(&ks, "s", ix: 6, pulseKeyframes(
                 startFrame: startFrame, endFrame: endFrame, peak: peak,
                 repeats: max(1, p.repeatCount ?? 1), easing: .easeInOut
@@ -241,6 +265,62 @@ struct LottieCompiler {
             } else {
                 warnings.append("Layer '\(targetName)': recolor needs params.color (hex) — skipped")
             }
+        case .squash:
+            let amount = normalizeScale(p.amount ?? 130)
+            let inverse = 10000.0 / amount
+            let mid = startFrame + (endFrame - startFrame) / 2
+            setVector(&ks, "s", ix: 6, [
+                kf(startFrame, [100, 100, 100], easing),
+                kf(mid, [amount, inverse, 100], easing),
+                kf(endFrame, [100, 100, 100])
+            ])
+        case .stretch:
+            let amount = normalizeScale(p.amount ?? 130)
+            let inverse = 10000.0 / amount
+            let mid = startFrame + (endFrame - startFrame) / 2
+            setVector(&ks, "s", ix: 6, [
+                kf(startFrame, [100, 100, 100], easing),
+                kf(mid, [inverse, amount, 100], easing),
+                kf(endFrame, [100, 100, 100])
+            ])
+        case .flash:
+            let low = p.amount ?? 0
+            let repeats = max(1, p.repeatCount ?? 1)
+            setScalar(&ks, "o", ix: 11, flashKeyframes(
+                startFrame: startFrame, endFrame: endFrame, low: low, repeats: repeats, easing: easing
+            ))
+        case .flip:
+            layer["ddd"] = 1
+            let flipAxis = (p.axis == "x") ? "rx" : "ry"
+            let ixVal = (p.axis == "x") ? 8 : 9
+            let from = p.fromDeg ?? 0
+            let to = p.toDeg ?? 180
+            setScalar(&ks, flipAxis, ix: ixVal, [
+                kf(startFrame, [from], easing), kf(endFrame, [to])
+            ])
+        case .colorTransition:
+            if let toHex = p.color, let toRGBA = parseHex(toHex) {
+                let fromRGBA: [Double]
+                if let fromHex = p.fromColor, let parsed = parseHex(fromHex) {
+                    fromRGBA = parsed
+                } else {
+                    fromRGBA = readCurrentColor(layer: layer) ?? [0, 0, 0, 1]
+                }
+                applyColorTransition(
+                    layer: &layer, from: fromRGBA, to: toRGBA,
+                    startFrame: startFrame, endFrame: endFrame, easing: easing
+                )
+            } else {
+                warnings.append("Layer '\(targetName)': colorTransition needs params.color — skipped")
+            }
+        case .blurIn:
+            let amount = p.blurAmount ?? 20
+            applyBlurEffect(layer: &layer, fromBlur: amount, toBlur: 0,
+                            startFrame: startFrame, endFrame: endFrame, easing: easing)
+        case .blurOut:
+            let amount = p.blurAmount ?? 20
+            applyBlurEffect(layer: &layer, fromBlur: 0, toBlur: amount,
+                            startFrame: startFrame, endFrame: endFrame, easing: easing)
         }
     }
 
@@ -611,6 +691,7 @@ struct LottieCompiler {
         case .easeInBack:   return (0.36, 0, 0.66, -0.56) // оттяжка в начале (y<0)
         case .easeInOutBack:return (0.68, -0.6, 0.32, 1.6)
         case .anticipate:   return (0.4, -0.3, 0.6, 1)
+        case .elastic:      return (0.175, 0.885, 0.32, 1.275) // выраженный перелёт
         }
     }
 
@@ -660,7 +741,30 @@ struct LottieCompiler {
         return v
     }
 
+    // MARK: - Wildcard matching
+
+    private func matchWildcard(_ pattern: String, indexByName: [String: Int]) -> [(name: String, idx: Int)] {
+        if pattern.hasSuffix("*") {
+            let prefix = String(pattern.dropLast())
+            return indexByName
+                .filter { $0.key.hasPrefix(prefix) }
+                .sorted { $0.value < $1.value }
+                .map { ($0.key, $0.value) }
+        } else if pattern.hasPrefix("*") {
+            let suffix = String(pattern.dropFirst())
+            return indexByName
+                .filter { $0.key.hasSuffix(suffix) }
+                .sorted { $0.value < $1.value }
+                .map { ($0.key, $0.value) }
+        }
+        return []
+    }
+
     // MARK: - Utilities
+
+    private func normalizeScale(_ v: Double) -> Double {
+        v > 0 && v < 10 ? v * 100 : v
+    }
 
     private func frame(_ seconds: Double, fps: Int) -> Int {
         max(0, Int((seconds * Double(fps)).rounded()))
@@ -675,6 +779,114 @@ struct LottieCompiler {
     private func pseudoNoise(_ seed: Int) -> Double {
         let x = Double((seed &* 2654435761) % 10_000) / 10_000.0 // [0,1)
         return x * 2 - 1
+    }
+
+    // MARK: - Flash
+
+    private func flashKeyframes(startFrame: Int, endFrame: Int, low: Double, repeats: Int, easing: Easing) -> [[String: Any]] {
+        var frames: [[String: Any]] = []
+        let total = endFrame - startFrame
+        let perCycle = max(2, total / repeats)
+        var t = startFrame
+        for _ in 0..<repeats {
+            let mid = t + perCycle / 2
+            let endCycle = t + perCycle
+            frames.append(kf(t, [100], easing))
+            frames.append(kf(mid, [low], easing))
+            frames.append(kf(endCycle, [100]))
+            t = endCycle
+        }
+        return normalizeTimes(frames, defaultValues: [100])
+    }
+
+    // MARK: - Blur
+
+    private func applyBlurEffect(layer: inout [String: Any], fromBlur: Double, toBlur: Double,
+                                 startFrame: Int, endFrame: Int, easing: Easing) {
+        let blurriness: [String: Any] = [
+            "ty": 0,
+            "nm": "Blurriness",
+            "mn": "ADBE Gaussian Blur 2-0001",
+            "ix": 1,
+            "v": ["a": 1, "k": [kf(startFrame, [fromBlur], easing), kf(endFrame, [toBlur])]]
+        ]
+        let dimensions: [String: Any] = [
+            "ty": 7,
+            "nm": "Blur Dimensions",
+            "mn": "ADBE Gaussian Blur 2-0002",
+            "ix": 2,
+            "v": ["a": 0, "k": 1]
+        ]
+        let repeatEdge: [String: Any] = [
+            "ty": 7,
+            "nm": "Repeat Edge Pixels",
+            "mn": "ADBE Gaussian Blur 2-0003",
+            "ix": 3,
+            "v": ["a": 0, "k": 1]
+        ]
+        let blur: [String: Any] = [
+            "ty": 29,
+            "nm": "Gaussian Blur",
+            "np": 5,
+            "mn": "ADBE Gaussian Blur 2",
+            "ix": 1,
+            "en": 1,
+            "ef": [blurriness, dimensions, repeatEdge]
+        ]
+        var effects = layer["ef"] as? [[String: Any]] ?? []
+        effects.append(blur)
+        layer["ef"] = effects
+    }
+
+    // MARK: - Color Transition
+
+    private func applyColorTransition(layer: inout [String: Any], from: [Double], to: [Double],
+                                      startFrame: Int, endFrame: Int, easing: Easing) {
+        if var shapes = layer["shapes"] as? [[String: Any]] {
+            colorTransitionShapes(&shapes, from: from, to: to,
+                                  startFrame: startFrame, endFrame: endFrame, easing: easing)
+            layer["shapes"] = shapes
+        }
+    }
+
+    private func colorTransitionShapes(_ shapes: inout [[String: Any]], from: [Double], to: [Double],
+                                       startFrame: Int, endFrame: Int, easing: Easing) {
+        for i in shapes.indices {
+            let ty = shapes[i]["ty"] as? String
+            if ty == "fl" || ty == "st" {
+                if var c = shapes[i]["c"] as? [String: Any] {
+                    c["a"] = 1
+                    c["k"] = [kf(startFrame, from, easing), kf(endFrame, to)]
+                    shapes[i]["c"] = c
+                }
+            } else if ty == "gr" {
+                if var items = shapes[i]["it"] as? [[String: Any]] {
+                    colorTransitionShapes(&items, from: from, to: to,
+                                          startFrame: startFrame, endFrame: endFrame, easing: easing)
+                    shapes[i]["it"] = items
+                }
+            }
+        }
+    }
+
+    private func readCurrentColor(layer: [String: Any]) -> [Double]? {
+        guard let shapes = layer["shapes"] as? [[String: Any]] else { return nil }
+        return findFirstColor(shapes)
+    }
+
+    private func findFirstColor(_ shapes: [[String: Any]]) -> [Double]? {
+        for s in shapes {
+            let ty = s["ty"] as? String
+            if ty == "fl" || ty == "st" {
+                if let c = s["c"] as? [String: Any], let k = c["k"] as? [Any] {
+                    let vals = k.compactMap { ($0 as? NSNumber)?.doubleValue }
+                    if vals.count >= 3 { return vals }
+                }
+            } else if ty == "gr", let items = s["it"] as? [[String: Any]] {
+                if let found = findFirstColor(items) { return found }
+            }
+        }
+        return nil
     }
 
     // MARK: - Recolor

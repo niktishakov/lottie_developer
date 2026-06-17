@@ -20,10 +20,19 @@ struct AnimationSpec: Codable, Equatable {
 
 /// Набор анимаций для одного слоя статичного Lottie.
 struct LayerAnimationSpec: Codable, Equatable {
-    /// Имя слоя (`nm`) в статичном Lottie — ключ матчинга. Если слой не найден, компилятор
-    /// добавляет warning и пропускает спек (без падения).
+    /// Имя слоя (`nm`) в статичном Lottie — ключ матчинга. Поддерживает wildcard `*`
+    /// в конце (`item_*`) — матчит все слои с данным префиксом.
     let target: String
     let animations: [MotionPrimitive]
+    /// Задержка (сек) между каждым совпавшим слоем при wildcard-матчинге.
+    /// Первый слой без задержки, второй +staggerDelay, третий +2×staggerDelay и т.д.
+    let staggerDelay: Double?
+
+    init(target: String, animations: [MotionPrimitive], staggerDelay: Double? = nil) {
+        self.target = target
+        self.animations = animations
+        self.staggerDelay = staggerDelay
+    }
 }
 
 /// Один high-level примитив движения с таймингом и easing.
@@ -65,6 +74,14 @@ enum MotionKind: String, Codable, CaseIterable {
     case swing      // маятниковое колебание поворота
     case followPath // движение вдоль bezier-пути (params.path)
     case recolor    // смена цвета fill/stroke (params.color)
+    // M5 — расширенные примитивы:
+    case squash          // X растёт, Y сжимается — удар/приземление
+    case stretch         // Y растёт, X сжимается — растяжение
+    case flash           // пульс прозрачности 100→min→100
+    case flip            // 3D-поворот по оси Y или X (params.axis)
+    case colorTransition // плавная смена цвета fill/stroke во времени
+    case blurIn          // размытие → чёткость (появление)
+    case blurOut         // чёткость → размытие (исчезновение)
 }
 
 enum Easing: String, Codable, CaseIterable {
@@ -78,6 +95,8 @@ enum Easing: String, Codable, CaseIterable {
     case easeInBack     // оттяжка в начале
     case easeInOutBack
     case anticipate     // короткая оттяжка, затем движение
+    // M5 — дополнительные кривые:
+    case elastic        // сильная пружина с выраженным перелётом
 }
 
 /// Объединённый набор параметров для всех примитивов. Каждый `kind` читает только релевантные поля.
@@ -102,8 +121,14 @@ struct MotionParams: Codable, Equatable {
     var repeatCount: Int?
     /// Контрольные точки пути (followPath): [[x,y], [x,y], ...]. Минимум 2 точки.
     var path: [[Double]]?
-    /// Hex-цвет (recolor): "#RRGGBB" или "#RGB".
+    /// Hex-цвет (recolor, colorTransition target): "#RRGGBB" или "#RGB".
     var color: String?
+    /// Начальный hex-цвет (colorTransition source). Если nil — берётся текущий цвет fill/stroke.
+    var fromColor: String?
+    /// Радиус размытия (blurIn/blurOut, default 20).
+    var blurAmount: Double?
+    /// Ось поворота для flip: "x" или "y" (default "y").
+    var axis: String?
 
     init(
         direction: String? = nil,
@@ -116,7 +141,10 @@ struct MotionParams: Codable, Equatable {
         frequency: Double? = nil,
         repeatCount: Int? = nil,
         path: [[Double]]? = nil,
-        color: String? = nil
+        color: String? = nil,
+        fromColor: String? = nil,
+        blurAmount: Double? = nil,
+        axis: String? = nil
     ) {
         self.direction = direction
         self.distance = distance
@@ -129,5 +157,8 @@ struct MotionParams: Codable, Equatable {
         self.repeatCount = repeatCount
         self.path = path
         self.color = color
+        self.fromColor = fromColor
+        self.blurAmount = blurAmount
+        self.axis = axis
     }
 }
