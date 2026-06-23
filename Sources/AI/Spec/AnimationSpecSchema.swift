@@ -179,6 +179,11 @@ enum AnimationSpecSchema {
                 "axis": [
                     "enum": ["x", "y"],
                     "description": "Rotation axis for flip: \"x\" (vertical) or \"y\" (horizontal, default)."
+                ],
+                "strokeWidth": [
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Stroke width for addStroke (default 2)."
                 ]
             ]
         ]

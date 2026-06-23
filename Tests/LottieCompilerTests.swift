@@ -477,6 +477,69 @@ final class LottieCompilerTests: XCTestCase {
         XCTAssertFalse(hasFill, "Ring should NOT have fill")
     }
 
+    // MARK: - Shape Editing
+
+    func testRemoveFill() throws {
+        let spec = AnimationSpec(fps: 30, durationFrames: 15, layers: [
+            LayerAnimationSpec(target: "test", animations: [
+                MotionPrimitive(kind: .removeFill, start: 0, end: 0, easing: .linear)
+            ])
+        ])
+        let root = try compiled(spec)
+        let layers = (root["layers"] as! [[String: Any]]).filter { ($0["td"] as? Int) != 1 }
+        let shapes = layers[0]["shapes"] as! [[String: Any]]
+        let group = shapes[0]["it"] as! [[String: Any]]
+        let hasFill = group.contains { ($0["ty"] as? String) == "fl" }
+        XCTAssertFalse(hasFill, "Fill should be removed")
+    }
+
+    func testRemoveStroke() throws {
+        let spec = AnimationSpec(fps: 30, durationFrames: 15, layers: [
+            LayerAnimationSpec(target: "test", animations: [
+                MotionPrimitive(kind: .removeStroke, start: 0, end: 0, easing: .linear)
+            ])
+        ])
+        let root = try compiled(spec)
+        let layers = (root["layers"] as! [[String: Any]]).filter { ($0["td"] as? Int) != 1 }
+        let shapes = layers[0]["shapes"] as! [[String: Any]]
+        let group = shapes[0]["it"] as! [[String: Any]]
+        let hasStroke = group.contains { ($0["ty"] as? String) == "st" }
+        XCTAssertFalse(hasStroke, "Stroke should be removed")
+    }
+
+    func testAddStroke() throws {
+        let spec = AnimationSpec(fps: 30, durationFrames: 15, layers: [
+            LayerAnimationSpec(target: "test", animations: [
+                MotionPrimitive(kind: .removeFill, start: 0, end: 0, easing: .linear),
+                MotionPrimitive(kind: .addStroke, start: 0, end: 0, easing: .linear,
+                                params: MotionParams(color: "#FF0000", strokeWidth: 4))
+            ])
+        ])
+        let root = try compiled(spec)
+        let layers = (root["layers"] as! [[String: Any]]).filter { ($0["td"] as? Int) != 1 }
+        let shapes = layers[0]["shapes"] as! [[String: Any]]
+        let group = shapes[0]["it"] as! [[String: Any]]
+        let stroke = group.first { ($0["ty"] as? String) == "st" }
+        XCTAssertNotNil(stroke, "Stroke should be added")
+        let w = (stroke?["w"] as? [String: Any])?["k"] as? Double
+        XCTAssertEqual(w, 4, "Stroke width should be 4")
+        let hasFill = group.contains { ($0["ty"] as? String) == "fl" }
+        XCTAssertFalse(hasFill, "Fill should be removed")
+    }
+
+    func testHideLayer() throws {
+        let spec = AnimationSpec(fps: 30, durationFrames: 15, layers: [
+            LayerAnimationSpec(target: "test", animations: [
+                MotionPrimitive(kind: .hideLayer, start: 0, end: 0, easing: .linear)
+            ])
+        ])
+        let root = try compiled(spec)
+        let ks = layerKS(root)
+        let opacity = ks["o"] as! [String: Any]
+        XCTAssertEqual(opacity["a"] as? Int, 0, "Should be static, not animated")
+        XCTAssertEqual(opacity["k"] as? Double, 0, "Opacity should be 0")
+    }
+
     func testGeneratedLayerMissingAnchor() throws {
         let spec = AnimationSpec(fps: 30, durationFrames: 15,
             generatedLayers: [

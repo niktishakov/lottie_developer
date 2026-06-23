@@ -349,6 +349,41 @@ struct LottieCompiler {
             let amount = p.blurAmount ?? 20
             applyBlurEffect(layer: &layer, fromBlur: 0, toBlur: amount,
                             startFrame: startFrame, endFrame: endFrame, easing: easing)
+        // M6 — shape-edit (мгновенные)
+        case .removeFill:
+            if var shapes = layer["shapes"] as? [[String: Any]] {
+                stripShapeType(&shapes, type: "fl")
+                layer["shapes"] = shapes
+            }
+        case .removeStroke:
+            if var shapes = layer["shapes"] as? [[String: Any]] {
+                stripShapeType(&shapes, type: "st")
+                layer["shapes"] = shapes
+            }
+        case .addStroke:
+            let hex = p.color ?? "#FFFFFF"
+            let rgba = parseHex(hex) ?? [1, 1, 1, 1]
+            let w = p.strokeWidth ?? 2
+            if var shapes = layer["shapes"] as? [[String: Any]] {
+                injectShapeItem(&shapes, item: [
+                    "ty": "st", "c": ["a": 0, "k": rgba], "o": ["a": 0, "k": 100],
+                    "w": ["a": 0, "k": w], "lc": 2, "lj": 2, "nm": "Added Stroke"
+                ])
+                layer["shapes"] = shapes
+            }
+        case .addFill:
+            let hex = p.color ?? "#FFFFFF"
+            let rgba = parseHex(hex) ?? [1, 1, 1, 1]
+            if var shapes = layer["shapes"] as? [[String: Any]] {
+                injectShapeItem(&shapes, item: [
+                    "ty": "fl", "c": ["a": 0, "k": rgba], "o": ["a": 0, "k": 100], "nm": "Added Fill"
+                ])
+                layer["shapes"] = shapes
+            }
+        case .hideLayer:
+            ks["o"] = ["a": 0, "k": 0, "ix": 11]
+        case .showLayer:
+            ks["o"] = ["a": 0, "k": 100, "ix": 11]
         }
     }
 
@@ -982,6 +1017,38 @@ struct LottieCompiler {
         var effects = layer["ef"] as? [[String: Any]] ?? []
         effects.append(blur)
         layer["ef"] = effects
+    }
+
+    // MARK: - Shape editing
+
+    private func stripShapeType(_ shapes: inout [[String: Any]], type: String) {
+        for i in shapes.indices {
+            let ty = shapes[i]["ty"] as? String
+            if ty == type {
+                shapes[i] = [:]
+            } else if ty == "gr" {
+                if var items = shapes[i]["it"] as? [[String: Any]] {
+                    stripShapeType(&items, type: type)
+                    items.removeAll { ($0 as [String: Any]).isEmpty }
+                    shapes[i]["it"] = items
+                }
+            }
+        }
+        shapes.removeAll { ($0 as [String: Any]).isEmpty }
+    }
+
+    private func injectShapeItem(_ shapes: inout [[String: Any]], item: [String: Any]) {
+        for i in shapes.indices {
+            if (shapes[i]["ty"] as? String) == "gr" {
+                if var items = shapes[i]["it"] as? [[String: Any]] {
+                    let trIdx = items.lastIndex { ($0["ty"] as? String) == "tr" } ?? items.endIndex
+                    items.insert(item, at: trIdx)
+                    shapes[i]["it"] = items
+                    return
+                }
+            }
+        }
+        shapes.append(item)
     }
 
     // MARK: - Color Transition

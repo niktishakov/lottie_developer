@@ -54,7 +54,11 @@ enum CLIPrompts {
           spin (continuous 360° loop), float (gentle vertical hover loop), breathe (subtle scale loop), swing (pendulum rotation loop),
           followPath (move layer along a path defined by params.path: [[dx,dy], ...] offsets from base position, min 2 points),
           recolor (instantly change all fill/stroke colors of the layer to params.color, a hex string like "#FF0000" or "#FFF"; applied at start time, end is ignored),
-          squash, stretch, flash, flip, colorTransition, blurIn, blurOut.
+          squash, stretch, flash, flip, colorTransition, blurIn, blurOut,
+          removeFill (strip all fills), removeStroke (strip all strokes), addStroke (params.color, params.strokeWidth), \
+          addFill (params.color), hideLayer (opacity→0), showLayer (opacity→100).
+        - Shape-edit kinds (removeFill, removeStroke, addStroke, addFill, hideLayer, showLayer) are INSTANT — \
+          start/end/easing are required by schema but ignored. Use start=0, end=0, easing=linear.
         - easing ∈ linear, easeIn, easeOut, easeInOut, spring, easeOutBack (overshoot), easeInBack, easeInOutBack, anticipate, elastic.
         - generatedLayers: create new shape layers (ellipse, rectangle) anchored to existing layers. \
           Use for effects like rings, waves, halos, particles that don't exist in the source.

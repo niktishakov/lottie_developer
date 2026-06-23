@@ -91,6 +91,13 @@ enum MotionKind: String, Codable, CaseIterable {
     case colorTransition // плавная смена цвета fill/stroke во времени
     case blurIn          // размытие → чёткость (появление)
     case blurOut         // чёткость → размытие (исчезновение)
+    // M6 — shape-edit примитивы (мгновенные, start/end игнорируются):
+    case removeFill      // удалить все fill из слоя
+    case removeStroke    // удалить все stroke из слоя
+    case addStroke       // добавить stroke (params.color, params.strokeWidth)
+    case addFill         // добавить fill (params.color)
+    case hideLayer       // скрыть слой (opacity=0 статически)
+    case showLayer       // показать скрытый слой (opacity=100)
 }
 
 enum Easing: String, Codable, CaseIterable {
@@ -182,6 +189,8 @@ struct MotionParams: Codable, Equatable {
     var blurAmount: Double?
     /// Ось поворота для flip: "x" или "y" (default "y").
     var axis: String?
+    /// Толщина обводки для addStroke (default 2).
+    var strokeWidth: Double?
 
     init(
         direction: String? = nil,
@@ -197,7 +206,8 @@ struct MotionParams: Codable, Equatable {
         color: String? = nil,
         fromColor: String? = nil,
         blurAmount: Double? = nil,
-        axis: String? = nil
+        axis: String? = nil,
+        strokeWidth: Double? = nil
     ) {
         self.direction = direction
         self.distance = distance
@@ -213,5 +223,6 @@ struct MotionParams: Codable, Equatable {
         self.fromColor = fromColor
         self.blurAmount = blurAmount
         self.axis = axis
+        self.strokeWidth = strokeWidth
     }
 }
