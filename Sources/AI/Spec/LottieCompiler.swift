@@ -44,9 +44,37 @@ struct LottieCompiler {
             }
         }
 
+        // Phase 0: Generate synthetic layers
+        var nextInd = (layers.compactMap { $0["ind"] as? Int }.max() ?? 0) + 1
+        if let generated = spec.generatedLayers {
+            var newLayers: [[String: Any]] = []
+            for gen in generated {
+                if indexByName[gen.name] != nil {
+                    warnings.append("Generated layer '\(gen.name)': name conflicts with existing layer — skipped")
+                    continue
+                }
+                guard let anchorIdx = indexByName[gen.anchor] else {
+                    warnings.append("Generated layer '\(gen.name)': anchor '\(gen.anchor)' not found — skipped")
+                    continue
+                }
+                let anchorLayer = layers[anchorIdx]
+                let newLayer = buildGeneratedLayer(gen, anchorLayer: anchorLayer, ind: nextInd, duration: duration)
+                newLayers.append(newLayer)
+                nextInd += 1
+            }
+            if !newLayers.isEmpty {
+                layers.insert(contentsOf: newLayers, at: 0)
+                indexByName.removeAll()
+                for (idx, layer) in layers.enumerated() {
+                    guard let name = layer["nm"] as? String else { continue }
+                    if indexByName[name] == nil { indexByName[name] = idx }
+                }
+            }
+        }
+
         var matteInserts: [(layerIdx: Int, matte: [String: Any])] = []
         var clipInserts: [(layerIdx: Int, matte: [String: Any])] = []
-        let maxInd = layers.compactMap { $0["ind"] as? Int }.max() ?? 0
+        let maxInd = nextInd
 
         for layerSpec in spec.layers {
             let matches: [(name: String, idx: Int)]
@@ -758,6 +786,124 @@ struct LottieCompiler {
                 .map { ($0.key, $0.value) }
         }
         return []
+    }
+
+    // MARK: - Animation Inspector
+
+    static func inspectAnimations(lottieData: Data) -> String? {
+        guard let root = (try? JSONSerialization.jsonObject(with: lottieData)) as? [String: Any],
+              let layers = root["layers"] as? [[String: Any]] else { return nil }
+
+        let fps = (root["fr"] as? NSNumber)?.intValue ?? 30
+        let op = (root["op"] as? NSNumber)?.intValue ?? 0
+
+        var lines: [String] = []
+        lines.append("Composition: \(fps)fps, \(op) frames (\(String(format: "%.1f", Double(op) / Double(fps)))s)")
+
+        for layer in layers {
+            guard let name = layer["nm"] as? String else { continue }
+            let ks = layer["ks"] as? [String: Any] ?? [:]
+
+            var animated: [String] = []
+            for (key, label) in [("o","opacity"),("p","position"),("s","scale"),("r","rotation"),("rx","rotationX"),("ry","rotationY")] {
+                if let ch = ks[key] as? [String: Any], (ch["a"] as? Int) == 1,
+                   let kfs = ch["k"] as? [[String: Any]] {
+                    let times = kfs.compactMap { $0["t"] as? Int }
+                    if let first = times.first, let last = times.last {
+                        let values = kfs.compactMap { ($0["s"] as? [Any])?.first as? NSNumber }.map { $0.doubleValue }
+                        let valStr = values.isEmpty ? "" : " [\(values.map { String(format: "%.0f", $0) }.joined(separator: "→"))]"
+                        animated.append("\(label) \(first)→\(last)f\(valStr)")
+                    }
+                }
+            }
+
+            if let ef = layer["ef"] as? [[String: Any]], !ef.isEmpty {
+                let names = ef.compactMap { $0["nm"] as? String }
+                animated.append("effects: \(names.joined(separator: ", "))")
+            }
+
+            if let shapes = layer["shapes"] as? [[String: Any]] {
+                if hasAnimatedProperty(shapes, types: ["fl", "st"], prop: "c") { animated.append("animated color") }
+                if containsTrimPath(shapes) { animated.append("trim path") }
+            }
+
+            if animated.isEmpty {
+                lines.append("  \(name): static")
+            } else {
+                lines.append("  \(name): \(animated.joined(separator: ", "))")
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func hasAnimatedProperty(_ shapes: [[String: Any]], types: [String], prop: String) -> Bool {
+        for s in shapes {
+            let ty = s["ty"] as? String ?? ""
+            if types.contains(ty), let ch = s[prop] as? [String: Any], (ch["a"] as? Int) == 1 { return true }
+            if ty == "gr", let items = s["it"] as? [[String: Any]], hasAnimatedProperty(items, types: types, prop: prop) { return true }
+        }
+        return false
+    }
+
+    private static func containsTrimPath(_ shapes: [[String: Any]]) -> Bool {
+        for s in shapes {
+            if (s["ty"] as? String) == "tm" { return true }
+            if (s["ty"] as? String) == "gr", let items = s["it"] as? [[String: Any]], containsTrimPath(items) { return true }
+        }
+        return false
+    }
+
+    // MARK: - Generated Layers
+
+    private func buildGeneratedLayer(
+        _ gen: GeneratedLayer, anchorLayer: [String: Any], ind: Int, duration: Int
+    ) -> [String: Any] {
+        let anchorKs = anchorLayer["ks"] as? [String: Any] ?? [:]
+        let pos = vectorBase(anchorKs, "p", fallback: [0, 0, 0])
+        let w = gen.width ?? 100
+        let h = gen.height ?? 100
+        let opacity = gen.opacity ?? 0
+
+        let shapeItem: [String: Any]
+        switch gen.shape {
+        case .ellipse:
+            shapeItem = ["ty": "el", "p": ["a": 0, "k": [0, 0]], "s": ["a": 0, "k": [w, h]], "nm": "Ellipse"]
+        case .rectangle:
+            shapeItem = ["ty": "rc", "d": 1, "p": ["a": 0, "k": [0, 0]], "s": ["a": 0, "k": [w, h]], "r": ["a": 0, "k": 0], "nm": "Rect"]
+        }
+
+        var groupItems: [[String: Any]] = [shapeItem]
+
+        if let fillHex = gen.fillColor, let rgba = parseHex(fillHex) {
+            groupItems.append(["ty": "fl", "c": ["a": 0, "k": rgba], "o": ["a": 0, "k": 100], "nm": "Fill"])
+        }
+        if let strokeHex = gen.strokeColor, let rgba = parseHex(strokeHex) {
+            groupItems.append([
+                "ty": "st", "c": ["a": 0, "k": rgba], "o": ["a": 0, "k": 100],
+                "w": ["a": 0, "k": gen.strokeWidth ?? 2], "lc": 2, "lj": 2, "nm": "Stroke"
+            ])
+        }
+        if gen.fillColor == nil && gen.strokeColor == nil {
+            groupItems.append(["ty": "fl", "c": ["a": 0, "k": [1, 1, 1, 1]], "o": ["a": 0, "k": 100], "nm": "Fill"])
+        }
+
+        groupItems.append([
+            "ty": "tr",
+            "p": ["a": 0, "k": [0, 0]], "a": ["a": 0, "k": [0, 0]],
+            "s": ["a": 0, "k": [100, 100]], "r": ["a": 0, "k": 0], "o": ["a": 0, "k": 100]
+        ])
+
+        return [
+            "ty": 4, "nm": gen.name, "ind": ind, "ip": 0, "op": duration, "st": 0, "sr": 1,
+            "shapes": [["ty": "gr", "it": groupItems, "nm": "Generated Group"]],
+            "ks": [
+                "o": ["a": 0, "k": opacity, "ix": 11],
+                "p": ["a": 0, "k": pos, "ix": 2],
+                "a": ["a": 0, "k": [0, 0, 0], "ix": 1],
+                "s": ["a": 0, "k": [100, 100, 100], "ix": 6],
+                "r": ["a": 0, "k": 0, "ix": 10]
+            ]
+        ]
     }
 
     // MARK: - Utilities

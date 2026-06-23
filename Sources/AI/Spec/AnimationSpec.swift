@@ -12,10 +12,19 @@ struct AnimationSpec: Codable, Equatable {
     let durationFrames: Int
     /// Анимации, сгруппированные по целевым слоям.
     let layers: [LayerAnimationSpec]
+    /// Слои, которые компилятор создаёт перед анимацией (волны, ореолы, частицы).
+    let generatedLayers: [GeneratedLayer]?
 
     static let minFPS = 24
     static let maxFPS = 60
     static let maxDurationFrames = 600
+
+    init(fps: Int, durationFrames: Int, generatedLayers: [GeneratedLayer]? = nil, layers: [LayerAnimationSpec]) {
+        self.fps = fps
+        self.durationFrames = durationFrames
+        self.layers = layers
+        self.generatedLayers = generatedLayers
+    }
 }
 
 /// Набор анимаций для одного слоя статичного Lottie.
@@ -97,6 +106,50 @@ enum Easing: String, Codable, CaseIterable {
     case anticipate     // короткая оттяжка, затем движение
     // M5 — дополнительные кривые:
     case elastic        // сильная пружина с выраженным перелётом
+}
+
+/// Форма генерируемого слоя.
+enum GeneratedShape: String, Codable, CaseIterable {
+    case ellipse
+    case rectangle
+}
+
+/// Описание слоя, который компилятор создаёт перед применением анимаций.
+/// Позиционируется по центру существующего слоя-якоря (`anchor`).
+struct GeneratedLayer: Codable, Equatable {
+    /// Уникальное имя для таргетинга в `layers[].target`.
+    let name: String
+    /// Тип фигуры.
+    let shape: GeneratedShape
+    /// Имя существующего слоя, от которого берётся позиция.
+    let anchor: String
+    /// Ширина фигуры (px). По умолчанию 100.
+    let width: Double?
+    /// Высота фигуры (px). По умолчанию 100.
+    let height: Double?
+    /// Hex-цвет заливки. nil = без заливки (только обводка).
+    let fillColor: String?
+    /// Hex-цвет обводки. nil = без обводки.
+    let strokeColor: String?
+    /// Толщина обводки (px). По умолчанию 2.
+    let strokeWidth: Double?
+    /// Начальная прозрачность 0–100. По умолчанию 0 (невидим — анимируется через fadeIn).
+    let opacity: Double?
+
+    init(name: String, shape: GeneratedShape, anchor: String,
+         width: Double? = nil, height: Double? = nil,
+         fillColor: String? = nil, strokeColor: String? = nil,
+         strokeWidth: Double? = nil, opacity: Double? = nil) {
+        self.name = name
+        self.shape = shape
+        self.anchor = anchor
+        self.width = width
+        self.height = height
+        self.fillColor = fillColor
+        self.strokeColor = strokeColor
+        self.strokeWidth = strokeWidth
+        self.opacity = opacity
+    }
 }
 
 /// Объединённый набор параметров для всех примитивов. Каждый `kind` читает только релевантные поля.

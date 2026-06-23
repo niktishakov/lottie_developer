@@ -427,6 +427,70 @@ final class LottieCompilerTests: XCTestCase {
         XCTAssertThrowsError(try compiler.compile(staticLottie: badData, spec: spec))
     }
 
+    func testGeneratedLayerRing() throws {
+        let spec = AnimationSpec(fps: 30, durationFrames: 15,
+            generatedLayers: [
+                GeneratedLayer(name: "wave1", shape: .ellipse, anchor: "test",
+                               width: 80, height: 80, strokeColor: "#FFFFFF", strokeWidth: 3, opacity: 0),
+                GeneratedLayer(name: "wave2", shape: .ellipse, anchor: "test",
+                               width: 80, height: 80, strokeColor: "#FFFFFF", strokeWidth: 2, opacity: 0)
+            ],
+            layers: [
+                LayerAnimationSpec(target: "test", animations: [
+                    MotionPrimitive(kind: .pulse, start: 0, end: 0.35, easing: .anticipate, params: MotionParams(amount: 112))
+                ]),
+                LayerAnimationSpec(target: "wave1", animations: [
+                    MotionPrimitive(kind: .fadeIn, start: 0.08, end: 0.18, easing: .easeOut),
+                    MotionPrimitive(kind: .scaleIn, start: 0.08, end: 0.38, easing: .easeOut, params: MotionParams(from: 60, to: 100)),
+                    MotionPrimitive(kind: .fadeOut, start: 0.28, end: 0.38, easing: .easeIn)
+                ]),
+                LayerAnimationSpec(target: "wave2", animations: [
+                    MotionPrimitive(kind: .fadeIn, start: 0.14, end: 0.24, easing: .easeOut),
+                    MotionPrimitive(kind: .scaleIn, start: 0.14, end: 0.42, easing: .easeOut, params: MotionParams(from: 50, to: 100)),
+                    MotionPrimitive(kind: .fadeOut, start: 0.32, end: 0.42, easing: .easeIn)
+                ])
+            ])
+        let root = try compiled(spec)
+        let allLayers = root["layers"] as! [[String: Any]]
+        let nonMatte = allLayers.filter { ($0["td"] as? Int) != 1 }
+
+        XCTAssertEqual(nonMatte.count, 3, "Should have 3 layers: 2 generated + 1 original")
+        XCTAssertEqual(nonMatte[0]["nm"] as? String, "wave1")
+        XCTAssertEqual(nonMatte[1]["nm"] as? String, "wave2")
+        XCTAssertEqual(nonMatte[2]["nm"] as? String, "test")
+
+        let wave1Ks = nonMatte[0]["ks"] as! [String: Any]
+        XCTAssertTrue(isAnimated(wave1Ks["o"] as! [String: Any]), "wave1 opacity should be animated")
+        XCTAssertTrue(isAnimated(wave1Ks["s"] as! [String: Any]), "wave1 scale should be animated")
+
+        let wave1Pos = (wave1Ks["p"] as! [String: Any])["k"] as! [Double]
+        XCTAssertEqual(wave1Pos[0], 50, accuracy: 0.01, "wave1 should inherit anchor X")
+        XCTAssertEqual(wave1Pos[1], 50, accuracy: 0.01, "wave1 should inherit anchor Y")
+
+        let wave1Shapes = nonMatte[0]["shapes"] as! [[String: Any]]
+        let groupItems = (wave1Shapes[0]["it"] as! [[String: Any]])
+        let hasEllipse = groupItems.contains { ($0["ty"] as? String) == "el" }
+        let hasStroke = groupItems.contains { ($0["ty"] as? String) == "st" }
+        let hasFill = groupItems.contains { ($0["ty"] as? String) == "fl" }
+        XCTAssertTrue(hasEllipse, "Should contain ellipse shape")
+        XCTAssertTrue(hasStroke, "Should contain stroke")
+        XCTAssertFalse(hasFill, "Ring should NOT have fill")
+    }
+
+    func testGeneratedLayerMissingAnchor() throws {
+        let spec = AnimationSpec(fps: 30, durationFrames: 15,
+            generatedLayers: [
+                GeneratedLayer(name: "orphan", shape: .ellipse, anchor: "nonexistent")
+            ],
+            layers: [
+                LayerAnimationSpec(target: "test", animations: [
+                    MotionPrimitive(kind: .fadeIn, start: 0, end: 0.5)
+                ])
+            ])
+        let result = try compiler.compile(staticLottie: minimalLottie(), spec: spec)
+        XCTAssertTrue(result.warnings.contains { $0.contains("nonexistent") })
+    }
+
     func testFPSClamping() throws {
         let spec = AnimationSpec(fps: 1000, durationFrames: 30, layers: [])
         let result = try compiler.compile(staticLottie: minimalLottie(), spec: spec)

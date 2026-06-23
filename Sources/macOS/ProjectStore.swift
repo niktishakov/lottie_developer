@@ -88,6 +88,22 @@ final class ProjectStore {
         return p
     }
 
+    @discardableResult
+    func createProjectFromLottie(name: String, lottieData: Data, sourceLabel: String) -> AnimationProject {
+        let names = layerNames(from: lottieData)
+        let p = AnimationProject(name: name, hasImportedStatic: true, layerNames: names, sourceLabel: sourceLabel)
+        try? lottieData.write(to: staticURL(p.id), options: .atomic)
+        projects.insert(p, at: 0)
+        save(p)
+        return p
+    }
+
+    /// Заменить геометрию проекта импортированным Lottie JSON.
+    func setImportedLottie(projectID: UUID, data: Data, sourceLabel: String) {
+        let names = layerNames(from: data)
+        setImportedStatic(projectID: projectID, data: data, layerNames: names, sourceLabel: sourceLabel)
+    }
+
     /// Заменить геометрию проекта импортированным SVG.
     func setImportedStatic(projectID: UUID, data: Data, layerNames: [String], sourceLabel: String) {
         guard let idx = projects.firstIndex(where: { $0.id == projectID }) else { return }

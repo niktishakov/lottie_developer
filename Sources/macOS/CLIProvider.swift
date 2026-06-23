@@ -47,9 +47,10 @@ struct CLIProvider {
 
     /// request → AnimationSpec. Repair-loop при невалидном JSON.
     func generateSpec(request: String, layerNames: [String], durationSeconds: Double,
+                      animationContext: String? = nil,
                       onTokenUpdate: (@Sendable (TokenUsage) -> Void)? = nil) async throws -> (spec: AnimationSpec, raw: String) {
         let claudePath = try CLIProvider.resolveClaudePath()
-        let system = CLIPrompts.systemPrompt(layerNames: layerNames)
+        let system = CLIPrompts.systemPrompt(layerNames: layerNames, animationContext: animationContext)
 
         var repairNote = ""
         var lastError = "unknown"

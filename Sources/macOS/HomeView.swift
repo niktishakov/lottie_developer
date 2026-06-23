@@ -22,6 +22,7 @@ struct HomeView: View {
                     .font(.largeTitle.weight(.bold))
                 Spacer()
                 Button { showAccount = true } label: { Label("Account", systemImage: "person.crop.circle") }
+                Button { openLottieAsProject() } label: { Label("Import Lottie…", systemImage: "doc.badge.arrow.up") }
                 Button { _ = openSVGAsProject() } label: { Label("New from SVG…", systemImage: "square.and.arrow.down") }
                 Button { pasteSVGAsProject() } label: { Label("Paste SVG", systemImage: "doc.on.clipboard") }
                     .keyboardShortcut("v", modifiers: [.command, .shift])
@@ -48,9 +49,15 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first(where: { $0.pathExtension.lowercased() == "svg" }) else { return false }
-            if let id = importSVGAsProject(url: url) { onOpen(id) }
-            return true
+            if let url = urls.first(where: { $0.pathExtension.lowercased() == "json" }) {
+                if let id = importLottieAsProject(url: url) { onOpen(id) }
+                return true
+            }
+            if let url = urls.first(where: { $0.pathExtension.lowercased() == "svg" }) {
+                if let id = importSVGAsProject(url: url) { onOpen(id) }
+                return true
+            }
+            return false
         } isTargeted: { dropTargeted = $0 }
         .overlay { if dropTargeted { dropHint } }
         .sheet(isPresented: $showAccount) { AccountView(onClose: { showAccount = false }) }
@@ -63,7 +70,7 @@ struct HomeView: View {
                 .foregroundStyle(.secondary)
             Text("No projects yet")
                 .font(.title3.weight(.semibold))
-            Text("Drag an SVG here, or create a new project.")
+            Text("Drag an SVG or Lottie JSON here, or create a new project.")
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -129,6 +136,26 @@ struct HomeView: View {
             .overlay(Text("Drop an SVG to create a project").font(.headline).foregroundStyle(Color.accentColor))
             .padding(12)
             .allowsHitTesting(false)
+    }
+
+    // MARK: - Lottie JSON → project
+
+    private func openLottieAsProject() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        if let id = importLottieAsProject(url: url) { onOpen(id) }
+    }
+
+    @discardableResult
+    private func importLottieAsProject(url: URL) -> UUID? {
+        guard let data = try? Data(contentsOf: url),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              obj["layers"] != nil else { return nil }
+        let name = url.deletingPathExtension().lastPathComponent
+        let p = store.createProjectFromLottie(name: name, lottieData: data, sourceLabel: url.lastPathComponent)
+        return p.id
     }
 
     // MARK: - SVG → project

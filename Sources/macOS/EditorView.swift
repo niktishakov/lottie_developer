@@ -52,6 +52,7 @@ struct EditorView: View {
                 Text(project.name).font(.headline).lineLimit(1)
                 Spacer()
                 Button { showAccount = true } label: { Label("Account", systemImage: "person.crop.circle") }
+                Button("Import Lottie…") { openLottieJSON() }
                 Button("Replace SVG…") { openSVG() }
                 Button("Paste SVG") { pasteSVGFromClipboard() }
                     .keyboardShortcut("v", modifiers: [.command, .shift])
@@ -364,6 +365,7 @@ struct EditorView: View {
         let request = prompt
         let model = modelID
         let effort = effortID
+        let animCtx = LottieCompiler.inspectAnimations(lottieData: geom)
         generating = true
         tokenUsage = nil
         let effortNote = effort.isEmpty ? "" : ", \(AIEffort.label(for: effort).lowercased()) effort"
@@ -371,7 +373,8 @@ struct EditorView: View {
         Task {
             do {
                 let (spec, _) = try await CLIProvider(model: model, effort: effort)
-                    .generateSpec(request: request, layerNames: names, durationSeconds: 3) { usage in
+                    .generateSpec(request: request, layerNames: names, durationSeconds: 3,
+                                  animationContext: animCtx) { usage in
                         Task { @MainActor in
                             tokenUsage = usage
                         }
@@ -422,6 +425,23 @@ struct EditorView: View {
         }
     }
 
+    private func openLottieJSON() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let data = try? Data(contentsOf: url),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              obj["layers"] != nil else {
+            status = "Not a valid Lottie JSON"
+            return
+        }
+        store.setImportedLottie(projectID: projectID, data: data, sourceLabel: url.lastPathComponent)
+        showGeometry()
+        let names = store.project(projectID)?.layerNames ?? []
+        status = "Imported Lottie: \(names.count) layers"
+    }
+
     private func openSVG() {
         let panel = NSOpenPanel()
         if let t = UTType(filenameExtension: "svg") { panel.allowedContentTypes = [t] }
@@ -467,9 +487,16 @@ struct EditorView: View {
         switch url.pathExtension.lowercased() {
         case "svg": importSVG(url: url)
         case "json", "lottie":
-            previewURL = url
-            report = LottieRuntimeValidator.validate(fileURL: url)
-            status = "Previewing \(url.lastPathComponent) (not saved as a version)"
+            guard let data = try? Data(contentsOf: url),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  obj["layers"] != nil else {
+                status = "Not a valid Lottie JSON"
+                return
+            }
+            store.setImportedLottie(projectID: projectID, data: data, sourceLabel: url.lastPathComponent)
+            showGeometry()
+            let names = store.project(projectID)?.layerNames ?? []
+            status = "Imported Lottie: \(names.count) layers"
         default:
             status = "Unsupported '.\(url.pathExtension)' — drop an .svg"
         }

@@ -14,15 +14,37 @@ enum CLIPrompts {
         return "{}"
     }
 
-    static func systemPrompt(layerNames: [String]) -> String {
+    static func systemPrompt(layerNames: [String], animationContext: String? = nil) -> String {
         let names = layerNames.map { "\"\($0)\"" }.joined(separator: ", ")
+
+        let modeBlock: String
+        if let ctx = animationContext {
+            modeBlock = """
+
+            MODE: FIX / MODIFY an existing animated Lottie.
+            Current animation state of the source:
+            \(ctx)
+
+            The user describes what to change. Re-animate ONLY the layers/channels mentioned in the request — \
+            the compiler will overwrite those channels. All other layers/channels remain untouched. \
+            Match the existing fps and duration unless the user asks to change them.
+            If a layer needs new shapes that don't exist (waves, halos, particles), use generatedLayers.
+            """
+        } else {
+            modeBlock = """
+
+            MODE: CREATE new animation from a static Lottie.
+            """
+        }
+
         return """
         You are a senior motion designer. You produce an AnimationSpec that describes HOW to animate \
-        the layers of an existing static Lottie. You DO NOT write Lottie/bodymovin JSON — a deterministic \
+        the layers of an existing Lottie. You DO NOT write Lottie/bodymovin JSON — a deterministic \
         compiler turns your AnimationSpec into Lottie.
 
         Output ONLY a single JSON object that conforms to this schema (no markdown, no code fences, no prose):
         \(schemaJSON())
+        \(modeBlock)
 
         Hard rules:
         - fps MUST be 60.
@@ -31,8 +53,11 @@ enum CLIPrompts {
         - kind ∈ fadeIn, fadeOut, slideIn, slideOut, scaleIn, scaleOut, rotate, pulse, bounce, drawOn, wiggle,
           spin (continuous 360° loop), float (gentle vertical hover loop), breathe (subtle scale loop), swing (pendulum rotation loop),
           followPath (move layer along a path defined by params.path: [[dx,dy], ...] offsets from base position, min 2 points),
-          recolor (instantly change all fill/stroke colors of the layer to params.color, a hex string like "#FF0000" or "#FFF"; applied at start time, end is ignored).
-        - easing ∈ linear, easeIn, easeOut, easeInOut, spring, easeOutBack (overshoot), easeInBack, easeInOutBack, anticipate.
+          recolor (instantly change all fill/stroke colors of the layer to params.color, a hex string like "#FF0000" or "#FFF"; applied at start time, end is ignored),
+          squash, stretch, flash, flip, colorTransition, blurIn, blurOut.
+        - easing ∈ linear, easeIn, easeOut, easeInOut, spring, easeOutBack (overshoot), easeInBack, easeInOutBack, anticipate, elastic.
+        - generatedLayers: create new shape layers (ellipse, rectangle) anchored to existing layers. \
+          Use for effects like rings, waves, halos, particles that don't exist in the source.
         - Animate ONLY these existing layers, by their EXACT names: \(names).
 
         Motion-design guidance (for a beautiful 60fps result):

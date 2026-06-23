@@ -32,6 +32,11 @@ enum AnimationSpecSchema {
                     "maximum": AnimationSpec.maxDurationFrames,
                     "description": "Composition length in frames."
                 ],
+                "generatedLayers": [
+                    "type": "array",
+                    "items": generatedLayerSchema,
+                    "description": "Layers the compiler creates before animation (waves, halos, particles). Positioned at anchor layer's center."
+                ],
                 "layers": [
                     "type": "array",
                     "minItems": 1,
@@ -60,6 +65,57 @@ enum AnimationSpecSchema {
                     "type": "number",
                     "minimum": 0,
                     "description": "Seconds between each matched layer when target uses wildcard. First layer starts at original time, each next adds staggerDelay."
+                ]
+            ]
+        ]
+    }
+
+    private static var generatedLayerSchema: [String: Any] {
+        let hexPattern = "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+        return [
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "shape", "anchor"],
+            "properties": [
+                "name": [
+                    "type": "string",
+                    "description": "Unique layer name for targeting in animations."
+                ],
+                "shape": [
+                    "enum": GeneratedShape.allCases.map(\.rawValue),
+                    "description": "Shape type: ellipse or rectangle."
+                ],
+                "anchor": [
+                    "type": "string",
+                    "description": "Name of existing layer — generated layer copies its position."
+                ],
+                "width": [
+                    "type": "number",
+                    "description": "Shape width in px (default 100)."
+                ],
+                "height": [
+                    "type": "number",
+                    "description": "Shape height in px (default 100)."
+                ],
+                "fillColor": [
+                    "type": "string",
+                    "pattern": hexPattern,
+                    "description": "Hex fill color. Omit for stroke-only shapes (rings)."
+                ],
+                "strokeColor": [
+                    "type": "string",
+                    "pattern": hexPattern,
+                    "description": "Hex stroke color. Omit for filled shapes."
+                ],
+                "strokeWidth": [
+                    "type": "number",
+                    "description": "Stroke width in px (default 2)."
+                ],
+                "opacity": [
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Initial opacity 0–100 (default 0 — animate with fadeIn)."
                 ]
             ]
         ]
