@@ -5,40 +5,67 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lottie Developer</title>
 <style>
-  :root { --bg:#f5f5f4; --panel:#fff; --text:#1c1c1a; --muted:#6b6b66; --border:#e3e2de; --accent:#2f6fec; --accent-bg:#e7efff; --chk1:#3a3a3a; --chk2:#2e2e2e; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#161616; --panel:#1f1f1f; --text:#ededeb; --muted:#9a9a95; --border:#2f2f2f; --accent:#5b8ff9; --accent-bg:#1e2c4a; } }
-  * { box-sizing: border-box; }
+  :root { --bg:#f5f5f4; --panel:#fff; --text:#1c1c1a; --muted:#6b6b66; --border:#e3e2de; --accent:#2f6fec; --accent-bg:#e7efff; --ok:#1f9d55; --warn:#d97706; --chk1:#3a3a3a; --chk2:#2e2e2e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161616; --panel:#1f1f1f; --text:#ededeb; --muted:#9a9a95; --border:#2f2f2f; --accent:#5b8ff9; --accent-bg:#1e2c4a; --ok:#3ecf7a; --warn:#f0a43a; } }
+  * { box-sizing:border-box; }
   body { margin:0; font:14px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--text); }
-  button, select, input { font:inherit; color:inherit; }
-  button { background:var(--panel); border:1px solid var(--border); border-radius:7px; padding:5px 11px; cursor:pointer; }
+  button, select, input, textarea { font:inherit; color:inherit; }
+  button, select { background:var(--panel); border:1px solid var(--border); border-radius:7px; padding:5px 11px; cursor:pointer; }
   button:hover { border-color:var(--muted); }
+  button:disabled { opacity:.45; cursor:default; }
   button.on { background:var(--accent-bg); border-color:var(--accent); color:var(--accent); }
-  header { display:flex; align-items:center; gap:12px; padding:14px 20px; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:7px; padding:6px 8px; resize:vertical; }
+  header { display:flex; align-items:center; gap:10px; padding:12px 18px; flex-wrap:wrap; }
   h1 { font-size:22px; margin:0; font-weight:600; }
-  .muted { color:var(--muted); }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:16px; padding:4px 20px 24px; }
+  .muted { color:var(--muted); } .small { font-size:12px; } .mono { font-variant-numeric:tabular-nums; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:16px; padding:4px 18px 24px; }
   .card { cursor:pointer; }
-  .thumb, .stage { background:repeating-conic-gradient(var(--chk1) 0 25%, var(--chk2) 0 50%) 0 0/16px 16px; border-radius:10px; overflow:hidden; }
-  .thumb { height:130px; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); }
+  .chk { background:repeating-conic-gradient(var(--chk1) 0 25%, var(--chk2) 0 50%) 0 0/16px 16px; }
+  .thumb { height:130px; border-radius:10px; overflow:hidden; border:1px solid var(--border); }
   .thumb > div { width:100%; height:100%; }
   .card:hover .thumb { border-color:var(--muted); }
   .name { font-weight:600; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .editor { display:grid; grid-template-columns:minmax(0,1fr) 260px; height:calc(100vh - 62px); }
-  .main { display:flex; flex-direction:column; gap:10px; padding:0 16px 16px 20px; min-height:0; }
-  .stage { flex:1; min-height:240px; position:relative; }
+  .editor { display:grid; grid-template-columns:210px minmax(0,1fr) 290px; height:calc(100vh - 58px); }
+  .col { background:var(--panel); overflow:auto; }
+  .col.left { border-right:1px solid var(--border); } .col.right { border-left:1px solid var(--border); }
+  .main { display:flex; flex-direction:column; gap:8px; padding:0 14px 12px; min-height:0; }
+  .stages { flex:1; display:flex; gap:8px; min-height:240px; }
+  .stage { flex:1; position:relative; border-radius:10px; overflow:hidden; }
   .stage.light { background:#fff; } .stage.dark { background:#111; }
-  #player { position:absolute; inset:8px; }
+  .stage .lbl { position:absolute; top:6px; left:8px; z-index:2; font-size:12px; background:rgba(0,0,0,.55); color:#fff; padding:1px 7px; border-radius:5px; }
+  .player { position:absolute; inset:8px; }
+  .hl { position:absolute; border:1.5px dashed var(--accent); background:rgba(91,143,249,.08); pointer-events:none; display:none; }
   .bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   input[type=range] { flex:1; accent-color:var(--accent); }
-  .mono { font-variant-numeric:tabular-nums; }
-  .side { border-left:1px solid var(--border); background:var(--panel); overflow:auto; padding:12px; }
+  .strip { display:flex; gap:4px; } .strip button { flex:1; padding:2px; font-size:11px; }
+  .sec { padding:10px 12px; border-bottom:1px solid var(--border); }
+  .sec h3 { margin:0 0 8px; font-size:13px; font-weight:600; }
+  .layer { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px; cursor:pointer; font-size:13px; }
+  .layer:hover { background:var(--bg); } .layer.sel { background:var(--accent-bg); color:var(--accent); }
+  .layer .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .layer .eye { border:0; background:none; padding:0 4px; opacity:.75; }
+  .layer.off .nm { opacity:.45; text-decoration:line-through; }
+  .dot { width:6px; height:6px; border-radius:50%; background:var(--warn); }
+  .tabs { display:flex; gap:4px; padding:10px 12px 0; }
+  .tabs button { flex:1; }
   .ver { border:1px solid var(--border); border-radius:8px; padding:8px; margin-bottom:6px; cursor:pointer; }
   .ver.sel { border-color:var(--accent); background:var(--accent-bg); }
-  .ver small { display:block; color:var(--muted); white-space:pre-wrap; }
-  .strip { display:flex; gap:4px; }
-  .strip button { flex:1; padding:2px; font-size:11px; }
+  .ver small, .fb small { display:block; color:var(--muted); white-space:pre-wrap; }
+  .assets { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
+  .asset { border:1px solid var(--border); border-radius:8px; overflow:hidden; font-size:12px; }
+  .asset .pv { height:76px; display:flex; align-items:center; justify-content:center; }
+  .asset .pv img { max-width:100%; max-height:100%; }
+  .asset .meta { padding:4px 6px; } .asset .meta div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .asset .acts { display:flex; gap:4px; padding:0 6px 6px; } .asset .acts button { flex:1; padding:2px 4px; font-size:12px; }
+  .drop { border:1.5px dashed var(--border); border-radius:8px; padding:12px; text-align:center; color:var(--muted); margin-bottom:8px; }
+  .drop.over { border-color:var(--accent); color:var(--accent); }
+  .fb { border:1px solid var(--border); border-radius:8px; padding:8px; margin-bottom:6px; cursor:pointer; }
+  .fb.done { opacity:.6; } .fb .reply { color:var(--ok); }
+  .row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .row label { width:62px; color:var(--muted); }
   .empty { padding:60px 20px; text-align:center; color:var(--muted); }
-  @media (max-width: 760px) { .editor { grid-template-columns:1fr; height:auto; } .side { border-left:0; } .stage { min-height:320px; } }
+  @media (max-width: 980px) { .editor { grid-template-columns:1fr; height:auto; } .col.left, .col.right { border:0; } .stages { min-height:340px; } }
 </style>
 </head>
 <body>
@@ -46,137 +73,344 @@
 <script src="/lottie.js"></script>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const api = (p) => fetch(p).then((r) => r.json());
-let state = { route: location.pathname, sig: null, cmdAt: null };
-let player = null, anim = null, raf = 0;
-const P = { frame: 0, playing: true, speed: 1, loop: true, bg: "checker", versionID: null, project: null, data: null };
+const api = (p, body, method) => fetch(p, body === undefined ? { method: method ?? "GET" } : { method: method ?? "POST", body: typeof body === "string" || body instanceof Blob || body instanceof ArrayBuffer ? body : JSON.stringify(body) }).then((r) => r.json());
+const clone = (x) => JSON.parse(JSON.stringify(x));
+const ago = (iso) => { const s = (Date.now() - Date.parse(iso)) / 1000; return s < 60 ? "just now" : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`; };
 
-function ago(iso) {
-  const s = (Date.now() - Date.parse(iso)) / 1000;
-  if (s < 60) return "just now"; if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  if (s < 86400) return `${Math.round(s / 3600)} h ago`; return `${Math.round(s / 86400)} d ago`;
+const S = { route: location.pathname, sig: null, cmdAt: null };
+const P = { project: null, versionID: null, source: null, overrides: {}, selected: null, frame: 0, playing: true, speed: 1, loop: true,
+  bg: "checker", tab: "versions", compareID: "", compareData: null, assets: [], feedback: [], showResolved: false };
+let anim = null, anim2 = null, raf = 0;
+
+// ---------- Правки слоёв (как core/overrides.ts на сервере) ----------
+function rgb(hex) { let s = (hex || "").replace("#", ""); if (s.length === 3) s = [...s].map((c) => c + c).join(""); if (!/^[0-9a-f]{6}$/i.test(s)) return null; const v = parseInt(s, 16); return [(v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255]; }
+function recolor(items, c) { for (const it of items || []) { if (it.ty === "fl" || it.ty === "st") it.c = { a: 0, k: [...c, 1] }; if (it.it) recolor(it.it, c); } }
+function scaleOp(o, f) { if (!o) return { a: 0, k: 100 * f }; if (o.a === 1 && Array.isArray(o.k)) { for (const kf of o.k) for (const k of ["s", "e"]) if (Array.isArray(kf[k])) kf[k] = kf[k].map((v) => v * f); } else if (typeof o.k === "number") o.k *= f; else if (Array.isArray(o.k)) o.k = o.k[0] * f; return o; }
+function applyOverrides(data) {
+  const out = clone(data);
+  (out.layers || []).forEach((l, i) => {
+    l.ln = "lyr" + i; // id слоя в SVG → выбор кликом и рамка
+    const o = P.overrides[l.nm]; if (!o) return;
+    if (o.hidden) l.hd = true;
+    const c = rgb(o.color); if (c) recolor(l.shapes, c);
+    if (o.opacity != null && l.ks) l.ks.o = scaleOp(l.ks.o, o.opacity / 100);
+  });
+  return out;
+}
+function firstColor(name) {
+  const l = (P.source?.layers || []).find((x) => x.nm === name); if (!l) return "#ffffff";
+  const find = (items) => { for (const it of items || []) { if ((it.ty === "fl" || it.ty === "st") && Array.isArray(it.c?.k)) return it.c.k; const r = find(it.it); if (r) return r; } return null; };
+  const c = find(l.shapes); return c ? "#" + c.slice(0, 3).map((v) => Math.floor(v * 255).toString(16).padStart(2, "0")).join("") : "#ffffff";
+}
+const ov = (name) => P.overrides[name] || {};
+const hasEdits = () => Object.values(P.overrides).some((o) => o.color || o.opacity != null || o.hidden);
+function setOv(name, patch) {
+  const o = { ...ov(name), ...patch };
+  if (!o.color) delete o.color; if (o.opacity == null || o.opacity >= 99.5) delete o.opacity; if (!o.hidden) delete o.hidden;
+  if (Object.keys(o).length) P.overrides[name] = o; else delete P.overrides[name];
+  loadPlayers(true); renderLayers(); renderInspector();
 }
 
 // ---------- Projects ----------
 async function renderHome() {
-  stopPlayer();
+  stopPlayers();
   const projects = await api("/api/projects");
   $("#app").innerHTML = `
     <header><h1>Projects</h1><span class="muted">${projects.length}</span><span style="flex:1"></span>
       <span class="muted">Ask Claude to create or change animations — this page updates by itself.</span></header>
     ${projects.length ? `<div class="grid">${projects.map((p) => `
-      <div class="card" data-id="${p.id}">
-        <div class="thumb"><div data-thumb="${p.id}"></div></div>
+      <div class="card" data-id="${p.id}"><div class="thumb chk"><div data-thumb="${p.id}"></div></div>
         <div class="name">${esc(p.name)}</div>
-        <div class="muted">${p.versions.length ? p.versions.length + (p.versions.length === 1 ? " version" : " versions") : "No versions"} · ${ago(p.updatedAt)}</div>
-      </div>`).join("")}</div>` : `<div class="empty">No projects yet. Send your assets (zip, folder, SVG, PNG) to Claude and describe the motion.</div>`}`;
-  document.querySelectorAll(".card").forEach((c) => (c.onclick = () => go(`/p/${c.dataset.id}`)));
+        <div class="muted small">${p.versions.length ? p.versions.length + (p.versions.length === 1 ? " version" : " versions") : "No versions"} · ${ago(p.updatedAt)}</div></div>`).join("")}</div>`
+      : `<div class="empty">No projects yet. Send your assets (zip, folder, SVG, PNG) to Claude and describe the motion.</div>`}`;
+  $$(".card").forEach((c) => (c.onclick = () => go(`/p/${c.dataset.id}`)));
   for (const p of projects) {
-    const latest = p.versions.reduce((a, b) => (!a || b.index > a.index ? b : a), null);
-    const fav = p.versions.find((v) => v.isFavourite) ?? latest;
-    const data = await api(fav ? `/api/project/${p.id}/version/${fav.id}` : `/api/project/${p.id}/geometry`).catch(() => null);
-    const el = document.querySelector(`[data-thumb="${p.id}"]`);
-    if (!data || !el) continue;
+    const v = p.versions.find((x) => x.isFavourite) ?? p.versions.reduce((a, b) => (!a || b.index > a.index ? b : a), null);
+    const data = await api(v ? `/api/project/${p.id}/version/${v.id}` : `/api/project/${p.id}/geometry`).catch(() => null);
+    const el = $(`[data-thumb="${p.id}"]`); if (!data || !el) continue;
     const a = lottie.loadAnimation({ container: el, renderer: "svg", loop: true, autoplay: false, animationData: data });
     const mid = () => a.goToAndStop(Math.floor((a.totalFrames || 1) / 2), true);
     a.addEventListener("DOMLoaded", mid);
-    const card = el.closest(".card");
-    card.onmouseenter = () => a.play(); card.onmouseleave = () => { a.pause(); mid(); };
+    const card = el.closest(".card"); card.onmouseenter = () => a.play(); card.onmouseleave = () => { a.pause(); mid(); };
   }
 }
 
 // ---------- Editor ----------
-async function renderProject(id, keep = false) {
-  const p = await api(`/api/project/${id}`);
-  if (p.error) return go("/");
+const vLabel = (id) => { const v = P.project?.versions.find((x) => x.id === id); return v ? "v" + v.index : "geometry"; };
+
+async function openProject(id) {
+  const p = await api(`/api/project/${id}`); if (p.error) return go("/");
+  const switching = P.project?.id !== p.id;
   P.project = p;
-  const versions = [...p.versions].sort((a, b) => b.index - a.index);
-  if (!keep || (P.versionID && !p.versions.some((v) => v.id === P.versionID))) P.versionID = versions[0]?.id ?? null;
+  if (switching) { P.overrides = {}; P.selected = null; P.compareID = ""; P.versionID = latest(p)?.id ?? null; }
   $("#app").innerHTML = `
-    <header><button id="back">‹ Projects</button><h1 style="font-size:18px">${esc(p.name)}</h1><span class="muted">${esc(p.sourceLabel)}</span>
+    <header><button id="back">‹ Projects</button><h1 style="font-size:18px">${esc(p.name)}</h1><span class="muted small">${esc(p.sourceLabel)}</span>
       <span style="flex:1"></span>
-      <span class="muted">Background</span>
-      ${["checker", "light", "dark"].map((b) => `<button data-bg="${b}" class="${P.bg === b ? "on" : ""}">${b[0].toUpperCase() + b.slice(1)}</button>`).join("")}
+      <span class="muted">Compare</span><select id="cmp"></select>
+      <span class="muted">Background</span>${["checker", "light", "dark"].map((b) => `<button data-bg="${b}">${b[0].toUpperCase() + b.slice(1)}</button>`).join("")}
     </header>
     <div class="editor">
+      <div class="col left"><div class="sec"><h3>Layers <span class="muted" id="lcount"></span></h3><div id="layers"></div></div></div>
       <div class="main">
-        <div class="stage ${P.bg === "checker" ? "" : P.bg}"><div id="player"></div></div>
+        <div class="stages" id="stages"></div>
         <div class="bar">
-          <button id="prev" title="Previous frame">◁|</button>
-          <button id="play" style="width:42px">${P.playing ? "❚❚" : "▶"}</button>
-          <button id="next" title="Next frame">|▷</button>
+          <button id="prev" title="Previous frame (←)">◁|</button><button id="play" style="width:42px"></button><button id="next" title="Next frame (→)">|▷</button>
           <input id="scrub" type="range" min="0" max="1" step="1" value="0">
-          <span id="flabel" class="mono" style="min-width:86px;text-align:right">0 / 0</span>
-          <span id="tlabel" class="mono muted" style="min-width:52px;text-align:right">0.00s</span>
+          <span id="flabel" class="mono" style="min-width:86px;text-align:right"></span><span id="tlabel" class="mono muted" style="min-width:52px;text-align:right"></span>
         </div>
         <div class="bar">
-          <button id="loop" class="${P.loop ? "on" : ""}">Loop</button>
-          <span class="muted">Speed</span><input id="speed" type="range" min="0.1" max="3" step="0.05" value="${P.speed}" style="max-width:160px">
-          <span id="slabel" class="mono" style="min-width:44px">${P.speed.toFixed(2)}x</span>
-          <span style="flex:1"></span><span id="status" class="muted"></span>
+          <button id="loop">Loop</button><span class="muted">Speed</span>
+          <input id="speed" type="range" min="0.1" max="3" step="0.05" style="max-width:150px"><span id="slabel" class="mono" style="min-width:44px"></span>
+          <span style="flex:1"></span><span id="status" class="muted small"></span>
         </div>
         <div class="strip" id="strip"></div>
       </div>
-      <div class="side">
-        <div style="font-weight:600;margin-bottom:8px">Versions</div>
-        <div class="ver ${P.versionID ? "" : "sel"}" data-v="">Static geometry<small>${esc(p.sourceLabel)} · ${p.layerNames.length} layers</small></div>
-        ${versions.map((v) => `<div class="ver ${v.id === P.versionID ? "sel" : ""}" data-v="${v.id}">
-          <b>v${v.index}</b>${v.isFavourite ? " ★" : ""} <span class="muted">${esc(v.source)} · ${ago(v.createdAt)}</span>
-          <small>${esc(v.note || v.prompt)}</small></div>`).join("")}
-        ${versions.length ? "" : `<div class="muted" style="margin-top:8px">No versions yet — ask Claude to animate.</div>`}
+      <div class="col right">
+        <div class="sec" id="inspector"></div>
+        <div class="tabs">${["versions", "assets", "comments"].map((t) => `<button data-tab="${t}">${t[0].toUpperCase() + t.slice(1)}<span data-count="${t}"></span></button>`).join("")}</div>
+        <div class="sec" id="side" style="border:0"></div>
       </div>
     </div>`;
   $("#back").onclick = () => go("/");
-  document.querySelectorAll("[data-bg]").forEach((b) => (b.onclick = () => { P.bg = b.dataset.bg; renderProject(id, true); }));
-  document.querySelectorAll(".ver").forEach((el) => (el.onclick = () => { P.versionID = el.dataset.v || null; renderProject(id, true); }));
-  $("#play").onclick = () => { P.playing = !P.playing; $("#play").textContent = P.playing ? "❚❚" : "▶"; };
+  $$("[data-bg]").forEach((b) => (b.onclick = () => { P.bg = b.dataset.bg; renderStages(); loadPlayers(true); }));
+  $$("[data-tab]").forEach((b) => (b.onclick = () => { P.tab = b.dataset.tab; renderSide(); }));
+  $("#cmp").onchange = (e) => { P.compareID = e.target.value; renderStages(); loadPlayers(true); };
+  $("#play").onclick = () => { P.playing = !P.playing; syncTransport(); };
   $("#prev").onclick = () => seek(Math.round(P.frame) - 1);
   $("#next").onclick = () => seek(Math.round(P.frame) + 1);
   $("#scrub").oninput = (e) => seek(+e.target.value);
-  $("#loop").onclick = (e) => { P.loop = !P.loop; e.target.classList.toggle("on", P.loop); };
-  $("#speed").oninput = (e) => { P.speed = +e.target.value; $("#slabel").textContent = P.speed.toFixed(2) + "x"; };
-  await loadData();
+  $("#loop").onclick = () => { P.loop = !P.loop; syncTransport(); };
+  $("#speed").value = P.speed; $("#speed").oninput = (e) => { P.speed = +e.target.value; syncTransport(); };
+  document.onkeydown = (e) => {
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) return;
+    if (e.key === " ") { e.preventDefault(); P.playing = !P.playing; syncTransport(); }
+    if (e.key === "ArrowLeft") seek(Math.round(P.frame) - 1);
+    if (e.key === "ArrowRight") seek(Math.round(P.frame) + 1);
+  };
+  await refreshSideData();
+  renderCompareSelect(); renderStages(); await loadPlayers(false); renderSide(); syncTransport();
+}
+const latest = (p) => [...p.versions].sort((a, b) => b.index - a.index)[0];
+
+function renderCompareSelect() {
+  const vs = [...P.project.versions].sort((a, b) => b.index - a.index);
+  $("#cmp").innerHTML = `<option value="">Off</option><option value="geometry">Static geometry</option>` +
+    vs.map((v) => `<option value="${v.id}">v${v.index}</option>`).join("");
+  $("#cmp").value = P.compareID;
+  $$("[data-bg]").forEach((b) => b.classList.toggle("on", b.dataset.bg === P.bg));
 }
 
-async function loadData() {
+function renderStages() {
+  const bgc = P.bg === "checker" ? "chk" : P.bg;
+  $("#stages").innerHTML = `<div class="stage ${bgc}" id="st1">${P.compareID ? `<span class="lbl">${vLabel(P.versionID)}</span>` : ""}<div class="player" id="pl1"></div><div class="hl" id="hl"></div></div>` +
+    (P.compareID ? `<div class="stage ${bgc}"><span class="lbl">${P.compareID === "geometry" ? "Static geometry" : vLabel(P.compareID)}</span><div class="player" id="pl2"></div></div>` : "");
+  $("#st1").onclick = (e) => {
+    // Верхний (внешний) слой под курсором: id вида lyrN ставим при загрузке.
+    let el = e.target, hit = null;
+    while (el && el.id !== "pl1") { if (/^lyr\d+$/.test(el.id || "")) hit = el; el = el.parentElement; }
+    const idx = hit ? +hit.id.slice(3) : -1;
+    select(idx >= 0 ? P.source.layers[idx]?.nm ?? null : null);
+  };
+}
+
+async function loadPlayers(keepFrame) {
   const p = P.project;
-  P.data = await api(P.versionID ? `/api/project/${p.id}/version/${P.versionID}` : `/api/project/${p.id}/geometry`);
-  stopPlayer();
-  anim = lottie.loadAnimation({ container: $("#player"), renderer: "svg", loop: false, autoplay: false, animationData: P.data });
-  const ip = P.data.ip ?? 0, op = P.data.op ?? 1;
+  if (!keepFrame || !P.source || P.sourceFor !== (P.versionID ?? "g")) {
+    P.source = await api(P.versionID ? `/api/project/${p.id}/version/${P.versionID}` : `/api/project/${p.id}/geometry`);
+    P.sourceFor = P.versionID ?? "g";
+  }
+  P.compareData = !P.compareID ? null : await api(P.compareID === "geometry" ? `/api/project/${p.id}/geometry` : `/api/project/${p.id}/version/${P.compareID}`).catch(() => null);
+  stopPlayers();
+  if (!$("#pl1")) renderStages();
+  anim = lottie.loadAnimation({ container: $("#pl1"), renderer: "svg", loop: false, autoplay: false, animationData: applyOverrides(P.source) });
+  if (P.compareData && $("#pl2")) anim2 = lottie.loadAnimation({ container: $("#pl2"), renderer: "svg", loop: false, autoplay: false, animationData: P.compareData });
+  const ip = P.source.ip ?? 0, op = P.source.op ?? 1;
   $("#scrub").min = ip; $("#scrub").max = op;
+  if (!keepFrame) P.frame = ip;
   P.frame = Math.min(Math.max(P.frame, ip), op);
-  const strip = $("#strip");
-  strip.innerHTML = Array.from({ length: 10 }, (_, i) => Math.round(ip + ((op - ip) * i) / 9)).map((f) => `<button data-f="${f}">${f}</button>`).join("");
-  strip.querySelectorAll("button").forEach((b) => (b.onclick = () => seek(+b.dataset.f)));
-  const v = p.versions.find((x) => x.id === P.versionID);
-  $("#status").textContent = `${v ? "v" + v.index : "Static geometry"} · ${P.data.fr ?? 60} fps · ${Math.round(op - ip)} frames · ${(P.data.layers ?? []).length} layers`;
+  $("#strip").innerHTML = Array.from({ length: 10 }, (_, i) => Math.round(ip + ((op - ip) * i) / 9)).map((f) => `<button data-f="${f}">${f}</button>`).join("");
+  $$("#strip button").forEach((b) => (b.onclick = () => seek(+b.dataset.f)));
+  $("#status").textContent = `${vLabel(P.versionID) === "geometry" ? "Static geometry" : vLabel(P.versionID)} · ${P.source.fr ?? 60} fps · ${Math.round(op - ip)} frames`;
+  if (P.selected && !(P.source.layers || []).some((l) => l.nm === P.selected)) P.selected = null;
+  renderLayers(); renderInspector();
   let last = performance.now();
   const tick = (t) => {
     const dt = (t - last) / 1000; last = t;
-    if (P.playing && anim) {
-      let f = P.frame + dt * (P.data.fr ?? 60) * P.speed;
-      if (f > op) { if (P.loop) f = ip + ((f - ip) % Math.max(op - ip, 1)); else { f = op; P.playing = false; $("#play").textContent = "▶"; } }
+    if (P.playing) {
+      let f = P.frame + dt * (P.source.fr ?? 60) * P.speed;
+      if (f > op) { if (P.loop) f = ip + ((f - ip) % Math.max(op - ip, 1)); else { f = op; P.playing = false; syncTransport(); } }
       P.frame = f;
     }
-    draw();
-    raf = requestAnimationFrame(tick);
+    draw(); raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
   publish();
 }
+function stopPlayers() { cancelAnimationFrame(raf); anim?.destroy(); anim2?.destroy(); anim = anim2 = null; }
 
 function draw() {
-  if (!anim || !P.data) return;
-  const ip = P.data.ip ?? 0;
+  if (!anim || !P.source) return;
+  const ip = P.source.ip ?? 0;
   anim.goToAndStop(P.frame - ip, true);
+  if (anim2 && P.compareData) anim2.goToAndStop(Math.min(P.frame, P.compareData.op ?? P.frame) - (P.compareData.ip ?? 0), true);
   $("#scrub").value = P.frame;
-  $("#flabel").textContent = `${Math.round(P.frame)} / ${Math.round(P.data.op ?? 0)}`;
-  $("#tlabel").textContent = (P.frame / (P.data.fr ?? 60)).toFixed(2) + "s";
+  $("#flabel").textContent = `${Math.round(P.frame)} / ${Math.round(P.source.op ?? 0)}`;
+  $("#tlabel").textContent = (P.frame / (P.source.fr ?? 60)).toFixed(2) + "s";
+  // Рамка выбранного слоя
+  const hl = $("#hl"); if (!hl) return;
+  const r = selectionRect();
+  if (r) { const s = $("#st1").getBoundingClientRect(); Object.assign(hl.style, { display: "block", left: r.left - s.left - 3 + "px", top: r.top - s.top - 3 + "px", width: r.width + 6 + "px", height: r.height + 6 + "px" }); }
+  else hl.style.display = "none";
 }
-function seek(f) { P.playing = false; const pl = $("#play"); if (pl) pl.textContent = "▶"; P.frame = Math.min(Math.max(f, P.data?.ip ?? 0), P.data?.op ?? 0); draw(); publish(); }
-function stopPlayer() { cancelAnimationFrame(raf); anim?.destroy(); anim = null; }
+/** Рамка выбранного слоя; у группы (null-слой без своей графики) — объединение всех её частей. */
+function selectionRect() {
+  const ls = P.source?.layers || [];
+  const idx = ls.findIndex((l) => l.nm === P.selected); if (idx < 0) return null;
+  const want = new Set([idx]);
+  if (ls[idx].ty === 3) {
+    const inds = new Set([ls[idx].ind]);
+    for (let grew = true; grew;) { grew = false; ls.forEach((l, i) => { if (inds.has(l.parent) && !want.has(i)) { want.add(i); if (l.ty === 3) inds.add(l.ind); grew = true; } }); }
+  }
+  let box = null;
+  for (const i of want) {
+    const el = document.getElementById("lyr" + i); if (!el) continue;
+    const r = el.getBoundingClientRect(); if (!r.width && !r.height) continue;
+    box = box ? { left: Math.min(box.left, r.left), top: Math.min(box.top, r.top), right: Math.max(box.right, r.right), bottom: Math.max(box.bottom, r.bottom) } : { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  }
+  return box && { left: box.left, top: box.top, width: box.right - box.left, height: box.bottom - box.top };
+}
+function seek(f) { P.playing = false; P.frame = Math.min(Math.max(f, P.source?.ip ?? 0), P.source?.op ?? 0); syncTransport(); draw(); publish(); }
+function syncTransport() {
+  if (!$("#play")) return;
+  $("#play").textContent = P.playing ? "❚❚" : "▶"; $("#loop").classList.toggle("on", P.loop); $("#slabel").textContent = P.speed.toFixed(2) + "x";
+}
+function select(name) { P.selected = name; renderLayers(); renderInspector(); publish(); }
+
+// ---------- Layers + inspector ----------
+const ICON = { 0: "▣", 1: "■", 2: "🖼", 3: "⌖", 4: "✎", 5: "T" };
+function renderLayers() {
+  const ls = P.source?.layers || [];
+  $("#lcount").textContent = ls.length;
+  $("#layers").innerHTML = ls.map((l, i) => {
+    const o = ov(l.nm), edited = o.color || o.opacity != null;
+    return `<div class="layer ${l.nm === P.selected ? "sel" : ""} ${o.hidden ? "off" : ""}" data-i="${i}" title="${esc(l.nm)}">
+      <span class="muted">${l.td === 1 ? "◐" : ICON[l.ty] ?? "✎"}</span><span class="nm">${esc(l.nm)}</span>${edited ? `<span class="dot" title="Edited"></span>` : ""}
+      <button class="eye" data-eye="${esc(l.nm)}" title="${o.hidden ? "Show" : "Hide"}">${o.hidden ? "◌" : "👁"}</button></div>`;
+  }).join("");
+  $$("#layers .layer").forEach((el) => (el.onclick = (e) => {
+    const name = ls[+el.dataset.i].nm;
+    if (e.target.dataset.eye !== undefined) { e.stopPropagation(); setOv(name, { hidden: !ov(name).hidden }); return; }
+    select(P.selected === name ? null : name);
+  }));
+}
+
+function renderInspector() {
+  const box = $("#inspector"); if (!box) return;
+  const n = P.selected, o = n ? ov(n) : {};
+  box.innerHTML = `<h3>Inspector</h3>` + (n ? `
+    <div style="font-weight:600;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis">${esc(n)}</div>
+    <div class="row"><label>Color</label><input type="color" id="icolor" value="${o.color || firstColor(n)}">${o.color ? `<button id="icolorx" title="Reset">↺</button>` : ""}</div>
+    <div class="row"><label>Opacity</label><input type="range" id="iop" min="0" max="100" step="1" value="${o.opacity ?? 100}"><span class="mono" style="width:40px">${Math.round(o.opacity ?? 100)}%</span></div>
+    <div class="row"><label>Hidden</label><input type="checkbox" id="ihid" ${o.hidden ? "checked" : ""}></div>`
+    : `<div class="muted small" style="margin-bottom:8px">Click a layer on the canvas or in the list.</div>`) +
+    `<div class="bar"><button class="primary" id="isave" ${hasEdits() ? "" : "disabled"}>Save edits as new version</button>${hasEdits() ? `<button id="ireset">Reset</button>` : ""}</div>`;
+  if (n) {
+    let t; $("#icolor").oninput = (e) => { clearTimeout(t); const v = e.target.value; t = setTimeout(() => setOv(n, { color: v }), 120); };
+    $("#icolorx")?.addEventListener("click", () => setOv(n, { color: null }));
+    $("#iop").onchange = (e) => setOv(n, { opacity: +e.target.value });
+    $("#ihid").onchange = (e) => setOv(n, { hidden: e.target.checked });
+  }
+  $("#ireset")?.addEventListener("click", () => { P.overrides = {}; loadPlayers(true); });
+  $("#isave").onclick = async () => {
+    const note = Object.entries(P.overrides).map(([k, o]) => `${k}: ${[o.color && "color " + o.color, o.opacity != null && "opacity " + Math.round(o.opacity) + "%", o.hidden && "hidden"].filter(Boolean).join(", ")}`).join("; ");
+    const r = await api(`/api/project/${P.project.id}/edits`, { version: P.versionID ? vLabel(P.versionID) : undefined, overrides: P.overrides, note });
+    if (r.error) return alert(r.error);
+    P.overrides = {}; P.versionID = r.version.id; await refreshProject(true);
+  };
+}
+
+// ---------- Side: versions / assets / comments ----------
+async function refreshSideData() {
+  const id = P.project.id;
+  [P.assets, P.feedback] = await Promise.all([api(`/api/project/${id}/assets`), api(`/api/project/${id}/feedback`)]);
+}
+
+function renderSide() {
+  $$("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === P.tab));
+  const open = P.feedback.filter((f) => !f.resolved).length;
+  $('[data-count="assets"]').textContent = P.assets.length ? ` ${P.assets.length}` : "";
+  $('[data-count="comments"]').textContent = open ? ` ${open}` : "";
+  const side = $("#side");
+  if (P.tab === "versions") {
+    const vs = [...P.project.versions].sort((a, b) => b.index - a.index);
+    side.innerHTML = `<div class="ver ${P.versionID ? "" : "sel"}" data-v="">Static geometry<small>${esc(P.project.sourceLabel)} · ${P.project.layerNames.length} layers</small></div>` +
+      vs.map((v) => `<div class="ver ${v.id === P.versionID ? "sel" : ""}" data-v="${v.id}"><b>v${v.index}</b>${v.isFavourite ? " ★" : ""} <span class="muted small">${esc(v.source)} · ${ago(v.createdAt)}</span><small>${esc(v.note || v.prompt)}</small></div>`).join("") +
+      (vs.length ? "" : `<div class="muted small">No versions yet — ask Claude to animate.</div>`);
+    $$(".ver", side).forEach((el) => (el.onclick = () => { P.versionID = el.dataset.v || null; P.overrides = {}; loadPlayers(true); renderSide(); }));
+  } else if (P.tab === "assets") {
+    side.innerHTML = `<div class="drop" id="drop">Drop files or a .zip here<br><button id="pick" style="margin-top:6px">Add files…</button><input type="file" id="file" multiple hidden accept=".svg,.png,.jpg,.jpeg,.webp,.json,.zip"></div>
+      <div class="assets">${P.assets.map((a) => `<div class="asset"><div class="pv chk">${a.kind === "lottie" ? `<span style="color:#fff">▶ JSON</span>` : `<img loading="lazy" src="/api/project/${P.project.id}/asset?name=${encodeURIComponent(a.name)}&t=${a.modified}">`}</div>
+        <div class="meta"><div title="${esc(a.name)}">${a.usedBy.length ? "✅ " : ""}${esc(a.name)}</div><div class="muted">${a.pixels ? a.pixels.width + "×" + a.pixels.height + " · " : ""}${(a.bytes / 1024).toFixed(a.bytes < 10240 ? 1 : 0)} KB</div></div>
+        <div class="acts"><button data-place="${esc(a.name)}" title="Put into the scene">To scene</button><button data-del="${esc(a.name)}" title="Delete">✕</button></div></div>`).join("")}</div>
+      ${P.assets.length ? "" : `<div class="muted small">Files here are visible to Claude (list_assets).</div>`}`;
+    const upload = async (files) => { for (const f of files) await api(`/api/project/${P.project.id}/upload?name=${encodeURIComponent(f.name)}`, await f.arrayBuffer()); await refreshSideData(); renderSide(); };
+    $("#pick").onclick = () => $("#file").click(); $("#file").onchange = (e) => upload([...e.target.files]);
+    const d = $("#drop");
+    d.ondragover = (e) => { e.preventDefault(); d.classList.add("over"); }; d.ondragleave = () => d.classList.remove("over");
+    d.ondrop = (e) => { e.preventDefault(); d.classList.remove("over"); upload([...e.dataTransfer.files]); };
+    $$("[data-place]", side).forEach((b) => (b.onclick = async () => {
+      const r = await api(`/api/project/${P.project.id}/place`, { name: b.dataset.place }); if (r.error) return alert(r.error);
+      P.versionID = null; P.selected = r.layer; await refreshProject(true);
+    }));
+    $$("[data-del]", side).forEach((b) => (b.onclick = async () => {
+      if (!confirm(`Delete ${b.dataset.del}? Layers already in the scene stay.`)) return;
+      await api(`/api/project/${P.project.id}/asset?name=${encodeURIComponent(b.dataset.del)}`, undefined, "DELETE"); await refreshSideData(); renderSide();
+    }));
+  } else {
+    const items = P.feedback.filter((f) => P.showResolved || !f.resolved).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    side.innerHTML = `<textarea id="ftext" rows="2" placeholder="Comment for Claude…">${esc(P.draft || "")}</textarea>
+      <div class="bar" style="margin:6px 0 10px"><span class="muted small" id="ftarget"></span><span style="flex:1"></span><button class="primary" id="fadd">Add</button></div>
+      <label class="small muted"><input type="checkbox" id="fres" ${P.showResolved ? "checked" : ""}> Show resolved</label>
+      <div style="margin-top:8px">${items.map((f) => `<div class="fb ${f.resolved ? "done" : ""}" data-f="${f.id}">
+        <small>${f.resolved ? "✅" : "🟠"} ${esc(f.versionLabel)} · f${f.frame}${f.layer ? " · " + esc(f.layer) : ""} · ${ago(f.createdAt)}</small>
+        <div>${esc(f.text)}</div>${f.reply ? `<small class="reply">Claude: ${esc(f.reply)}</small>` : ""}
+        <div class="bar" style="margin-top:4px"><button data-res="${f.id}" style="padding:1px 8px;font-size:12px">${f.resolved ? "Reopen" : "Resolve"}</button><button data-fdel="${f.id}" style="padding:1px 8px;font-size:12px">Delete</button></div></div>`).join("")}</div>
+      ${items.length ? "" : `<div class="muted small">Pause on a frame, select a layer if needed, and write what to change. Claude reads these (get_feedback).</div>`}`;
+    const tgt = () => ($("#ftarget").textContent = `${vLabel(P.versionID)} · f${Math.round(P.frame)}${P.selected ? " · " + P.selected : ""}`);
+    tgt(); clearInterval(P.tgtTimer); P.tgtTimer = setInterval(() => $("#ftarget") && tgt(), 300);
+    $("#ftext").oninput = (e) => (P.draft = e.target.value);
+    $("#fres").onchange = (e) => { P.showResolved = e.target.checked; renderSide(); };
+    $("#fadd").onclick = async () => {
+      const text = $("#ftext").value.trim(); if (!text) return;
+      await api(`/api/project/${P.project.id}/feedback`, { text, frame: P.frame, layer: P.selected, versionID: P.versionID, versionLabel: vLabel(P.versionID) });
+      P.draft = ""; await refreshSideData(); renderSide();
+    };
+    $$(".fb", side).forEach((el) => (el.onclick = async (e) => {
+      const f = P.feedback.find((x) => x.id === el.dataset.f);
+      if (e.target.dataset.res) { await api(`/api/project/${P.project.id}/feedback-resolve`, { id: f.id, resolved: !f.resolved }); await refreshSideData(); return renderSide(); }
+      if (e.target.dataset.fdel) { if (confirm("Delete this comment?")) { await api(`/api/project/${P.project.id}/feedback-delete`, { id: f.id }); await refreshSideData(); renderSide(); } return; }
+      // переход к месту комментария
+      const target = f.versionID && P.project.versions.some((v) => v.id === f.versionID) ? f.versionID : null;
+      if (target !== P.versionID) { P.versionID = target; P.overrides = {}; await loadPlayers(true); }
+      seek(f.frame); select(f.layer ?? null);
+    }));
+  }
+}
+
+/** Перечитать проект без сброса плеера (если текущая версия цела). */
+async function refreshProject(forcePlayers) {
+  const before = new Set(P.project.versions.map((v) => v.id));
+  P.project = await api(`/api/project/${P.project.id}`);
+  const added = P.project.versions.filter((v) => !before.has(v.id));
+  if (added.length && !forcePlayers) { P.versionID = latest(P.project).id; P.overrides = {}; }
+  if (P.versionID && !P.project.versions.some((v) => v.id === P.versionID)) P.versionID = latest(P.project)?.id ?? null;
+  await refreshSideData();
+  renderCompareSelect();
+  if (forcePlayers || added.length || P.versionID === null) { P.sourceFor = null; await loadPlayers(true); }
+  renderSide();
+}
 
 // Что видит дизайнер — для get_app_state.
 let pubTimer = 0;
@@ -184,46 +418,34 @@ function publish() {
   clearTimeout(pubTimer);
   pubTimer = setTimeout(() => {
     const p = P.project; if (!p) return;
-    const v = p.versions.find((x) => x.id === P.versionID);
-    fetch("/api/state", { method: "POST", body: JSON.stringify({ projectID: p.id, projectName: p.name, version: v ? "v" + v.index : "geometry",
-      frame: Math.round(P.frame), playing: P.playing, mode: P.loop ? "Loop" : "Once", engine: "lottie-web (svg)", activeEngine: "lottie-web",
-      selectedLayer: null, overrides: {} }) });
+    api("/api/state", { projectID: p.id, projectName: p.name, version: vLabel(P.versionID), frame: Math.round(P.frame), playing: P.playing,
+      mode: P.loop ? "Loop" : "Once", engine: "lottie-web (svg)", activeEngine: "lottie-web", selectedLayer: P.selected, overrides: P.overrides });
   }, 400);
 }
 
 // ---------- Routing + live sync ----------
-function go(path) { history.pushState(null, "", path); state.route = path; route(); }
-window.onpopstate = () => { state.route = location.pathname; route(); };
-function route() {
-  const m = state.route.match(/^\/p\/([0-9A-F-]+)/i);
-  return m ? renderProject(m[1]) : renderHome();
-}
+function go(path) { history.pushState(null, "", path); S.route = path; route(); }
+window.onpopstate = () => { S.route = location.pathname; route(); };
+function route() { const m = S.route.match(/^\/p\/([0-9A-F-]+)/i); return m ? openProject(m[1]) : (P.project = null, renderHome()); }
 
 async function poll() {
   try {
     const r = await api("/api/poll");
     const cmd = r.command;
-    if (cmd && cmd.issuedAt !== state.cmdAt) {
-      const first = state.cmdAt === null; state.cmdAt = cmd.issuedAt;
+    if (cmd && cmd.issuedAt !== S.cmdAt) {
+      const first = S.cmdAt === null; S.cmdAt = cmd.issuedAt;
       if (!first && cmd.projectID) {
-        if (cmd.versionID) P.versionID = cmd.versionID;
-        if (typeof cmd.frame === "number") { P.frame = cmd.frame; P.playing = false; }
-        history.pushState(null, "", `/p/${cmd.projectID}`); state.route = `/p/${cmd.projectID}`;
-        state.sig = r.sig;
-        await renderProject(cmd.projectID, true);
+        S.sig = r.sig;
+        if (P.project?.id !== cmd.projectID) { history.pushState(null, "", `/p/${cmd.projectID}`); S.route = `/p/${cmd.projectID}`; await openProject(cmd.projectID); }
+        else await refreshProject(false);
+        if (cmd.versionID && cmd.versionID !== P.versionID) { P.versionID = cmd.versionID; P.overrides = {}; await loadPlayers(true); renderSide(); }
+        if (typeof cmd.frame === "number") seek(cmd.frame);
+        if (cmd.layer) select(cmd.layer);
         return;
       }
     }
-    if (state.sig !== null && r.sig !== state.sig) {
-      const m = state.route.match(/^\/p\/([0-9A-F-]+)/i);
-      if (m) {
-        const before = P.project?.versions.length ?? 0;
-        const p = await api(`/api/project/${m[1]}`);
-        if (p.versions.length > before) P.versionID = [...p.versions].sort((a, b) => b.index - a.index)[0].id; // новая версия — показать её
-        await renderProject(m[1], true);
-      } else await renderHome();
-    }
-    state.sig = r.sig;
+    if (S.sig !== null && r.sig !== S.sig) { if (P.project) await refreshProject(false); else await renderHome(); }
+    S.sig = r.sig;
   } catch {}
   finally { setTimeout(poll, 800); }
 }

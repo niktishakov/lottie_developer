@@ -7,8 +7,8 @@ import spec from "./tools.json" with { type: "json" };
 
 const log = (m: string) => process.stderr.write(`[lottie-developer] ${m}\n`);
 const store = new Store();
-const serving = startViewer(store);
 const tools = new Tools(store, { url: viewerURL, open: (p?: string) => openBrowser(p) });
+const serving = startViewer(store, tools);
 log(`storage: ${store.root}; viewer: ${viewerURL()}${serving ? "" : " (served by another instance)"}`);
 
 if (process.argv.includes("--viewer") || process.stdin.isTTY) {
