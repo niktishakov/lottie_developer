@@ -30,11 +30,11 @@ final class ProjectStore {
     private func currentDiskSignature() -> String {
         guard let entries = try? fm.contentsOfDirectory(at: rootDir, includingPropertiesForKeys: nil) else { return "" }
         return entries.filter(\.hasDirectoryPath).map { dir -> String in
-            let m = ["project.json", "feedback.json"].map { name -> Double in
+            let m = ["project.json", "feedback.json", "assets"].map { name -> Double in
                 let f = dir.appendingPathComponent(name)
                 return (try? fm.attributesOfItem(atPath: f.path)[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
             }
-            return "\(dir.lastPathComponent):\(m[0]):\(m[1])"
+            return "\(dir.lastPathComponent):\(m[0]):\(m[1]):\(m[2])"
         }.sorted().joined(separator: "|")
     }
 
@@ -310,10 +310,71 @@ final class ProjectStore {
 
     /// Новый проект из zip/папки ассетов (SVG, картинки, Lottie) — одной композицией.
     func importBundle(_ url: URL, name: String? = nil) throws -> (AnimationProject, AssetBundle.Report) {
-        let r = try AssetBundle.load(url)
+        let staging = fm.temporaryDirectory.appendingPathComponent("staging_\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: staging) }
+        let r = try AssetBundle.load(url, copyTo: staging)
         let base = name ?? url.deletingPathExtension().lastPathComponent
         let p = createProjectFromLottie(name: uniqueName(base), lottieData: r.data, sourceLabel: url.lastPathComponent)
+        _ = try? AssetFiles.add(AssetFiles.list(staging).map(\.url), into: assetsDir(p.id))
+        AssetFiles.setUsage(r.usage, assetsDir(p.id))
         return (p, r)
+    }
+
+    // MARK: - Assets (оригиналы файлов проекта)
+
+    func assetsDir(_ id: UUID) -> URL { projectDir(id).appendingPathComponent("assets", isDirectory: true) }
+
+    func assets(projectID: UUID) -> [AssetFiles.Item] { AssetFiles.list(assetsDir(projectID)) }
+
+    /// Какие слои сцены сделаны из какого файла (только ещё существующие в геометрии).
+    func assetUsage(projectID: UUID) -> [String: [String]] {
+        guard let p = project(projectID), let geom = geometryData(for: p) else { return [:] }
+        let names = Set(LottieOverrides.layers(in: geom).map(\.name))
+        return AssetFiles.usage(assetsDir(projectID)).mapValues { $0.filter(names.contains) }.filter { !$0.value.isEmpty }
+    }
+
+    /// Положить файлы/zip в папку ассетов (в сцену не добавляет).
+    @discardableResult
+    func addAssets(projectID: UUID, _ urls: [URL]) throws -> [String] {
+        let added = try AssetFiles.add(urls, into: assetsDir(projectID))
+        diskSignature = currentDiskSignature()
+        feedbackRevision += 1
+        return added
+    }
+
+    /// В Корзину (восстановимо). Слои в сцене остаются: картинки в Lottie вшиты.
+    func trashAsset(projectID: UUID, name: String) throws {
+        let url = assetsDir(projectID).appendingPathComponent(name)
+        try fm.trashItem(at: url, resultingItemURL: nil)
+        var u = AssetFiles.usage(assetsDir(projectID)); u[name] = nil
+        AssetFiles.setUsage(u, assetsDir(projectID))
+        diskSignature = currentDiskSignature()
+        feedbackRevision += 1
+    }
+
+    /// Поставить файл из папки ассетов в сцену. Возвращает имя слоя/группы.
+    @discardableResult
+    func placeAsset(projectID: UUID, name: String, origin: CGPoint? = nil, frame: CGRect? = nil) throws -> (layer: String, warnings: [String]) {
+        let url = assetsDir(projectID).appendingPathComponent(name)
+        let data = try Data(contentsOf: url)
+        let base = url.deletingPathExtension().lastPathComponent
+        let result: (String, [String])
+        switch url.pathExtension.lowercased() {
+        case "svg", "json":
+            let r = try addPart(projectID: projectID, data: data, isSVG: url.pathExtension.lowercased() == "svg", name: base, origin: origin)
+            result = (r.group, r.warnings)
+        default:
+            result = (try addImage(projectID: projectID, image: data, name: base, frame: frame), [])
+        }
+        AssetFiles.recordUsage(file: name, layer: result.0, assetsDir(projectID))
+        return result
+    }
+
+    /// Файл (откуда угодно) → в папку ассетов → в сцену.
+    @discardableResult
+    func importAndPlace(projectID: UUID, file: URL, origin: CGPoint? = nil, frame: CGRect? = nil) throws -> (layer: String, warnings: [String]) {
+        let name = try AssetFiles.copy(file, into: assetsDir(projectID))
+        return try placeAsset(projectID: projectID, name: name, origin: origin, frame: frame)
     }
 
     /// Изменить геометрию проекта функцией над Lottie JSON.

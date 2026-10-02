@@ -13,6 +13,8 @@ enum AssetBundle {
         var canvas: CGSize
         var parts: [String]        // имена групп/слоёв верхнего уровня, сверху вниз
         var warnings: [String]
+        /// Какие слои/группы получились из какого файла (имя файла в `copyTo`).
+        var usage: [String: [String]] = [:]
     }
 
     struct BundleError: LocalizedError {
@@ -22,7 +24,8 @@ enum AssetBundle {
 
     static let imageExts: Set<String> = ["png", "jpg", "jpeg", "webp", "heic"]
 
-    static func load(_ url: URL, fps: Int = 60, frames: Int = 120) throws -> Report {
+    /// - copyTo: если задано, оригиналы использованных файлов копируются туда (папка ассетов проекта).
+    static func load(_ url: URL, fps: Int = 60, frames: Int = 120, copyTo: URL? = nil) throws -> Report {
         let fm = FileManager.default
         var dir = url
         var tmp: URL?
@@ -67,6 +70,11 @@ enum AssetBundle {
                                            fps: fps, frames: frames)
         var parts: [String] = []
         var swatches: [String] = []
+        var usage: [String: [String]] = [:]
+        func keep(_ file: URL, _ part: String) {
+            guard let copyTo else { return }
+            if let name = try? AssetFiles.copy(file, into: copyTo) { usage[name, default: []].append(part) }
+        }
 
         // От крупных к мелким: каждый следующий ложится сверху.
         for item in items.sorted(by: { area($0) > area($1) }) {
@@ -78,10 +86,10 @@ enum AssetBundle {
                 let r = try SVGToLottie.convert(svgData: raw)
                 warnings += r.warnings.map { "\(item.url.lastPathComponent): \($0)" }
                 let (d, g) = try LottieMerge.add(r.data, to: data, group: name, origin: origin)
-                data = d; parts.insert(g, at: 0)
+                data = d; parts.insert(g, at: 0); keep(item.url, g)
             case "lottie":
                 let (d, g) = try LottieMerge.add(raw, to: data, group: name, origin: origin)
-                data = d; parts.insert(g, at: 0)
+                data = d; parts.insert(g, at: 0); keep(item.url, g)
             default:
                 if item.size.width <= 4 && item.size.height <= 4 {
                     let (d, l) = try LottieImageLayers.addImage(to: data, image: raw, name: name,
@@ -89,17 +97,17 @@ enum AssetBundle {
                     data = try LottieMerge.reorder(layer: l, in: d, to: Int.max)
                     data = LottieOverrides.apply([l: LayerOverride(hidden: true)], to: data)
                     swatches.append(l)
-                    parts.append(l)
+                    parts.append(l); keep(item.url, l)
                 } else {
                     let (d, l) = try LottieImageLayers.addImage(to: data, image: raw, name: name, frame: nil)
-                    data = d; parts.insert(l, at: 0)
+                    data = d; parts.insert(l, at: 0); keep(item.url, l)
                 }
             }
         }
         if !swatches.isEmpty {
             warnings.append("Tiny images treated as color swatches: \(swatches.joined(separator: ", ")) — stretched to the canvas, at the bottom, hidden")
         }
-        return Report(data: data, canvas: canvas, parts: parts, warnings: warnings)
+        return Report(data: data, canvas: canvas, parts: parts, warnings: warnings, usage: usage)
     }
 
     private static func svgSize(_ data: Data) -> CGSize {

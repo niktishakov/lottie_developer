@@ -105,6 +105,28 @@ final class MCPServer {
         case "render_frame": return try renderFrames(a)
         case "add_image": return try addImage(a)
         case "add_svg": return try addSVG(a)
+        case "list_assets": return try listAssets(a)
+        case "add_assets":
+            let p = try project(a)
+            let paths = (a["paths"] as? [String]) ?? ((a["path"] as? String).map { [$0] } ?? [])
+            guard !paths.isEmpty else { throw ToolError("Pass 'paths' (files, folders or .zip)") }
+            let added = try store.addAssets(projectID: p.id, paths.map(Self.fileURL))
+            var placed: [String] = []
+            if a["place"] as? Bool ?? false {
+                for n in added { placed.append(try store.placeAsset(projectID: p.id, name: n).layer) }
+            }
+            return ["added": added, "placed": placed, "folder": store.assetsDir(p.id).path]
+        case "place_asset":
+            let p = try project(a)
+            let origin = ((a["x"] as? NSNumber)?.doubleValue).flatMap { x in ((a["y"] as? NSNumber)?.doubleValue).map { CGPoint(x: x, y: $0) } }
+            let (layer, warnings) = try store.placeAsset(projectID: p.id, name: try str(a, "name"), origin: origin, frame: Self.rect(a))
+            store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date(), layer: layer))
+            return ["layer": layer, "warnings": warnings]
+        case "delete_asset":
+            let p = try project(a)
+            let name = try str(a, "name")
+            try store.trashAsset(projectID: p.id, name: name)
+            return ["trashed": name, "note": "Moved to Trash. Layers already in the scene stay (images are embedded)."]
         case "get_feedback": return try getFeedback(a)
         case "resolve_feedback":
             let p = try project(a)
@@ -156,8 +178,7 @@ final class MCPServer {
             // поэтому добавляем с конца.
             for path in images.reversed() {
                 let url = Self.fileURL(path)
-                added.insert(contentsOf: [try store.addImage(projectID: p.id, image: try Data(contentsOf: url),
-                                                name: url.deletingPathExtension().lastPathComponent)], at: 0)
+                added.insert(try store.importAndPlace(projectID: p.id, file: url).layer, at: 0)
             }
             if a["show_in_app"] as? Bool ?? true { store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date())) }
             return ["project": try projectDetails(try project(["project_id": p.id.uuidString])), "imageLayers": added]
@@ -379,11 +400,13 @@ final class MCPServer {
     private func addImage(_ a: [String: Any]) throws -> Any {
         let p = try project(a)
         let data: Data
-        var defaultName = "image"
+        let defaultName = "image"
         if let path = a["path"] as? String, !path.isEmpty {
-            let url = Self.fileURL(path)
-            data = try Data(contentsOf: url)
-            defaultName = url.deletingPathExtension().lastPathComponent
+            // Файл → в папку ассетов проекта → в сцену.
+            let layer = try store.importAndPlace(projectID: p.id, file: Self.fileURL(path), frame: Self.rect(a)).layer
+            store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date(), layer: layer))
+            let geom = store.geometryData(for: try project(a)) ?? Data()
+            return ["layer": layer, "frame": Self.rectDict(LottieImageLayers.imageFrames(in: geom)[layer])]
         } else if let b64 = a["base64"] as? String, let d = Data(base64Encoded: b64.components(separatedBy: ",").last ?? b64) {
             data = d
         } else {
@@ -421,6 +444,21 @@ final class MCPServer {
                 "order": LottieOverrides.layers(in: after).map(\.name)]
     }
 
+    private func listAssets(_ a: [String: Any]) throws -> Any {
+        let p = try project(a)
+        let usage = store.assetUsage(projectID: p.id)
+        let items: [[String: Any]] = store.assets(projectID: p.id).map { f in
+            var d: [String: Any] = ["name": f.name, "path": f.url.path, "kind": f.kind, "bytes": f.bytes,
+                                    "usedBy": usage[f.name] ?? []]
+            if f.kind == "image", let data = try? Data(contentsOf: f.url), let px = LottieImageLayers.pixelSize(data) {
+                d["pixels"] = ["width": px.width, "height": px.height]
+            }
+            return d
+        }
+        return ["folder": store.assetsDir(p.id).path, "assets": items,
+                "tip": "Open 'path' with your file reader to look at an asset. place_asset puts one into the scene."]
+    }
+
     private func getFeedback(_ a: [String: Any]) throws -> Any {
         let status = (a["status"] as? String) ?? "open"
         let projects: [AnimationProject] = a["project_id"] != nil ? [try project(a)] : store.projects
@@ -444,11 +482,11 @@ final class MCPServer {
         let p = try project(a)
         let data: Data, isSVG: Bool
         var name = (a["name"] as? String) ?? ""
+        let origin0 = ((a["x"] as? NSNumber)?.doubleValue).flatMap { x in ((a["y"] as? NSNumber)?.doubleValue).map { CGPoint(x: x, y: $0) } }
         if let path = a["path"] as? String, !path.isEmpty {
-            let url = Self.fileURL(path)
-            data = try Data(contentsOf: url)
-            isSVG = url.pathExtension.lowercased() != "json"
-            if name.isEmpty { name = url.deletingPathExtension().lastPathComponent }
+            let (group, warnings) = try store.importAndPlace(projectID: p.id, file: Self.fileURL(path), origin: origin0)
+            store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date(), layer: group))
+            return ["group": group, "warnings": warnings]
         } else if let svg = a["svg"] as? String, !svg.isEmpty {
             data = Data(svg.utf8); isSVG = true
         } else {

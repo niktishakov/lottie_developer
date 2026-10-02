@@ -57,6 +57,10 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .dropDestination(for: URL.self) { urls, _ in
+            if let zip = urls.first(where: { $0.pathExtension.lowercased() == "zip" || $0.hasDirectoryPath }),
+               let (p, _) = try? store.importBundle(zip) {
+                onOpen(p.id); return true
+            }
             let images = urls.filter { Self.imageExts.contains($0.pathExtension.lowercased()) }
             if !images.isEmpty {
                 if let id = createProject(fromImages: images) { onOpen(id) }
@@ -136,8 +140,7 @@ struct HomeView: View {
         let p = store.createBlankProject(name: name, width: px.width, height: px.height)
         // Первая — верхний слой: добавляем с конца (каждая новая ложится сверху).
         for url in urls.reversed() {
-            guard let data = try? Data(contentsOf: url) else { continue }
-            _ = try? store.addImage(projectID: p.id, image: data, name: url.deletingPathExtension().lastPathComponent)
+            _ = try? store.importAndPlace(projectID: p.id, file: url)
         }
         return p.id
     }
@@ -146,7 +149,7 @@ struct HomeView: View {
         RoundedRectangle(cornerRadius: 16, style: .continuous)
             .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
             .background(Color.accentColor.opacity(0.08))
-            .overlay(Text("Drop SVG, Lottie or images to create a project").font(.headline).foregroundStyle(Color.accentColor))
+            .overlay(Text("Drop a .zip / folder, SVG, Lottie or images to create a project").font(.headline).foregroundStyle(Color.accentColor))
             .padding(12)
             .allowsHitTesting(false)
     }

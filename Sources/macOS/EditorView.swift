@@ -19,7 +19,7 @@ struct EditorView: View {
     @State private var frameCostMs: Double?
     @State private var sideTab = SideTab.versions
 
-    private enum SideTab: String, CaseIterable { case versions = "Versions", comments = "Comments" }
+    private enum SideTab: String, CaseIterable { case versions = "Versions", assets = "Assets", comments = "Comments" }
     @State private var report: LottieRuntimeReport?
     @State private var dropTargeted = false
     @State private var multiSelection: Set<UUID> = []
@@ -46,6 +46,10 @@ struct EditorView: View {
                         .pickerStyle(.segmented).labelsHidden().padding(8)
                         if sideTab == .versions {
                             versionsSidebar(project)
+                        } else if sideTab == .assets {
+                            AssetsPanel(store: store, projectID: projectID,
+                                        onSceneChanged: { layer in showGeometry(); player.select(layer) },
+                                        onStatus: { status = $0 })
                         } else {
                             FeedbackPanel(store: store, projectID: projectID, player: player,
                                           versionID: selectedVersionID, versionLabel: currentLabel(project),
@@ -80,7 +84,7 @@ struct EditorView: View {
                 Button { onClose() } label: { Label("Projects", systemImage: "chevron.left") }
                 Text(project.name).font(.headline).lineLimit(1)
                 Spacer()
-                Button("Add image…") { openImages() }
+                Button("Add to scene…") { openImages() }
                 Button("Import Lottie…") { openLottieJSON() }
                 Button("Replace SVG…") { openSVG() }
                 Button("Paste SVG") { pasteSVGFromClipboard() }
@@ -115,8 +119,16 @@ struct EditorView: View {
         .padding(14)
         .frame(maxWidth: .infinity)
         .dropDestination(for: URL.self) { urls, _ in
-            let images = urls.filter { HomeView.imageExts.contains($0.pathExtension.lowercased()) }
-            if !images.isEmpty { addImages(images); return true }
+            // Картинки и SVG — в сцену (оригиналы в Assets). Заменить геометрию — кнопкой Replace SVG….
+            let parts = urls.filter { HomeView.imageExts.contains($0.pathExtension.lowercased()) || $0.pathExtension.lowercased() == "svg" }
+            if !parts.isEmpty { addImages(parts); return true }
+            let zips = urls.filter { $0.pathExtension.lowercased() == "zip" }
+            if !zips.isEmpty {
+                do { status = "Added to assets: " + (try store.addAssets(projectID: projectID, zips)).joined(separator: ", ") }
+                catch { status = "Zip import failed: \(error.localizedDescription)" }
+                sideTab = .assets
+                return true
+            }
             guard let url = urls.first else { return false }
             handleDropped(url: url); return true
         } isTargeted: { dropTargeted = $0 }
@@ -300,7 +312,7 @@ struct EditorView: View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
             .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
             .background(Color.accentColor.opacity(0.08))
-            .overlay(Text("Drop images to add layers, or SVG / Lottie to replace geometry").font(.headline).foregroundStyle(Color.accentColor))
+            .overlay(Text("Drop images or SVG to add to the scene, a .zip to add to Assets").font(.headline).foregroundStyle(Color.accentColor))
             .allowsHitTesting(false)
     }
 
@@ -508,7 +520,7 @@ struct EditorView: View {
 
     private func openImages() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.png, .jpeg, .webP, .heic]
+        panel.allowedContentTypes = [.png, .jpeg, .webP, .heic, .svg]
         panel.allowsMultipleSelection = true
         guard panel.runModal() == .OK else { return }
         addImages(panel.urls)
@@ -518,9 +530,9 @@ struct EditorView: View {
     private func addImages(_ urls: [URL]) {
         var added: [String] = []
         for url in urls {
-            guard let data = try? Data(contentsOf: url) else { continue }
-            do { added.append(try store.addImage(projectID: projectID, image: data, name: url.deletingPathExtension().lastPathComponent)) }
-            catch { status = "Image import failed: \(error.localizedDescription)"; return }
+            // Оригинал → папка ассетов проекта → сцена.
+            do { added.append(try store.importAndPlace(projectID: projectID, file: url).layer) }
+            catch { status = "Import failed: \(error.localizedDescription)"; return }
         }
         guard !added.isEmpty else { return }
         showGeometry()
