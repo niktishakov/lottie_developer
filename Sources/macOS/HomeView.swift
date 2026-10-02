@@ -29,6 +29,7 @@ struct HomeView: View {
                 TextField("Search", text: $query)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 200)
+                Button { openImagesAsProject() } label: { Label("New from images…", systemImage: "photo.on.rectangle") }
                 Button { openLottieAsProject() } label: { Label("Import Lottie…", systemImage: "doc.badge.arrow.up") }
                 Button { _ = openSVGAsProject() } label: { Label("New from SVG…", systemImage: "square.and.arrow.down") }
                 Button { pasteSVGAsProject() } label: { Label("Paste SVG", systemImage: "doc.on.clipboard") }
@@ -56,6 +57,11 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .dropDestination(for: URL.self) { urls, _ in
+            let images = urls.filter { Self.imageExts.contains($0.pathExtension.lowercased()) }
+            if !images.isEmpty {
+                if let id = createProject(fromImages: images) { onOpen(id) }
+                return true
+            }
             if let url = urls.first(where: { $0.pathExtension.lowercased() == "json" }) {
                 if let id = importLottieAsProject(url: url) { onOpen(id) }
                 return true
@@ -111,11 +117,36 @@ struct HomeView: View {
         return store.geometryPreviewURL(for: project)
     }
 
+    static let imageExts: Set<String> = ["png", "jpg", "jpeg", "webp", "heic"]
+
+    private func openImagesAsProject() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .webP, .heic]
+        panel.allowsMultipleSelection = true
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+        if let id = createProject(fromImages: panel.urls) { onOpen(id) }
+    }
+
+    /// Новый растровый проект: холст по самой большой картинке, каждая картинка — слой.
+    private func createProject(fromImages urls: [URL]) -> UUID? {
+        let sized = urls.compactMap { url in (try? Data(contentsOf: url)).flatMap(LottieImageLayers.pixelSize).map { (url, $0) } }
+        guard let first = urls.first,
+              let px = sized.max(by: { $0.1.width * $0.1.height < $1.1.width * $1.1.height })?.1 else { return nil }
+        let name = store.uniqueName(first.deletingPathExtension().lastPathComponent)
+        let p = store.createBlankProject(name: name, width: px.width, height: px.height)
+        // Первая — верхний слой: добавляем с конца (каждая новая ложится сверху).
+        for url in urls.reversed() {
+            guard let data = try? Data(contentsOf: url) else { continue }
+            _ = try? store.addImage(projectID: p.id, image: data, name: url.deletingPathExtension().lastPathComponent)
+        }
+        return p.id
+    }
+
     private var dropHint: some View {
         RoundedRectangle(cornerRadius: 16, style: .continuous)
             .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
             .background(Color.accentColor.opacity(0.08))
-            .overlay(Text("Drop an SVG to create a project").font(.headline).foregroundStyle(Color.accentColor))
+            .overlay(Text("Drop SVG, Lottie or images to create a project").font(.headline).foregroundStyle(Color.accentColor))
             .padding(12)
             .allowsHitTesting(false)
     }

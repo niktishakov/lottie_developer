@@ -245,6 +245,69 @@ final class ProjectStore {
         save(projects[idx])
     }
 
+    /// Пустой проект под растровые ассеты (композиция w×h).
+    @discardableResult
+    func createBlankProject(name: String, width: Int, height: Int, fps: Int = 60, frames: Int = 120) -> AnimationProject {
+        createProjectFromLottie(name: name, lottieData: LottieImageLayers.blank(width: width, height: height, fps: fps, frames: frames),
+                                sourceLabel: "Images \(width)×\(height)")
+    }
+
+    /// Добавить картинку слоем в геометрию проекта. Возвращает итоговое имя слоя.
+    @discardableResult
+    func addImage(projectID: UUID, image: Data, name: String, frame: CGRect? = nil) throws -> String {
+        guard let p = project(projectID), let geom = geometryData(for: p) else {
+            throw LottieImageLayers.ImageError(message: "Project not found")
+        }
+        let (data, layer) = try LottieImageLayers.addImage(to: geom, image: image, name: name, frame: frame)
+        setImportedLottie(projectID: projectID, data: data, sourceLabel: p.sourceLabel)
+        return layer
+    }
+
+    /// Новый проект из zip/папки ассетов (SVG, картинки, Lottie) — одной композицией.
+    func importBundle(_ url: URL, name: String? = nil) throws -> (AnimationProject, AssetBundle.Report) {
+        let r = try AssetBundle.load(url)
+        let base = name ?? url.deletingPathExtension().lastPathComponent
+        let p = createProjectFromLottie(name: uniqueName(base), lottieData: r.data, sourceLabel: url.lastPathComponent)
+        return (p, r)
+    }
+
+    /// Изменить геометрию проекта функцией над Lottie JSON.
+    func editGeometry(projectID: UUID, _ edit: (Data) throws -> Data) throws {
+        guard let p = project(projectID), let geom = geometryData(for: p) else {
+            throw LottieImageLayers.ImageError(message: "Project not found")
+        }
+        setImportedLottie(projectID: projectID, data: try edit(geom), sourceLabel: p.sourceLabel)
+    }
+
+    /// Добавить к сцене SVG/Lottie группой. Возвращает имя группы и предупреждения импорта.
+    @discardableResult
+    func addPart(projectID: UUID, data: Data, isSVG: Bool, name: String, origin: CGPoint?) throws -> (group: String, warnings: [String]) {
+        var part = data
+        var warnings: [String] = []
+        if isSVG {
+            let r = try SVGToLottie.convert(svgData: data)
+            part = r.data; warnings = r.warnings
+        }
+        var group = ""
+        try editGeometry(projectID: projectID) { geom in
+            let canvas = LottieMerge.size(geom) ?? .zero, size = LottieMerge.size(part) ?? .zero
+            let o = origin ?? CGPoint(x: (canvas.width - size.width) / 2, y: (canvas.height - size.height) / 2)
+            let (d, g) = try LottieMerge.add(part, to: geom, group: name, origin: o)
+            group = g
+            return d
+        }
+        return (group, warnings)
+    }
+
+    /// Переставить слой-картинку в геометрии проекта.
+    func placeImage(projectID: UUID, layer: String, frame: CGRect) throws {
+        guard let p = project(projectID), let geom = geometryData(for: p) else {
+            throw LottieImageLayers.ImageError(message: "Project not found")
+        }
+        setImportedLottie(projectID: projectID, data: try LottieImageLayers.place(layer: layer, in: geom, frame: frame),
+                          sourceLabel: p.sourceLabel)
+    }
+
     /// Имя без повторов: "Name", "Name 2", "Name 3"…
     func uniqueName(_ base: String) -> String {
         let names = Set(projects.map(\.name))

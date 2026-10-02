@@ -103,6 +103,14 @@ final class MCPServer {
         case "export": return try export(a)
         case "show_in_app": return try showInApp(a)
         case "render_frame": return try renderFrames(a)
+        case "add_image": return try addImage(a)
+        case "add_svg": return try addSVG(a)
+        case "rename_layer":
+            let p = try project(a)
+            let from = try str(a, "layer"), to = try str(a, "name")
+            try store.editGeometry(projectID: p.id) { try LottieMerge.rename(layer: from, to: to, in: $0) }
+            return ["renamed": from, "to": to]
+        case "place_layer": return try placeLayer(a)
         case "get_app_state": return appState()
         case "apply_overrides": return try applyOverrides(a)
         default: throw ToolError("Unknown tool: \(name)")
@@ -113,6 +121,40 @@ final class MCPServer {
 
     private func createProject(_ a: [String: Any]) throws -> Any {
         let name = (a["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled \(store.projects.count + 1)"
+        // Пачка ассетов: zip или папка → одна композиция.
+        if let bundle = a["bundle"] as? String, !bundle.isEmpty {
+            let (p, r) = try store.importBundle(Self.fileURL(bundle), name: a["name"] as? String)
+            if a["show_in_app"] as? Bool ?? true { store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date())) }
+            return ["project": try projectDetails(try project(["project_id": p.id.uuidString])),
+                    "canvas": ["width": r.canvas.width, "height": r.canvas.height],
+                    "parts": r.parts, "warnings": r.warnings,
+                    "next": "render_frame to check the layout, place_layer to fix it, rename_layer for meaningful names"]
+        }
+        // Растровый проект: пустая композиция (width/height или размер первой картинки) + картинки слоями.
+        let images = (a["images"] as? [String]) ?? []
+        if a["width"] != nil || !images.isEmpty {
+            var w = (a["width"] as? NSNumber)?.intValue, h = (a["height"] as? NSNumber)?.intValue
+            if w == nil || h == nil {
+                // Холст — по самой большой картинке (обычно это фон).
+                let sizes = images.compactMap { (try? Data(contentsOf: Self.fileURL($0))).flatMap(LottieImageLayers.pixelSize) }
+                let px = sizes.max { $0.width * $0.height < $1.width * $1.height }
+                w = w ?? px?.width; h = h ?? px?.height
+            }
+            guard let w, let h, w > 0, h > 0 else { throw ToolError("Pass width and height (or images)") }
+            let p = store.createBlankProject(name: store.uniqueName(name), width: w, height: h,
+                                             fps: (a["fps"] as? NSNumber)?.intValue ?? 60,
+                                             frames: (a["frames"] as? NSNumber)?.intValue ?? 120)
+            var added: [String] = []
+            // Как в панели слоёв Figma: первая картинка — верхний слой. Каждая новая ложится сверху,
+            // поэтому добавляем с конца.
+            for path in images.reversed() {
+                let url = Self.fileURL(path)
+                added.insert(contentsOf: [try store.addImage(projectID: p.id, image: try Data(contentsOf: url),
+                                                name: url.deletingPathExtension().lastPathComponent)], at: 0)
+            }
+            if a["show_in_app"] as? Bool ?? true { store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date())) }
+            return ["project": try projectDetails(try project(["project_id": p.id.uuidString])), "imageLayers": added]
+        }
         if let geom = try geometryInput(a) {
             let p: AnimationProject
             switch geom {
@@ -152,6 +194,7 @@ final class MCPServer {
         guard let data = store.geometryData(for: p) else { throw ToolError("Geometry unavailable") }
         var out: [String: Any] = [
             "layers": p.layerNames,
+            "imageFrames": LottieImageLayers.imageFrames(in: data).mapValues { Self.rectDict($0) },
             "summary": Self.lottieSummary(data),
             "animations": LottieCompiler.inspectAnimations(lottieData: data) ?? NSNull(),
         ]
@@ -324,6 +367,88 @@ final class MCPServer {
         else { throw ToolError("Failed to save version") }
         if a["show_in_app"] as? Bool ?? true { store.writeUICommand(.init(projectID: p.id, versionID: v.id, issuedAt: Date())) }
         return ["version": versionSummary(v), "summary": Self.lottieSummary(data)]
+    }
+
+    private func addImage(_ a: [String: Any]) throws -> Any {
+        let p = try project(a)
+        let data: Data
+        var defaultName = "image"
+        if let path = a["path"] as? String, !path.isEmpty {
+            let url = Self.fileURL(path)
+            data = try Data(contentsOf: url)
+            defaultName = url.deletingPathExtension().lastPathComponent
+        } else if let b64 = a["base64"] as? String, let d = Data(base64Encoded: b64.components(separatedBy: ",").last ?? b64) {
+            data = d
+        } else {
+            throw ToolError("Pass 'path' (PNG/JPEG file) or 'base64'")
+        }
+        let layer = try store.addImage(projectID: p.id, image: data, name: (a["name"] as? String) ?? defaultName,
+                                       frame: Self.rect(a))
+        store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date(), layer: layer))
+        let geom = store.geometryData(for: try project(a)) ?? Data()
+        return ["layer": layer, "frame": Self.rectDict(LottieImageLayers.imageFrames(in: geom)[layer]),
+                "note": "Geometry changed. Existing versions keep the old geometry; create a new version to animate it."]
+    }
+
+    private func placeLayer(_ a: [String: Any]) throws -> Any {
+        let p = try project(a)
+        let layer = try str(a, "layer")
+        let geom = store.geometryData(for: p) ?? Data()
+        if let r = Self.rect(a), LottieImageLayers.imageFrames(in: geom)[layer] != nil {
+            // Картинка: точный прямоугольник.
+            try store.placeImage(projectID: p.id, layer: layer, frame: r)
+        } else if a["x"] != nil || a["scale"] != nil {
+            let origin = ((a["x"] as? NSNumber)?.doubleValue).flatMap { x in
+                ((a["y"] as? NSNumber)?.doubleValue).map { CGPoint(x: x, y: $0) } }
+            try store.editGeometry(projectID: p.id) {
+                try LottieMerge.move(layer: layer, in: $0, to: origin, scale: (a["scale"] as? NSNumber)?.doubleValue)
+            }
+        }
+        if let z = a["z"] {
+            let pos: Int = (z as? String) == "top" ? 0 : (z as? String) == "bottom" ? Int.max : ((z as? NSNumber)?.intValue ?? 0)
+            try store.editGeometry(projectID: p.id) { try LottieMerge.reorder(layer: layer, in: $0, to: pos) }
+        }
+        store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date(), layer: layer))
+        let after = store.geometryData(for: try project(a)) ?? Data()
+        return ["layer": layer, "imageFrame": Self.rectDict(LottieImageLayers.imageFrames(in: after)[layer]),
+                "order": LottieOverrides.layers(in: after).map(\.name)]
+    }
+
+    private func addSVG(_ a: [String: Any]) throws -> Any {
+        let p = try project(a)
+        let data: Data, isSVG: Bool
+        var name = (a["name"] as? String) ?? ""
+        if let path = a["path"] as? String, !path.isEmpty {
+            let url = Self.fileURL(path)
+            data = try Data(contentsOf: url)
+            isSVG = url.pathExtension.lowercased() != "json"
+            if name.isEmpty { name = url.deletingPathExtension().lastPathComponent }
+        } else if let svg = a["svg"] as? String, !svg.isEmpty {
+            data = Data(svg.utf8); isSVG = true
+        } else {
+            throw ToolError("Pass 'path' (.svg or Lottie .json) or 'svg' markup")
+        }
+        if name.isEmpty { name = SVGToLottie.title(svgData: data) ?? "svg" }
+        let origin = ((a["x"] as? NSNumber)?.doubleValue).flatMap { x in ((a["y"] as? NSNumber)?.doubleValue).map { CGPoint(x: x, y: $0) } }
+        let (group, warnings) = try store.addPart(projectID: p.id, data: data, isSVG: isSVG, name: name, origin: origin)
+        store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date(), layer: group))
+        return ["group": group, "warnings": warnings,
+                "layers": LottieOverrides.layers(in: store.geometryData(for: try project(a)) ?? Data()).map(\.name)]
+    }
+
+    private static func rect(_ a: [String: Any]) -> CGRect? {
+        guard let x = (a["x"] as? NSNumber)?.doubleValue, let y = (a["y"] as? NSNumber)?.doubleValue,
+              let w = (a["width"] as? NSNumber)?.doubleValue, let h = (a["height"] as? NSNumber)?.doubleValue else { return nil }
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    private static func rectDict(_ r: CGRect?) -> Any {
+        guard let r else { return NSNull() }
+        return ["x": r.minX.rounded(), "y": r.minY.rounded(), "width": r.width.rounded(), "height": r.height.rounded()]
+    }
+
+    private static func fileURL(_ path: String) -> URL {
+        URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
     }
 
     struct RenderedFrames {

@@ -38,15 +38,36 @@ enum SVGToLottie {
         return first("<title[^>]*>(.*?)</title>") ?? first("<svg[^>]*?\\sid=\"([^\"]+)\"")
     }
 
+    /// Контекст конвертации: градиенты из defs и узлы, которые рисуем картинкой.
+    struct Context {
+        var gradients: [String: Gradient] = [:]
+        var rasterNodes: [SVGNode] = []
+        var root: SVGNode?
+        var canvas = CGSize(width: 512, height: 512)
+        var assets: [[String: Any]] = []
+    }
+
     static func convert(svgData: Data) throws -> Result {
+        guard let dom = SVGDocument.parse(svgData) else { throw SVGError.parseFailed }
+        var ctx = Context()
+        ctx.root = dom
+        ctx.gradients = collectGradients(dom)
+        let gradients = ctx.gradients
+        let needsRaster: ([String: String]) -> Bool = { needsRasterization($0, gradients: gradients) }
+        ctx.rasterNodes = SVGDocument.rasterNodes(dom) { needsRaster($0.attrs) }
+
         let parser = XMLParser(data: svgData)
-        let collector = Collector()
+        let collector = Collector(needsRaster: needsRaster)
         parser.delegate = collector
         guard parser.parse() else { throw SVGError.parseFailed }
         guard !collector.elements.isEmpty else { throw SVGError.noDrawables }
 
         let (w, h) = collector.size()
+        ctx.canvas = CGSize(width: w, height: h)
         var warnings = collector.warnings
+        if !ctx.rasterNodes.isEmpty {
+            warnings.append("\(ctx.rasterNodes.count) element(s) with blur/mask/complex gradient imported as images (exact look, transform-only animation)")
+        }
 
         // SVG рисует в порядке документа (последний — сверху). В Lottie layers[0] — сверху.
         // Реверсируем, чтобы z-порядок совпал.
@@ -54,7 +75,7 @@ enum SVGToLottie {
         var names: [String] = []
         var ind = 1
         for element in collector.elements.reversed() {
-            guard let layer = makeLayer(from: element, ind: ind, warnings: &warnings) else { continue }
+            guard let layer = makeLayer(from: element, ind: ind, ctx: &ctx, warnings: &warnings) else { continue }
             layers.append(layer)
             names.append(element.name)
             ind += 1
@@ -71,7 +92,7 @@ enum SVGToLottie {
         let root: [String: Any] = [
             "v": "5.7.0", "fr": 60, "ip": 0, "op": 1,
             "w": compW, "h": compH,
-            "nm": "SVG Import", "ddd": 0, "assets": [], "layers": layers,
+            "nm": "SVG Import", "ddd": 0, "assets": ctx.assets, "layers": layers,
         ]
         let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
         return Result(data: data, layerNames: names, warnings: warnings)
@@ -89,6 +110,13 @@ enum SVGToLottie {
 
     final class Collector: NSObject, XMLParserDelegate {
         private(set) var elements: [Element] = []
+        private let needsRaster: ([String: String]) -> Bool
+        private var rasterDepth = 0
+        private var rasterCount = 0
+
+        init(needsRaster: @escaping ([String: String]) -> Bool = { _ in false }) {
+            self.needsRaster = needsRaster
+        }
         private(set) var warnings: [String] = []
         private var svgAttrs: [String: String] = [:]
         private var groupIdStack: [String] = []
@@ -96,7 +124,7 @@ enum SVGToLottie {
         private let drawable: Set<String> = ["rect", "circle", "ellipse", "line", "polygon", "polyline", "path"]
         // Содержимое этих контейнеров не рисуется напрямую (определения для clip/mask/и т.п.).
         // Без пропуска <rect> внутри <clipPath> становится видимым прямоугольником во весь холст.
-        private let nonRendered: Set<String> = ["defs", "clippath", "mask", "symbol", "pattern", "marker"]
+        private let nonRendered: Set<String> = SVGDocument.nonRendered
         private var skipDepth = 0
         private var sawUnsupportedTransform = false
 
@@ -116,6 +144,16 @@ enum SVGToLottie {
             if tag == "svg" { svgAttrs = attributeDict }
             if nonRendered.contains(tag) { skipDepth += 1; return }
             if skipDepth > 0 { return } // внутри defs/clipPath/mask — ничего не собираем
+            if rasterDepth > 0 { rasterDepth += 1; return } // внутри растеризуемого узла
+            if tag != "svg", needsRaster(attributeDict) {
+                // Порядок совпадает с SVGDocument.rasterNodes (тот же обход документа).
+                counter += 1
+                let name = layerName(forID: attributeDict["id"], tag: tag == "g" ? "group" : tag, ordinal: counter)
+                elements.append(Element(tag: "__raster", attrs: ["index": String(rasterCount)], name: name))
+                rasterCount += 1
+                rasterDepth = 1
+                return
+            }
             if tag == "g" {
                 groupIdStack.append(attributeDict["id"] ?? "")
                 if attributeDict["transform"] != nil { sawUnsupportedTransform = true }
@@ -133,6 +171,7 @@ enum SVGToLottie {
             let tag = elementName.lowercased()
             if nonRendered.contains(tag) { skipDepth = max(0, skipDepth - 1); return }
             if skipDepth > 0 { return }
+            if rasterDepth > 0 { rasterDepth -= 1; return }
             if tag == "g", !groupIdStack.isEmpty { groupIdStack.removeLast() }
         }
 
@@ -151,7 +190,8 @@ enum SVGToLottie {
 
     // MARK: - Layer construction
 
-    private static func makeLayer(from element: Element, ind: Int, warnings: inout [String]) -> [String: Any]? {
+    private static func makeLayer(from element: Element, ind: Int, ctx: inout Context, warnings: inout [String]) -> [String: Any]? {
+        if element.tag == "__raster" { return rasterLayer(element, ind: ind, ctx: &ctx) }
         var shapeItems: [[String: Any]] = []
         var bbox: BBox? = nil
 
@@ -219,12 +259,21 @@ enum SVGToLottie {
         stroke?[3] *= strokeOpacity
         let strokeWidth = num(element.attrs["stroke-width"]) ?? styleNum(element.attrs["style"], "stroke-width") ?? 1
 
-        if let stroke {
+        let fillGradient = gradientRef(element.attrs["fill"] ?? styleValue(element.attrs["style"], "fill")).flatMap { ctx.gradients[$0] }
+        let strokeGradient = gradientRef(element.attrs["stroke"] ?? styleValue(element.attrs["style"], "stroke")).flatMap { ctx.gradients[$0] }
+        if fillGradient != nil { fill = nil }
+        if strokeGradient != nil { stroke = nil }
+
+        if let g = strokeGradient, let item = gradientItem(g, bbox: bbox, opacity: strokeOpacity, strokeWidth: strokeWidth) {
+            shapeItems.append(item)
+        } else if let stroke {
             shapeItems.append(strokeItem(color: stroke, width: strokeWidth))
         }
-        if let fill {
+        if let g = fillGradient, let item = gradientItem(g, bbox: bbox, opacity: fillOpacity, strokeWidth: nil) {
+            shapeItems.append(item)
+        } else if let fill {
             shapeItems.append(fillItem(color: fill))
-        } else if stroke == nil {
+        } else if stroke == nil && strokeGradient == nil {
             // нет ни fill, ни stroke → дефолтный чёрный fill (как SVG)
             shapeItems.append(fillItem(color: [0, 0, 0, 1]))
         }
@@ -247,6 +296,154 @@ enum SVGToLottie {
             ],
             "ao": 0, "shapes": [group], "ip": 0, "op": 1, "st": 0, "bm": 0,
         ]
+    }
+
+    // MARK: - Raster fallback
+
+    /// Элемент, который Lottie не нарисует (blur, маска, вытянутый radial gradient): рисуем системным
+    /// SVG-рендерером в картинку ×3 и ставим слоем-картинкой на то же место.
+    private static func rasterLayer(_ element: Element, ind: Int, ctx: inout Context) -> [String: Any]? {
+        guard let i = Int(element.attrs["index"] ?? ""), i < ctx.rasterNodes.count, let root = ctx.root else { return nil }
+        let scale = 3.0
+        let doc = SVGDocument.isolate(ctx.rasterNodes[i], root: root)
+        guard let img = SVGDocument.rasterize(doc, canvas: ctx.canvas, scale: scale),
+              let (png, rect) = SVGDocument.cropToContent(img, scale: scale),
+              let px = LottieImageLayers.pixelSize(png) else { return nil }
+        let id = "svg_raster_\(ctx.assets.count + 1)"
+        ctx.assets.append(LottieImageLayers.asset(id: id, image: png, px: px))
+        return LottieImageLayers.layer(name: element.name, assetID: id, px: px, rect: rect, ind: ind, op: 1)
+    }
+
+    // MARK: - Gradients
+
+    struct Gradient {
+        var radial: Bool
+        var attrs: [String: String]
+        var stops: [(offset: Double, color: [Double])]
+    }
+
+    static func collectGradients(_ root: SVGNode) -> [String: Gradient] {
+        var raw: [String: SVGNode] = [:]
+        func walk(_ n: SVGNode) {
+            let t = n.tag.lowercased()
+            if (t == "lineargradient" || t == "radialgradient"), let id = n.attrs["id"] { raw[id] = n }
+            n.children.forEach(walk)
+        }
+        walk(root)
+        var out: [String: Gradient] = [:]
+        for (id, n) in raw {
+            var attrs = n.attrs
+            var stopsNode = n
+            // xlink:href / href — наследование стопов и атрибутов
+            var hops = 0
+            while stopsNode.children.isEmpty, hops < 5,
+                  let href = (stopsNode.attrs["xlink:href"] ?? stopsNode.attrs["href"])?.replacingOccurrences(of: "#", with: ""),
+                  let parent = raw[href] {
+                for (k, v) in parent.attrs where attrs[k] == nil { attrs[k] = v }
+                stopsNode = parent; hops += 1
+            }
+            let stops: [(Double, [Double])] = stopsNode.children.filter { $0.tag.lowercased() == "stop" }.map { st in
+                let offRaw = st.attrs["offset"] ?? styleValue(st.attrs["style"], "offset") ?? "0"
+                var off = num(offRaw) ?? 0
+                if offRaw.contains("%") { off /= 100 }
+                var c = color(st.attrs["stop-color"], style: st.attrs["style"], key: "stop-color") ?? [0, 0, 0, 1]
+                c[3] *= num(st.attrs["stop-opacity"]) ?? styleNum(st.attrs["style"], "stop-opacity") ?? 1
+                return (min(max(off, 0), 1), c)
+            }
+            guard !stops.isEmpty else { continue }
+            out[id] = Gradient(radial: n.tag.lowercased() == "radialgradient", attrs: attrs, stops: stops)
+        }
+        return out
+    }
+
+    private static func gradientRef(_ v: String?) -> String? {
+        guard let v, let r = v.range(of: "url(#") else { return nil }
+        let rest = v[r.upperBound...]
+        guard let end = rest.firstIndex(of: ")") else { return nil }
+        return String(rest[..<end])
+    }
+
+    /// blur / маска / вытянутый radial gradient (Lottie рисует только круглые) → картинка.
+    static func needsRasterization(_ attrs: [String: String], gradients: [String: Gradient]) -> Bool {
+        for key in ["filter", "mask"] {
+            if let v = attrs[key] ?? styleValue(attrs["style"], key), v != "none", !v.isEmpty { return true }
+        }
+        for key in ["fill", "stroke"] {
+            if let id = gradientRef(attrs[key] ?? styleValue(attrs["style"], key)), let g = gradients[id], g.radial,
+               radialAnisotropy(g) > 1.5 { return true }
+        }
+        return false
+    }
+
+    private static func radialAnisotropy(_ g: Gradient) -> Double {
+        let t = transform(g.attrs["gradientTransform"])
+        let a = CGPoint(x: 1, y: 0).applying(t), b = CGPoint(x: 0, y: 1).applying(t), o = CGPoint.zero.applying(t)
+        let rx = hypot(a.x - o.x, a.y - o.y), ry = hypot(b.x - o.x, b.y - o.y)
+        return max(rx, ry) / max(min(rx, ry), 0.0001)
+    }
+
+    private static func gradientItem(_ g: Gradient, bbox: BBox, opacity: Double, strokeWidth: Double?) -> [String: Any]? {
+        let objectBox = (g.attrs["gradientUnits"] ?? "objectBoundingBox") != "userSpaceOnUse"
+        let t = transform(g.attrs["gradientTransform"])
+        func coord(_ key: String, _ def: Double, horizontal: Bool) -> Double {
+            guard let raw = g.attrs[key], var v = num(raw) else { return def }
+            if raw.contains("%") { v /= 100 }
+            return v
+        }
+        func map(_ p: CGPoint) -> [Double] {
+            let q = p.applying(t)
+            if objectBox {
+                let w = bbox.maxX - bbox.minX, h = bbox.maxY - bbox.minY
+                return [bbox.minX + Double(q.x) * w, bbox.minY + Double(q.y) * h]
+            }
+            return [Double(q.x), Double(q.y)]
+        }
+        let start: [Double], end: [Double]
+        if g.radial {
+            let cx = coord("cx", 0.5, horizontal: true), cy = coord("cy", 0.5, horizontal: false), r = coord("r", 0.5, horizontal: true)
+            start = map(CGPoint(x: cx, y: cy)); end = map(CGPoint(x: cx + r, y: cy))
+        } else {
+            start = map(CGPoint(x: coord("x1", 0, horizontal: true), y: coord("y1", 0, horizontal: false)))
+            end = map(CGPoint(x: coord("x2", 1, horizontal: true), y: coord("y2", 0, horizontal: false)))
+        }
+        let stops = g.stops.sorted { $0.offset < $1.offset }
+        var k: [Double] = []
+        for st in stops { k += [st.offset, st.color[0], st.color[1], st.color[2]] }
+        for st in stops { k += [st.offset, st.color[3]] }
+        var item: [String: Any] = [
+            "ty": strokeWidth == nil ? "gf" : "gs", "o": kScalar(opacity * 100), "bm": 0, "r": 1,
+            "g": ["p": stops.count, "k": ["a": 0, "k": k]],
+            "s": kStatic(start), "e": kStatic(end), "t": g.radial ? 2 : 1,
+            "nm": "Gradient", "hd": false,
+        ]
+        if g.radial { item["h"] = kScalar(0); item["a"] = kScalar(0) }
+        if let w = strokeWidth { item["w"] = kScalar(w); item["lc"] = 2; item["lj"] = 2; item["ml"] = 4 }
+        return item
+    }
+
+    /// SVG transform-лист → аффинная матрица (matrix, translate, scale, rotate).
+    static func transform(_ s: String?) -> CGAffineTransform {
+        guard let s else { return .identity }
+        var total = CGAffineTransform.identity
+        let re = try! NSRegularExpression(pattern: "(matrix|translate|scale|rotate)\\s*\\(([^)]*)\\)")
+        for m in re.matches(in: s, range: NSRange(s.startIndex..., in: s)) {
+            guard let fr = Range(m.range(at: 1), in: s), let ar = Range(m.range(at: 2), in: s) else { continue }
+            let args = s[ar].split(whereSeparator: { $0 == " " || $0 == "," }).compactMap { Double($0) }
+            var t = CGAffineTransform.identity
+            switch s[fr] {
+            case "matrix" where args.count == 6: t = CGAffineTransform(a: args[0], b: args[1], c: args[2], d: args[3], tx: args[4], ty: args[5])
+            case "translate": t = CGAffineTransform(translationX: args.first ?? 0, y: args.count > 1 ? args[1] : 0)
+            case "scale": t = CGAffineTransform(scaleX: args.first ?? 1, y: args.count > 1 ? args[1] : (args.first ?? 1))
+            case "rotate":
+                let a = (args.first ?? 0) * .pi / 180
+                if args.count == 3 {
+                    t = CGAffineTransform(translationX: args[1], y: args[2]).rotated(by: a).translatedBy(x: -args[1], y: -args[2])
+                } else { t = CGAffineTransform(rotationAngle: a) }
+            default: break
+            }
+            total = t.concatenating(total)
+        }
+        return total
     }
 
     // MARK: - Lottie shape helpers

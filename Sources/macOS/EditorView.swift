@@ -65,6 +65,7 @@ struct EditorView: View {
                 Button { onClose() } label: { Label("Projects", systemImage: "chevron.left") }
                 Text(project.name).font(.headline).lineLimit(1)
                 Spacer()
+                Button("Add image…") { openImages() }
                 Button("Import Lottie…") { openLottieJSON() }
                 Button("Replace SVG…") { openSVG() }
                 Button("Paste SVG") { pasteSVGFromClipboard() }
@@ -99,6 +100,8 @@ struct EditorView: View {
         .padding(14)
         .frame(maxWidth: .infinity)
         .dropDestination(for: URL.self) { urls, _ in
+            let images = urls.filter { HomeView.imageExts.contains($0.pathExtension.lowercased()) }
+            if !images.isEmpty { addImages(images); return true }
             guard let url = urls.first else { return false }
             handleDropped(url: url); return true
         } isTargeted: { dropTargeted = $0 }
@@ -282,7 +285,7 @@ struct EditorView: View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
             .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
             .background(Color.accentColor.opacity(0.08))
-            .overlay(Text("Drop an SVG to replace geometry").font(.headline).foregroundStyle(Color.accentColor))
+            .overlay(Text("Drop images to add layers, or SVG / Lottie to replace geometry").font(.headline).foregroundStyle(Color.accentColor))
             .allowsHitTesting(false)
     }
 
@@ -472,8 +475,31 @@ struct EditorView: View {
         }
     }
 
+    private func openImages() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .webP, .heic]
+        panel.allowsMultipleSelection = true
+        guard panel.runModal() == .OK else { return }
+        addImages(panel.urls)
+    }
+
+    /// Картинки — новыми слоями поверх геометрии (по центру, в натуральном размере).
+    private func addImages(_ urls: [URL]) {
+        var added: [String] = []
+        for url in urls {
+            guard let data = try? Data(contentsOf: url) else { continue }
+            do { added.append(try store.addImage(projectID: projectID, image: data, name: url.deletingPathExtension().lastPathComponent)) }
+            catch { status = "Image import failed: \(error.localizedDescription)"; return }
+        }
+        guard !added.isEmpty else { return }
+        showGeometry()
+        player.select(added.last)
+        status = "Added image layer(s): \(added.joined(separator: ", ")) — geometry changed; new versions will include them"
+    }
+
     private func handleDropped(url: URL) {
         switch url.pathExtension.lowercased() {
+        case let ext where HomeView.imageExts.contains(ext): addImages([url])
         case "svg": importSVG(url: url)
         case "json", "lottie":
             guard let data = try? Data(contentsOf: url),

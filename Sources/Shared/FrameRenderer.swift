@@ -45,7 +45,9 @@ enum FrameRenderer {
         if let bg = background?.cgColor {
             ctx.setFillColor(bg); ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
         }
-        // CALayer рисует в координатах с началом сверху — переворачиваем.
+        // isGeometryFlipped + переворот контекста: только так и фигуры, и contents слоёв-картинок
+        // получаются в правильной ориентации (один переворот контекста переворачивает картинки).
+        layer.isGeometryFlipped = true
         ctx.translateBy(x: 0, y: CGFloat(h))
         ctx.scaleBy(x: CGFloat(scale), y: -CGFloat(scale))
         layer.render(in: ctx)
