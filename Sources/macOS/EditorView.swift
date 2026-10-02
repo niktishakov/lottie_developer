@@ -165,7 +165,7 @@ struct EditorView: View {
                 .padding(8)
             }
             if project.versions.isEmpty {
-                Text("No versions yet.\nGenerate to create v1.")
+                Text("No versions yet.\nCreate one via MCP (lottie-mcp).")
                     .font(.caption).foregroundStyle(.secondary)
                     .padding(12)
             }
