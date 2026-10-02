@@ -1,0 +1,4 @@
+app_identifier("com.nikapps.lottie.developer")
+apple_id("starscreamnik@gmail.com")
+team_id("LWV5ZRPC43")
+itc_team_id("126696443") # App Store Connect Team ID for "Nik Tishakov"

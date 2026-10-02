@@ -16,3 +16,7 @@ cert_key.pub
 .claude/context.env
 build/
 build/
+
+# fastlane
+fastlane/report.xml
+fastlane/README.md

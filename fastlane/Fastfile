@@ -1,0 +1,61 @@
+# TestFlight для iOS-приложения Lottie Developer — по образцу resident_live (fastlane локально, без CI-сервиса).
+# Ключи App Store Connect общие для всех приложений nikapps и лежат вне репозиториев:
+# ~/projects/.credentials/nikapps/.env (APP_STORE_CONNECT_KEY_ID, _ISSUER_ID, _KEY_PATH).
+# Запуск из корня репозитория: fastlane beta
+require "dotenv"
+Dotenv.load(File.expand_path("~/projects/.credentials/nikapps/.env"))
+
+# UTF-8 независимо от шелла (агент, cron): иначе Ruby читает файлы как US-ASCII и падает на не-ASCII байтах.
+Encoding.default_external = Encoding::UTF_8
+Encoding.default_internal = Encoding::UTF_8
+ENV["LANG"] = "en_US.UTF-8"
+ENV["LC_ALL"] = "en_US.UTF-8"
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Deploy Lottie Developer (iOS) to TestFlight"
+  lane :beta do
+    app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+      key_filepath: ENV["APP_STORE_CONNECT_KEY_PATH"],
+      duration: 1200
+    )
+
+    # Проект генерируется xcodegen из project.yml — номер сборки передаём в xcodebuild (xcargs),
+    # а не пишем в project.pbxproj/Info.plist, чтобы дерево оставалось чистым.
+    build_number = (latest_testflight_build_number(app_identifier: "com.nikapps.lottie.developer", initial_build_number: 0) + 1).to_s
+    sh("cd .. && xcodegen generate") if system("command -v xcodegen > /dev/null")
+
+    build_ios_app(
+      project: "LottieDeveloper.xcodeproj",
+      scheme: "LottieDeveloper",
+      configuration: "Release",
+      export_method: "app-store",
+      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} -allowProvisioningUpdates",
+      cloned_source_packages_path: "build/spm",
+      # Один архив и один ipa, перезаписываются следующей сборкой (не копятся в ~/Library/.../Archives).
+      archive_path: "./build/testflight/LottieDeveloper.xcarchive",
+      output_directory: "./build/testflight",
+      output_name: "LottieDeveloper.ipa",
+      export_options: { signingStyle: "automatic", teamID: "LWV5ZRPC43" }
+    )
+
+    upload_to_testflight(skip_waiting_for_build_processing: true)
+    UI.success("Uploaded build #{build_number} to TestFlight")
+  end
+end
+
+platform :ios do
+  desc "Upload the last built ipa again (без пересборки)"
+  lane :upload do
+    app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+      key_filepath: ENV["APP_STORE_CONNECT_KEY_PATH"],
+      duration: 1200
+    )
+    upload_to_testflight(ipa: "./build/testflight/LottieDeveloper.ipa", skip_waiting_for_build_processing: true)
+  end
+end
