@@ -10,9 +10,51 @@ final class ProjectStore {
     private(set) var projects: [AnimationProject] = []
 
     private let fm = FileManager.default
+    /// Подпись состояния диска (mtime всех project.json) — для live-reload изменений из MCP.
+    private var diskSignature = ""
 
     init() {
         load()
+    }
+
+    /// Перечитать с диска, если что-то поменялось извне (например, lottie-mcp). true — если перечитали.
+    @discardableResult
+    func reloadIfChanged() -> Bool {
+        let sig = currentDiskSignature()
+        guard sig != diskSignature else { return false }
+        load()
+        return true
+    }
+
+    private func currentDiskSignature() -> String {
+        guard let entries = try? fm.contentsOfDirectory(at: rootDir, includingPropertiesForKeys: nil) else { return "" }
+        return entries.filter(\.hasDirectoryPath).map { dir -> String in
+            let f = dir.appendingPathComponent("project.json")
+            let m = (try? fm.attributesOfItem(atPath: f.path)[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+            return "\(dir.lastPathComponent):\(m)"
+        }.sorted().joined(separator: "|")
+    }
+
+    // MARK: - UI command (MCP → app)
+
+    /// Файл-команда, через который lottie-mcp просит приложение открыть проект/версию.
+    var uiCommandURL: URL { rootDir.deletingLastPathComponent().appendingPathComponent("ui_command.json") }
+
+    struct UICommand: Codable, Equatable {
+        var projectID: UUID?
+        var versionID: UUID?
+        var issuedAt: Date
+    }
+
+    func writeUICommand(_ cmd: UICommand) {
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
+        if let data = try? enc.encode(cmd) { try? data.write(to: uiCommandURL, options: .atomic) }
+    }
+
+    func readUICommand() -> UICommand? {
+        let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+        guard let data = try? Data(contentsOf: uiCommandURL) else { return nil }
+        return try? dec.decode(UICommand.self, from: data)
     }
 
     // MARK: - Paths
@@ -45,8 +87,21 @@ final class ProjectStore {
     // MARK: - Geometry
 
     func bundledStaticData() -> Data? {
-        guard let url = Bundle.main.url(forResource: "rocket_static_simplified", withExtension: "json") else { return nil }
-        return try? Data(contentsOf: url)
+        if let url = Bundle.main.url(forResource: "rocket_static_simplified", withExtension: "json") {
+            return try? Data(contentsOf: url)
+        }
+        // CLI (lottie-mcp) без бандла: семпл, скопированный приложением при первом запуске.
+        return try? Data(contentsOf: sampleCacheURL)
+    }
+
+    var sampleCacheURL: URL { rootDir.deletingLastPathComponent().appendingPathComponent("sample_static.json") }
+
+    /// Приложение кладёт семпл рядом с проектами, чтобы lottie-mcp мог им пользоваться.
+    func exportSampleForCLI() {
+        guard !fm.fileExists(atPath: sampleCacheURL.path),
+              let url = Bundle.main.url(forResource: "rocket_static_simplified", withExtension: "json"),
+              let data = try? Data(contentsOf: url) else { return }
+        try? data.write(to: sampleCacheURL, options: .atomic)
     }
 
     /// Статичная геометрия проекта (импорт или bundled).
@@ -117,13 +172,15 @@ final class ProjectStore {
 
     @discardableResult
     func addVersion(projectID: UUID, prompt: String, compiledData: Data, layerCount: Int,
-                    compilerWarnings: Int, specJSON: String?) -> AnimationVersion? {
+                    compilerWarnings: Int, specJSON: String?, parentVersionID: UUID? = nil,
+                    note: String = "", source: String = "mcp") -> AnimationVersion? {
         guard let idx = projects.firstIndex(where: { $0.id == projectID }) else { return nil }
         let nextIndex = (projects[idx].versions.map { $0.index }.max() ?? 0) + 1
         let file = "v\(nextIndex)_\(UUID().uuidString).json"
         try? compiledData.write(to: versionURL(projectID, file), options: .atomic)
         let version = AnimationVersion(index: nextIndex, prompt: prompt, compiledFile: file,
-                                       layerCount: layerCount, compilerWarnings: compilerWarnings, specJSON: specJSON)
+                                       layerCount: layerCount, compilerWarnings: compilerWarnings, specJSON: specJSON,
+                                       parentVersionID: parentVersionID, note: note, source: source)
         projects[idx].versions.append(version)
         projects[idx].updatedAt = Date()
         save(projects[idx])
@@ -134,6 +191,14 @@ final class ProjectStore {
         guard let idx = projects.firstIndex(where: { $0.id == projectID }) else { return }
         guard let vIdx = projects[idx].versions.firstIndex(where: { $0.id == versionID }) else { return }
         projects[idx].versions[vIdx].isFavourite.toggle()
+        projects[idx].updatedAt = Date()
+        save(projects[idx])
+    }
+
+    func setNote(projectID: UUID, versionID: UUID, note: String) {
+        guard let idx = projects.firstIndex(where: { $0.id == projectID }),
+              let vIdx = projects[idx].versions.firstIndex(where: { $0.id == versionID }) else { return }
+        projects[idx].versions[vIdx].note = note
         projects[idx].updatedAt = Date()
         save(projects[idx])
     }
@@ -156,8 +221,9 @@ final class ProjectStore {
     }
 
     func delete(projectID: UUID) {
-        try? fm.removeItem(at: projectDir(projectID))
+        try? fm.removeItem(at: rootDir.appendingPathComponent(projectID.uuidString, isDirectory: true))
         projects.removeAll { $0.id == projectID }
+        diskSignature = currentDiskSignature()
     }
 
     // MARK: - Persistence
@@ -170,9 +236,10 @@ final class ProjectStore {
             try? data.write(to: projectDir(project.id).appendingPathComponent("project.json"), options: .atomic)
         }
         projects.sort { $0.updatedAt > $1.updatedAt }
+        diskSignature = currentDiskSignature()
     }
 
-    private func load() {
+    func load() {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let entries = try? fm.contentsOfDirectory(at: rootDir, includingPropertiesForKeys: nil) else { return }
@@ -184,6 +251,7 @@ final class ProjectStore {
             }
         }
         projects = loaded.sorted { $0.updatedAt > $1.updatedAt }
+        diskSignature = currentDiskSignature()
     }
 
     // MARK: - Helpers

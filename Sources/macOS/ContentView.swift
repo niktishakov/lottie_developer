@@ -1,20 +1,44 @@
 #if os(macOS)
 import SwiftUI
+import AppKit
 
 /// Роутер: Home (список проектов) ↔ Editor (проект).
 struct ContentView: View {
     @State private var store = ProjectStore()
     @State private var openProjectID: UUID?
+    @State private var requestedVersionID: UUID?
+    @State private var lastCommandAt: Date?
 
     var body: some View {
         Group {
             if let id = openProjectID, store.project(id) != nil {
-                EditorView(store: store, projectID: id, onClose: { openProjectID = nil })
+                EditorView(store: store, projectID: id, requestedVersionID: requestedVersionID,
+                           onClose: { openProjectID = nil })
+                    .id(id)
             } else {
                 HomeView(store: store, onOpen: { openProjectID = $0 })
             }
         }
         .frame(minWidth: 760, minHeight: 660)
+        .task { await syncWithMCP() }
+    }
+
+    /// Live-sync с lottie-mcp: перечитываем проекты с диска и выполняем UI-команды (show_in_app).
+    private func syncWithMCP() async {
+        store.exportSampleForCLI()
+        lastCommandAt = store.readUICommand()?.issuedAt
+        while !Task.isCancelled {
+            store.reloadIfChanged()
+            if let cmd = store.readUICommand(), cmd.issuedAt != lastCommandAt {
+                lastCommandAt = cmd.issuedAt
+                if let pid = cmd.projectID, store.project(pid) != nil {
+                    openProjectID = pid
+                    requestedVersionID = cmd.versionID
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
+            try? await Task.sleep(for: .milliseconds(700))
+        }
     }
 }
 #endif

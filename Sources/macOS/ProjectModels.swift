@@ -39,9 +39,16 @@ struct AnimationVersion: Codable, Identifiable, Equatable {
     var compilerWarnings: Int
     var specJSON: String?    // исходный AnimationSpec (для повторного редактирования/диффа)
     var isFavourite: Bool
+    /// Версия, от которой построена эта (nil — от статичной геометрии).
+    var parentVersionID: UUID?
+    /// Свободная заметка (комментарий автора/агента).
+    var note: String
+    /// Кто создал: "mcp", "import", "restore".
+    var source: String
 
     init(id: UUID = UUID(), index: Int, prompt: String, compiledFile: String,
-         layerCount: Int, compilerWarnings: Int, specJSON: String?, isFavourite: Bool = false) {
+         layerCount: Int, compilerWarnings: Int, specJSON: String?, isFavourite: Bool = false,
+         parentVersionID: UUID? = nil, note: String = "", source: String = "mcp") {
         self.id = id
         self.index = index
         self.prompt = prompt
@@ -51,6 +58,9 @@ struct AnimationVersion: Codable, Identifiable, Equatable {
         self.compilerWarnings = compilerWarnings
         self.specJSON = specJSON
         self.isFavourite = isFavourite
+        self.parentVersionID = parentVersionID
+        self.note = note
+        self.source = source
     }
 
     var label: String { "v\(index)" }
@@ -66,6 +76,9 @@ struct AnimationVersion: Codable, Identifiable, Equatable {
         compilerWarnings = try c.decode(Int.self, forKey: .compilerWarnings)
         specJSON = try c.decodeIfPresent(String.self, forKey: .specJSON)
         isFavourite = try c.decodeIfPresent(Bool.self, forKey: .isFavourite) ?? false
+        parentVersionID = try c.decodeIfPresent(UUID.self, forKey: .parentVersionID)
+        note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+        source = try c.decodeIfPresent(String.self, forKey: .source) ?? "mcp"
     }
 }
 #endif

@@ -37,6 +37,7 @@ targets:
           - Info.plist
           - Resources
           - macOS
+          - MCP
       - path: Sources/Assets.xcassets
         buildPhase: resources
       - path: Sources/Resources/en.lproj
@@ -85,6 +86,22 @@ targets:
         product: Lottie
     scheme:
       gatherCoverageData: false
+  lottie-mcp:
+    type: tool
+    platform: macOS
+    deploymentTarget: "14.0"
+    settings:
+      base:
+        PRODUCT_NAME: lottie-mcp
+        PRODUCT_BUNDLE_IDENTIFIER: com.nikapps.lottie.developer.mcp
+        CODE_SIGN_STYLE: Automatic
+    sources:
+      - path: Sources/AI/Spec
+      - path: Sources/MCP
+      - path: Sources/macOS/ProjectModels.swift
+      - path: Sources/macOS/ProjectStore.swift
+      - path: Sources/macOS/SVGToLottie.swift
+    scheme: {}
   LottieCompilerTests:
     type: bundle.unit-test
     platform: macOS

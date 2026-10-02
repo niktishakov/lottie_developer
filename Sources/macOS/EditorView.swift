@@ -3,10 +3,11 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
-/// Редактор проекта: превью + генерация (создаёт версию) + список версий с переходом.
+/// Редактор проекта: превью + список версий. Версии создаются извне через MCP (lottie-mcp).
 struct EditorView: View {
     let store: ProjectStore
     let projectID: UUID
+    var requestedVersionID: UUID? = nil
     var onClose: () -> Void
 
     @State private var previewURL: URL?
@@ -15,14 +16,8 @@ struct EditorView: View {
     @State private var loop = true
     @State private var speed: CGFloat = 1.0
     @State private var report: LottieRuntimeReport?
-    @State private var prompt = "Animate this: stagger the elements in with a little overshoot, then add one subtle idle loop so it stays alive."
-    @State private var generating = false
     @State private var dropTargeted = false
-    @State private var showAccount = false
-    @State private var tokenUsage: TokenUsage?
     @State private var multiSelection: Set<UUID> = []
-    @AppStorage("ai.model") private var modelID = AIModel.defaultID
-    @AppStorage("ai.effort") private var effortID = AIEffort.defaultID
 
     private var project: AnimationProject? { store.project(projectID) }
 
@@ -40,7 +35,17 @@ struct EditorView: View {
             }
         }
         .onAppear { loadInitial() }
-        .sheet(isPresented: $showAccount) { AccountView(onClose: { showAccount = false }) }
+        .onChange(of: requestedVersionID) { _, id in
+            if let id, let v = project?.versions.first(where: { $0.id == id }) { select(v) }
+        }
+        .onChange(of: project?.versions.map(\.id) ?? []) { old, new in
+            // Новая версия пришла извне (MCP) — показываем её.
+            if new.count > old.count, let latest = project?.versions.max(by: { $0.index < $1.index }) {
+                select(latest)
+            } else if let sel = selectedVersionID, !new.contains(sel) {
+                loadInitial()
+            }
+        }
     }
 
     // MARK: - Main column
@@ -51,7 +56,6 @@ struct EditorView: View {
                 Button { onClose() } label: { Label("Projects", systemImage: "chevron.left") }
                 Text(project.name).font(.headline).lineLimit(1)
                 Spacer()
-                Button { showAccount = true } label: { Label("Account", systemImage: "person.crop.circle") }
                 Button("Import Lottie…") { openLottieJSON() }
                 Button("Replace SVG…") { openSVG() }
                 Button("Paste SVG") { pasteSVGFromClipboard() }
@@ -65,49 +69,6 @@ struct EditorView: View {
                 Text(String(format: "%.2fx", speed)).monospacedDigit().frame(width: 52, alignment: .trailing)
             }
 
-            HStack(spacing: 8) {
-                TextField("Describe the animation…", text: $prompt, axis: .vertical)
-                    .lineLimit(1...3)
-                    .textFieldStyle(.roundedBorder)
-                Menu {
-                    ForEach(AIModel.all) { m in
-                        Button {
-                            modelID = m.id
-
-                        } label: {
-                            if modelID == m.id { Label("\(m.label) — \(m.blurb)", systemImage: "checkmark") }
-                            else { Text("\(m.label) — \(m.blurb)") }
-                        }
-                    }
-                } label: {
-                    Label(AIModel.label(for: modelID), systemImage: "cpu")
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .disabled(generating)
-                Menu {
-                    ForEach(AIEffort.all) { e in
-                        Button {
-                            effortID = e.id
-                        } label: {
-                            if effortID == e.id { Label(e.label, systemImage: "checkmark") }
-                            else { Text(e.label) }
-                        }
-                    }
-                } label: {
-                    Label(AIEffort.label(for: effortID), systemImage: "gauge.with.dots.needle.67percent")
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .disabled(generating)
-                Button {
-                    generate()
-                } label: {
-                    if generating { ProgressView().controlSize(.small) } else { Text("Generate with AI") }
-                }
-                .disabled(generating || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-
             ZStack {
                 CheckerboardBackground()
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -116,7 +77,7 @@ struct EditorView: View {
                         .id("\(previewURL.path)-\(loop)")
                         .padding(8)
                 } else {
-                    Text("Generate a version, or view the static geometry").foregroundStyle(.secondary)
+                    Text("No versions yet — create them via MCP (lottie-mcp)").foregroundStyle(.secondary)
                 }
             }
             .frame(minWidth: 360, minHeight: 360)
@@ -128,19 +89,6 @@ struct EditorView: View {
                         .font(.caption).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
-                    if let tu = tokenUsage {
-                        tokenBadge(tu)
-                            .opacity(generating ? 0.7 : 1)
-                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: generating)
-                    } else if generating {
-                        ProgressView().controlSize(.mini)
-                    }
-                }
-                if status.lowercased().contains("generation failed") {
-                    Button { showAccount = true } label: {
-                        Label("Check account / switch…", systemImage: "person.crop.circle.badge.exclamationmark")
-                    }
-                    .font(.caption)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -196,7 +144,8 @@ struct EditorView: View {
                         }
                         .contextMenu {
                             Button {
-                                prompt = v.prompt
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(v.prompt, forType: .string)
                             } label: {
                                 Label("Copy Prompt", systemImage: "doc.on.doc")
                             }
@@ -297,39 +246,6 @@ struct EditorView: View {
             .allowsHitTesting(false)
     }
 
-    // MARK: - Token badge
-
-    private func tokenBadge(_ tu: TokenUsage) -> some View {
-        HStack(spacing: 4) {
-            if tu.costUSD > 0 {
-                Text(String(format: "$%.4f", tu.costUSD))
-            }
-            if tu.outputTokens > 0 {
-                Text("↑\(formatTokens(tu.outputTokens))")
-            }
-            if tu.inputTokens > 0 || tu.cacheReadTokens > 0 || tu.cacheCreationTokens > 0 {
-                Text("↓\(formatTokens(tu.inputTokens + tu.cacheReadTokens + tu.cacheCreationTokens))")
-            }
-            if !tu.rateLimitStatus.isEmpty {
-                Image(systemName: tu.rateLimitStatus == "allowed" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(tu.rateLimitStatus == "allowed" ? .green : .orange)
-                if let resets = tu.rateLimitResetsAt {
-                    Text("resets \(resets, style: .relative)")
-                }
-            }
-        }
-        .font(.caption2.monospacedDigit())
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(RoundedRectangle(cornerRadius: 4).fill(Color(white: 0.18)))
-    }
-
-    private func formatTokens(_ count: Int) -> String {
-        if count >= 1000 { return String(format: "%.1fk", Double(count) / 1000) }
-        return "\(count)"
-    }
-
     // MARK: - Actions
 
     private func loadInitial() {
@@ -355,48 +271,6 @@ struct EditorView: View {
         previewURL = url
         report = LottieRuntimeValidator.validate(fileURL: url)
         status = "Viewing \(v.label) · \(v.layerCount) layers"
-    }
-
-    private func generate() {
-        guard let project, let geom = store.geometryData(for: project) else {
-            status = "No geometry available"; return
-        }
-        let names = project.layerNames
-        let request = prompt
-        let model = modelID
-        let effort = effortID
-        let animCtx = LottieCompiler.inspectAnimations(lottieData: geom)
-        generating = true
-        tokenUsage = nil
-        let effortNote = effort.isEmpty ? "" : ", \(AIEffort.label(for: effort).lowercased()) effort"
-        status = "Generating with claude (\(AIModel.label(for: model))\(effortNote))…"
-        Task {
-            do {
-                let (spec, _) = try await CLIProvider(model: model, effort: effort)
-                    .generateSpec(request: request, layerNames: names, durationSeconds: 3,
-                                  animationContext: animCtx) { usage in
-                        Task { @MainActor in
-                            tokenUsage = usage
-                        }
-                    }
-                let result = try LottieCompiler().compile(staticLottie: geom, spec: spec)
-                let specJSON = (try? JSONEncoder().encode(spec)).flatMap { String(data: $0, encoding: .utf8) }
-                await MainActor.run {
-                    if let v = store.addVersion(projectID: projectID, prompt: request, compiledData: result.data,
-                                                layerCount: spec.layers.count, compilerWarnings: result.warnings.count,
-                                                specJSON: specJSON) {
-                        select(v)
-                        status = "Generated \(v.label): \(spec.layers.count) layers, \(result.warnings.count) warning(s)"
-                    }
-                    generating = false
-                }
-            } catch {
-                await MainActor.run {
-                    status = "AI generation failed: \(error.localizedDescription)"
-                    generating = false
-                }
-            }
-        }
     }
 
     private func toggleMultiSelection(_ id: UUID) {

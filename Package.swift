@@ -37,6 +37,7 @@ let package = Package(
                 .product(name: "Lottie", package: "lottie-ios")
             ],
             path: "Sources",
+            exclude: ["MCP"],
             resources: [
                 .process("Resources/en.lproj"),
                 .process("Resources/ru.lproj"),

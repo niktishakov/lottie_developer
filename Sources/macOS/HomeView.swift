@@ -11,7 +11,6 @@ struct HomeView: View {
     @State private var dropTargeted = false
     @State private var renaming: UUID?
     @State private var renameText = ""
-    @State private var showAccount = false
 
     private let columns = [GridItem(.adaptive(minimum: 200), spacing: 16)]
 
@@ -21,7 +20,6 @@ struct HomeView: View {
                 Text("Projects")
                     .font(.largeTitle.weight(.bold))
                 Spacer()
-                Button { showAccount = true } label: { Label("Account", systemImage: "person.crop.circle") }
                 Button { openLottieAsProject() } label: { Label("Import Lottie…", systemImage: "doc.badge.arrow.up") }
                 Button { _ = openSVGAsProject() } label: { Label("New from SVG…", systemImage: "square.and.arrow.down") }
                 Button { pasteSVGAsProject() } label: { Label("Paste SVG", systemImage: "doc.on.clipboard") }
@@ -60,7 +58,6 @@ struct HomeView: View {
             return false
         } isTargeted: { dropTargeted = $0 }
         .overlay { if dropTargeted { dropHint } }
-        .sheet(isPresented: $showAccount) { AccountView(onClose: { showAccount = false }) }
     }
 
     private var emptyState: some View {
