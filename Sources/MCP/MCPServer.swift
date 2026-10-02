@@ -3,7 +3,13 @@ import Foundation
 /// Обработчик MCP-протокола и инструментов поверх `ProjectStore` + `LottieCompiler`.
 @MainActor
 final class MCPServer {
-    let store = ProjectStore()
+    let store: ProjectStore
+
+    /// Собственное хранилище (lottie-mcp).
+    init() { store = ProjectStore() }
+
+    /// Общее хранилище с приложением (iOS companion / HTTP API).
+    init(store: ProjectStore) { self.store = store }
 
     private static let serverVersion = "1.0.0"
     private static let defaultProtocol = "2025-06-18"
@@ -16,7 +22,7 @@ final class MCPServer {
 
     // MARK: - JSON-RPC
 
-    func handle(_ msg: [String: Any]) -> [String: Any]? {
+    func handle(_ msg: [String: Any]) async -> [String: Any]? {
         let id = msg["id"]
         let method = msg["method"] as? String ?? ""
         let params = msg["params"] as? [String: Any] ?? [:]
@@ -36,7 +42,7 @@ final class MCPServer {
                 "protocolVersion": proto,
                 "capabilities": ["tools": ["listChanged": false]],
                 "serverInfo": ["name": "lottie-developer", "version": Self.serverVersion],
-                "instructions": Self.instructions,
+                "instructions": Self.instructions + Self.platformNote,
             ])
         case "ping":
             return ok([:])
@@ -47,7 +53,7 @@ final class MCPServer {
             let args = params["arguments"] as? [String: Any] ?? [:]
             store.load() // приложение могло изменить данные
             do {
-                let result = try callTool(name, args)
+                let result = try await callTool(name, args)
                 if let r = result as? RenderedFrames {
                     var content: [[String: Any]] = [["type": "text", "text": Self.jsonString(r.meta)]]
                     content += r.images.map { ["type": "image", "data": $0.base64EncodedString(), "mimeType": "image/png"] }
@@ -64,12 +70,25 @@ final class MCPServer {
 
     // MARK: - Tools dispatch
 
-    private func callTool(_ name: String, _ a: [String: Any]) throws -> Any {
+    /// Вызов инструмента для HTTP API: результат JSON-совместимый (то, что tools/call кладёт текстом).
+    /// render_frame: meta + `images` — PNG в base64. Ошибки инструмента — throw.
+    func toolCall(name: String, arguments: [String: Any]) async throws -> Any {
+        store.load()
+        let result = try await callTool(name, arguments)
+        if let r = result as? RenderedFrames {
+            var meta = r.meta
+            meta["images"] = r.images.map { $0.base64EncodedString() }
+            return meta
+        }
+        return result
+    }
+
+    private func callTool(_ name: String, _ a: [String: Any]) async throws -> Any {
         switch name {
         case "get_guide": return guide()
         case "list_projects": return store.projects.map(projectSummary)
         case "get_project": return try projectDetails(try project(a))
-        case "create_project": return try createProject(a)
+        case "create_project": return try await createProject(a)
         case "rename_project":
             let p = try project(a)
             store.rename(projectID: p.id, to: try str(a, "name"))
@@ -78,7 +97,7 @@ final class MCPServer {
             let p = try project(a)
             store.delete(projectID: p.id)
             return ["deleted": p.id.uuidString]
-        case "replace_geometry": return try replaceGeometry(a)
+        case "replace_geometry": return try await replaceGeometry(a)
         case "get_geometry": return try getGeometry(a)
         case "validate_spec": return try compileSpec(a, save: false)
         case "create_version": return try compileSpec(a, save: true)
@@ -103,8 +122,8 @@ final class MCPServer {
         case "export": return try export(a)
         case "show_in_app": return try showInApp(a)
         case "render_frame": return try renderFrames(a)
-        case "add_image": return try addImage(a)
-        case "add_svg": return try addSVG(a)
+        case "add_image": return try await addImage(a)
+        case "add_svg": return try await addSVG(a)
         case "list_assets": return try listAssets(a)
         case "add_assets":
             let p = try project(a)
@@ -113,13 +132,13 @@ final class MCPServer {
             let added = try store.addAssets(projectID: p.id, paths.map(Self.fileURL))
             var placed: [String] = []
             if a["place"] as? Bool ?? false {
-                for n in added { placed.append(try store.placeAsset(projectID: p.id, name: n).layer) }
+                for n in added { placed.append(try await store.placeAssetAsync(projectID: p.id, name: n).layer) }
             }
             return ["added": added, "placed": placed, "folder": store.assetsDir(p.id).path]
         case "place_asset":
             let p = try project(a)
             let origin = ((a["x"] as? NSNumber)?.doubleValue).flatMap { x in ((a["y"] as? NSNumber)?.doubleValue).map { CGPoint(x: x, y: $0) } }
-            let (layer, warnings) = try store.placeAsset(projectID: p.id, name: try str(a, "name"), origin: origin, frame: Self.rect(a))
+            let (layer, warnings) = try await store.placeAssetAsync(projectID: p.id, name: try str(a, "name"), origin: origin, frame: Self.rect(a))
             store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date(), layer: layer))
             return ["layer": layer, "warnings": warnings]
         case "delete_asset":
@@ -148,11 +167,11 @@ final class MCPServer {
 
     // MARK: - Projects
 
-    private func createProject(_ a: [String: Any]) throws -> Any {
+    private func createProject(_ a: [String: Any]) async throws -> Any {
         let name = (a["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled \(store.projects.count + 1)"
         // Пачка ассетов: zip или папка → одна композиция.
         if let bundle = a["bundle"] as? String, !bundle.isEmpty {
-            let (p, r) = try store.importBundle(Self.fileURL(bundle), name: a["name"] as? String)
+            let (p, r) = try await store.importBundleAsync(Self.fileURL(bundle), name: a["name"] as? String)
             if a["show_in_app"] as? Bool ?? true { store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date())) }
             return ["project": try projectDetails(try project(["project_id": p.id.uuidString])),
                     "canvas": ["width": r.canvas.width, "height": r.canvas.height],
@@ -178,7 +197,7 @@ final class MCPServer {
             // поэтому добавляем с конца.
             for path in images.reversed() {
                 let url = Self.fileURL(path)
-                added.insert(try store.importAndPlace(projectID: p.id, file: url).layer, at: 0)
+                added.insert(try await store.importAndPlaceAsync(projectID: p.id, file: url).layer, at: 0)
             }
             if a["show_in_app"] as? Bool ?? true { store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date())) }
             return ["project": try projectDetails(try project(["project_id": p.id.uuidString])), "imageLayers": added]
@@ -187,7 +206,7 @@ final class MCPServer {
             let p: AnimationProject
             switch geom {
             case let .svg(data, label):
-                let r = try SVGToLottie.convert(svgData: data)
+                let r = try await SVGToLottie.convertAsync(svgData: data)
                 let svgName = (a["name"] as? String).flatMap { $0.isEmpty ? nil : $0 }
                     ?? store.uniqueName(SVGToLottie.title(svgData: data) ?? (label == "SVG (MCP)" ? "SVG" : (label as NSString).deletingPathExtension))
                 p = store.createProjectFromSVG(name: svgName, svgStaticData: r.data, layerNames: r.layerNames, sourceLabel: label)
@@ -203,12 +222,12 @@ final class MCPServer {
         return ["project": try projectDetails(store.createSampleProject(name: name))]
     }
 
-    private func replaceGeometry(_ a: [String: Any]) throws -> Any {
+    private func replaceGeometry(_ a: [String: Any]) async throws -> Any {
         let p = try project(a)
         guard let geom = try geometryInput(a) else { throw ToolError("Pass svg, svg_path, lottie or lottie_path") }
         switch geom {
         case let .svg(data, label):
-            let r = try SVGToLottie.convert(svgData: data)
+            let r = try await SVGToLottie.convertAsync(svgData: data)
             store.setImportedStatic(projectID: p.id, data: r.data, layerNames: r.layerNames, sourceLabel: label)
             return ["project": try projectDetails(try project(a)), "svgWarnings": r.warnings]
         case let .lottie(data, label):
@@ -397,13 +416,13 @@ final class MCPServer {
         return ["version": versionSummary(v), "summary": Self.lottieSummary(data)]
     }
 
-    private func addImage(_ a: [String: Any]) throws -> Any {
+    private func addImage(_ a: [String: Any]) async throws -> Any {
         let p = try project(a)
         let data: Data
         let defaultName = "image"
         if let path = a["path"] as? String, !path.isEmpty {
             // Файл → в папку ассетов проекта → в сцену.
-            let layer = try store.importAndPlace(projectID: p.id, file: Self.fileURL(path), frame: Self.rect(a)).layer
+            let layer = try await store.importAndPlaceAsync(projectID: p.id, file: Self.fileURL(path), frame: Self.rect(a)).layer
             store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date(), layer: layer))
             let geom = store.geometryData(for: try project(a)) ?? Data()
             return ["layer": layer, "frame": Self.rectDict(LottieImageLayers.imageFrames(in: geom)[layer])]
@@ -478,13 +497,13 @@ final class MCPServer {
          "resolved": f.resolved, "reply": f.reply ?? NSNull(), "createdAt": iso.string(from: f.createdAt)]
     }
 
-    private func addSVG(_ a: [String: Any]) throws -> Any {
+    private func addSVG(_ a: [String: Any]) async throws -> Any {
         let p = try project(a)
         let data: Data, isSVG: Bool
         var name = (a["name"] as? String) ?? ""
         let origin0 = ((a["x"] as? NSNumber)?.doubleValue).flatMap { x in ((a["y"] as? NSNumber)?.doubleValue).map { CGPoint(x: x, y: $0) } }
         if let path = a["path"] as? String, !path.isEmpty {
-            let (group, warnings) = try store.importAndPlace(projectID: p.id, file: Self.fileURL(path), origin: origin0)
+            let (group, warnings) = try await store.importAndPlaceAsync(projectID: p.id, file: Self.fileURL(path), origin: origin0)
             store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date(), layer: group))
             return ["group": group, "warnings": warnings]
         } else if let svg = a["svg"] as? String, !svg.isEmpty {
@@ -494,7 +513,9 @@ final class MCPServer {
         }
         if name.isEmpty { name = SVGToLottie.title(svgData: data) ?? "svg" }
         let origin = ((a["x"] as? NSNumber)?.doubleValue).flatMap { x in ((a["y"] as? NSNumber)?.doubleValue).map { CGPoint(x: x, y: $0) } }
-        let (group, warnings) = try store.addPart(projectID: p.id, data: data, isSVG: isSVG, name: name, origin: origin)
+        let converted = isSVG ? try await SVGToLottie.convertAsync(svgData: data) : nil
+        let (group, warnings) = try store.addPart(projectID: p.id, data: data, isSVG: isSVG, name: name, origin: origin,
+                                                  converted: converted)
         store.writeUICommand(.init(projectID: p.id, versionID: nil, issuedAt: Date(), layer: group))
         return ["group": group, "warnings": warnings,
                 "layers": LottieOverrides.layers(in: store.geometryData(for: try project(a)) ?? Data()).map(\.name)]
@@ -562,8 +583,12 @@ final class MCPServer {
             }
             frames.append(info)
         }
-        return RenderedFrames(meta: ["project": p.name, "source": label, "frames": frames,
-                                     "summary": Self.lottieSummary(data)], images: images)
+        var meta: [String: Any] = ["project": p.name, "source": label, "frames": frames,
+                                   "summary": Self.lottieSummary(data)]
+        #if os(iOS)
+        meta["renderer"] = "lottie-ios (iPhone)"
+        #endif
+        return RenderedFrames(meta: meta, images: images)
     }
 
     private func showInApp(_ a: [String: Any]) throws -> Any {

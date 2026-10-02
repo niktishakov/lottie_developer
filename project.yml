@@ -12,6 +12,9 @@ packages:
   Lottie:
     url: https://github.com/airbnb/lottie-ios.git
     from: 4.6.0
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation.git
+    from: 0.9.19
 targets:
   LottieDeveloper:
     type: application
@@ -24,6 +27,11 @@ targets:
           UIColorName: LaunchFallback
           UIImageName: LaunchBackground
           UIImageRespectsSafeAreaInsets: false
+        NSLocalNetworkUsageDescription: Claude on your computer connects to this iPhone over Wi-Fi to build and check Lottie animations.
+        NSBonjourServices: [_lottiedev._tcp]
+        NSAppTransportSecurity: { NSAllowsArbitraryLoads: true, NSAllowsLocalNetworking: true }
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nikapps.lottie.developer
@@ -38,7 +46,17 @@ targets:
           - Resources
           - macOS
           - MCP
-          - Shared
+          - Companion
+      - path: Sources/MCP
+        excludes: [main.swift]
+      - path: Sources/macOS/ProjectModels.swift
+      - path: Sources/macOS/ProjectStore.swift
+      - path: Sources/macOS/SVGToLottie.swift
+      - path: Sources/Companion
+        excludes: [Resources]
+      - path: Sources/Companion/Resources/viewer
+        type: folder
+        buildPhase: resources
       - path: Sources/Assets.xcassets
         buildPhase: resources
       - path: Sources/Resources/en.lproj
@@ -56,6 +74,8 @@ targets:
     dependencies:
       - package: Lottie
         product: Lottie
+      - package: ZIPFoundation
+        product: ZIPFoundation
     scheme:
       gatherCoverageData: false
       testTargets:

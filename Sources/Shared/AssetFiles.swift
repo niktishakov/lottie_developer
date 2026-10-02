@@ -1,4 +1,7 @@
 import Foundation
+#if os(iOS)
+import ZIPFoundation
+#endif
 
 /// Файлы-оригиналы ассетов проекта (папка `assets/`): их видят дизайнер (вкладка Assets, Finder) и Claude (MCP).
 /// Рядом — скрытый `.usage.json`: какие слои сцены сделаны из какого файла.
@@ -60,10 +63,7 @@ enum AssetFiles {
                 if url.pathExtension.lowercased() == "zip" {
                     let t = fm.temporaryDirectory.appendingPathComponent("assets_\(UUID().uuidString)")
                     try fm.createDirectory(at: t, withIntermediateDirectories: true)
-                    let p = Process()
-                    p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-                    p.arguments = ["-x", "-k", url.path, t.path]
-                    try p.run(); p.waitUntilExit()
+                    try unzip(url, to: t)
                     src = t; tmp = t
                 }
                 defer { if let tmp { try? fm.removeItem(at: tmp) } }
@@ -77,6 +77,25 @@ enum AssetFiles {
             }
         }
         return added
+    }
+
+    struct ZipError: LocalizedError {
+        let message: String
+        var errorDescription: String? { message }
+    }
+
+    /// Распаковать zip в папку (macOS — ditto, iOS — ZIPFoundation).
+    static func unzip(_ zip: URL, to dir: URL) throws {
+        #if os(iOS)
+        do { try FileManager.default.unzipItem(at: zip, to: dir) }
+        catch { throw ZipError(message: "Cannot unzip \(zip.lastPathComponent): \(error.localizedDescription)") }
+        #else
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        p.arguments = ["-x", "-k", zip.path, dir.path]
+        try p.run(); p.waitUntilExit()
+        guard p.terminationStatus == 0 else { throw ZipError(message: "Cannot unzip \(zip.lastPathComponent)") }
+        #endif
     }
 
     // MARK: - Usage index

@@ -212,6 +212,15 @@ export class Tools {
         return J({ requested: true, viewer: `${this.viewer.url()}/p/${p.id}`, note: "The viewer page follows within ~1s if it is open. Pass open_browser=true to open it." });
       }
       case "render_frame": return this.renderFrame(a);
+      case "device_status": {
+        try { const r = await fetch(`${this.viewer.url()}/api/device/status`); return J(await r.json()); }
+        catch { return J({ devices: [], note: "Viewer is not running — call open_viewer." }); }
+      }
+      case "ios_check": {
+        const p = this.project(a);
+        const l = typeof a.version === "string" && a.version ? s.versionLottie(p.id, this.findVersion(p, a.version)) : this.geometry(p);
+        return J(await this.deviceCall("/api/device/check", { lottie: l }));
+      }
       case "get_app_state": {
         const st = s.appState();
         if (!st) return J({ running: false, note: `No viewer state yet — open ${this.viewer.url()}` });
@@ -410,6 +419,8 @@ export class Tools {
     else if (typeof a.count === "number" && a.count > 1) { const c = Math.min(a.count, 16); frames = Array.from({ length: c }, (_, i) => ip + ((op - ip) * i) / (c - 1)); }
     else if (typeof a.frame === "number") frames = [a.frame];
     else frames = [ip + (op - ip) * Math.min(Math.max(a.progress ?? 0, 0), 1)];
+    const engine = String(a.engine ?? "skottie");
+    if (engine.startsWith("ios")) return this.renderOnDevice(l, label, frames, a, engine);
     const rendered = await renderFrames(l, frames, a.size ?? 512, a.background ?? null);
     const info = rendered.map((r, i) => {
       const d: any = { frame: r.frame, width: r.width, height: r.height };
@@ -420,6 +431,32 @@ export class Tools {
       return d;
     });
     return { json: { project: p.name, source: label, frames: info, summary: this.summary(l), renderer: "skottie" }, images: rendered.map((r) => r.png) };
+  }
+
+  /** Кадры с iPhone (настоящий lottie-ios) через хаб устройств просмотрщика. */
+  async deviceCall(path: string, body: any): Promise<any> {
+    let r: Response;
+    try { r = await fetch(`${this.viewer.url()}${path}`, { method: "POST", body: JSON.stringify(body) }); }
+    catch { throw new ToolError("Viewer is not running, so no iPhone can be connected. Call open_viewer first."); }
+    const j = await r.json();
+    if (!r.ok || j.error) throw new ToolError(j.error ?? `Device request failed (${r.status})`);
+    return j;
+  }
+
+  async renderOnDevice(l: Lottie, label: string, frames: number[], a: any, engine: string): Promise<ToolOutput> {
+    const res = await this.deviceCall("/api/device/render", { lottie: l, frames, size: Math.min(a.size ?? 512, 1024),
+      engine: engine === "ios-main-thread" ? "mainThread" : engine === "ios-auto" ? "automatic" : "coreAnimation", background: a.background ?? null });
+    const pngs: Uint8Array[] = res.frames.map((f: any) => Uint8Array.from(Buffer.from(f.png, "base64")));
+    const info = res.frames.map((f: any, i: number) => {
+      const d: any = { frame: f.frame, width: f.width, height: f.height };
+      if (typeof a.save_dir === "string") {
+        const dir = this.path(a.save_dir); mkdirSync(dir, { recursive: true });
+        const file = join(dir, `${label}_ios_f${Math.round(f.frame)}_${i}.png`); writeFileSync(file, pngs[i]); d.saved = file;
+      }
+      return d;
+    });
+    return { json: { source: label, frames: info, renderer: `lottie-ios ${res.lottieVersion ?? ""}`.trim(), device: res.device,
+      engineRequested: res.engineRequested, engineUsed: res.engineUsed, warnings: res.warnings }, images: pngs };
   }
 
   guide() {

@@ -1,5 +1,6 @@
-#if os(macOS)
+#if os(macOS) || os(iOS)
 import Foundation
+import CoreGraphics
 
 /// Конвертер SVG → статичный Lottie (bodymovin) с ИМЕНОВАННЫМИ слоями.
 /// Каждый рисуемый элемент → отдельный слой `ty:4` с `nm` = svg `id` (или сгенерированное имя),
@@ -45,9 +46,42 @@ enum SVGToLottie {
         var root: SVGNode?
         var canvas = CGSize(width: 512, height: 512)
         var assets: [[String: Any]] = []
+        /// Растеризатор узла: (индекс узла, изолированный SVG, холст, масштаб) → картинка.
+        var rasterize: (Int, Data, CGSize, Double) -> CGImage? = { _, _, _, _ in nil }
     }
 
+    /// Масштаб растеризации узлов, которые Lottie не нарисует.
+    static let rasterScale = 3.0
+
+    /// Синхронная конвертация. macOS: растеризация через CoreSVG. iOS: без WebKit узлы-картинки
+    /// пропускаются — используйте `convertAsync`.
     static func convert(svgData: Data) throws -> Result {
+        #if os(macOS)
+        return try convert(svgData: svgData) { _, doc, canvas, scale in SVGDocument.rasterize(doc, canvas: canvas, scale: scale) }
+        #else
+        return try convert(svgData: svgData) { _, _, _, _ in nil }
+        #endif
+    }
+
+    /// Асинхронная конвертация: на iOS сначала рисует растровые узлы через WKWebView, потом та же конвертация.
+    @MainActor
+    static func convertAsync(svgData: Data) async throws -> Result {
+        #if os(iOS)
+        let prep = try prepare(svgData)
+        var images: [Int: CGImage] = [:]
+        if let root = prep.ctx.root {
+            for (i, node) in prep.ctx.rasterNodes.enumerated() {
+                let doc = SVGDocument.isolate(node, root: root)
+                images[i] = await SVGDocument.rasterizeAsync(doc, canvas: prep.ctx.canvas, scale: rasterScale)
+            }
+        }
+        return try convert(svgData: svgData) { i, _, _, _ in images[i] }
+        #else
+        return try convert(svgData: svgData)
+        #endif
+    }
+
+    private static func prepare(_ svgData: Data) throws -> (ctx: Context, collector: Collector) {
         guard let dom = SVGDocument.parse(svgData) else { throw SVGError.parseFailed }
         var ctx = Context()
         ctx.root = dom
@@ -64,6 +98,15 @@ enum SVGToLottie {
 
         let (w, h) = collector.size()
         ctx.canvas = CGSize(width: w, height: h)
+        return (ctx, collector)
+    }
+
+    static func convert(svgData: Data, rasterizer: @escaping (Int, Data, CGSize, Double) -> CGImage?) throws -> Result {
+        let prep = try prepare(svgData)
+        var ctx = prep.ctx
+        let collector = prep.collector
+        ctx.rasterize = rasterizer
+        let (w, h) = (Double(ctx.canvas.width), Double(ctx.canvas.height))
         var warnings = collector.warnings
         if !ctx.rasterNodes.isEmpty {
             warnings.append("\(ctx.rasterNodes.count) element(s) with blur/mask/complex gradient imported as images (exact look, transform-only animation)")
@@ -304,9 +347,9 @@ enum SVGToLottie {
     /// SVG-рендерером в картинку ×3 и ставим слоем-картинкой на то же место.
     private static func rasterLayer(_ element: Element, ind: Int, ctx: inout Context) -> [String: Any]? {
         guard let i = Int(element.attrs["index"] ?? ""), i < ctx.rasterNodes.count, let root = ctx.root else { return nil }
-        let scale = 3.0
+        let scale = rasterScale
         let doc = SVGDocument.isolate(ctx.rasterNodes[i], root: root)
-        guard let img = SVGDocument.rasterize(doc, canvas: ctx.canvas, scale: scale),
+        guard let img = ctx.rasterize(i, doc, ctx.canvas, scale),
               let (png, rect) = SVGDocument.cropToContent(img, scale: scale),
               let px = LottieImageLayers.pixelSize(png) else { return nil }
         let id = "svg_raster_\(ctx.assets.count + 1)"

@@ -1,5 +1,5 @@
 {
- "instructions": "Lottie Developer: you build Lottie animations together with a designer. The designer watches the Lottie Developer viewer in the browser (open_viewer gives its URL; it shows every change live) and gets a lottie-ios compatible JSON at the end. Talk to the designer in plain words, in their language, without internal terms (spec, null layer).\n\nWorkflow:\n1. Assets → project. zip/folder: create_project(bundle: path). Files the designer put in the app's Assets tab: list_assets (open the returned paths to look at files) → place_asset. Single files: add_svg / add_image. A screenshot pasted into chat cannot be saved as a file — ask the designer to drag the file itself into the chat.\n2. Scene. render_frame and LOOK at the image yourself → place_layer / rename_layer until it matches the design. Imported layers are named path-3, rect-2 — rename the meaningful ones before animating.\n3. Motion. get_guide (schema + motion kinds) → validate_spec → create_version with prompt (intent) and note (one line: what changed).\n4. Check. render_frame(version: latest, count: 8) and look at every frame before saying it is done.\n5. Comments. get_feedback → fix in a new version → resolve_feedback with a short reply. get_app_state tells what the designer is looking at.\n6. Deliver. export(path) → give the designer the JSON path.\n\nRules: never delete projects, versions or assets unless the designer asks (rollback = restore_version). Image layers (raster, SVG parts with blur/masks) animate with transforms only (fade, slide, scale, rotate, followPath). A group (layer named after its file) moves all its parts. show_in_app(frame, layer) shows the designer an exact moment.",
+ "instructions": "Lottie Developer: you build Lottie animations together with a designer. The designer watches the Lottie Developer viewer in the browser (open_viewer gives its URL; it shows every change live) and gets a lottie-ios compatible JSON at the end. Talk to the designer in plain words, in their language, without internal terms (spec, null layer).\n\nWorkflow:\n1. Assets → project. zip/folder: create_project(bundle: path). Files the designer put in the app's Assets tab: list_assets (open the returned paths to look at files) → place_asset. Single files: add_svg / add_image. A screenshot pasted into chat cannot be saved as a file — ask the designer to drag the file itself into the chat.\n2. Scene. render_frame and LOOK at the image yourself → place_layer / rename_layer until it matches the design. Imported layers are named path-3, rect-2 — rename the meaningful ones before animating.\n3. Motion. get_guide (schema + motion kinds) → validate_spec → create_version with prompt (intent) and note (one line: what changed).\n4. Check. render_frame(version: latest, count: 8) and look at every frame before saying it is done.\n5. Comments. get_feedback → fix in a new version → resolve_feedback with a short reply. get_app_state tells what the designer is looking at.\n6. iOS truth: if device_status shows an iPhone, verify with render_frame(engine: \"ios\") and ios_check before delivering — the target is lottie-ios.\n7. Deliver. export(path) → give the designer the JSON path.\n\nRules: never delete projects, versions or assets unless the designer asks (rollback = restore_version). Image layers (raster, SVG parts with blur/masks) animate with transforms only (fade, slide, scale, rotate, followPath). A group (layer named after its file) moves all its parts. show_in_app(frame, layer) shows the designer an exact moment.",
  "tools": [
   {
    "inputSchema": {
@@ -749,7 +749,7 @@
    }
   },
   {
-   "description": "Render frames to PNG so you can SEE the result. Returns images. Use count for a filmstrip.",
+   "description": "Render frames to PNG so you can SEE the result. Returns images. Use count for a filmstrip. engine: \"skottie\" (default, local) | \"ios\" (real lottie-ios Core Animation engine on the connected iPhone) | \"ios-main-thread\" | \"ios-auto\" (what lottie-ios would pick).",
    "inputSchema": {
     "properties": {
      "frame": {
@@ -790,6 +790,15 @@
      "background": {
       "type": "string",
       "description": "Hex like #FFFFFF; default transparent"
+     },
+     "engine": {
+      "type": "string",
+      "enum": [
+       "skottie",
+       "ios",
+       "ios-main-thread",
+       "ios-auto"
+      ]
      }
     },
     "type": "object",
@@ -880,6 +889,33 @@
     }
    },
    "description": "Save a new version with per-layer edits baked in: color (hex, recolors fills/strokes), opacity (0-100 multiplier), hidden."
+  },
+  {
+   "name": "device_status",
+   "description": "Connected iPhones (Lottie Companion app): name, iOS version, lottie-ios version. If none, ask the designer to press “Connect iPhone” in the viewer and scan the QR code.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+   }
+  },
+  {
+   "name": "ios_check",
+   "description": "Ask real lottie-ios on the connected iPhone about a version: which rendering engine it picks (Core Animation vs Main Thread fallback), why, and its warnings. Use before delivering.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "string"
+     },
+     "version": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "project_id"
+    ]
+   }
   }
  ]
 }

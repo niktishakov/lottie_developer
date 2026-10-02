@@ -26,20 +26,51 @@ enum AssetBundle {
 
     /// - copyTo: если задано, оригиналы использованных файлов копируются туда (папка ассетов проекта).
     static func load(_ url: URL, fps: Int = 60, frames: Int = 120, copyTo: URL? = nil) throws -> Report {
-        let fm = FileManager.default
-        var dir = url
-        var tmp: URL?
-        defer { if let tmp { try? fm.removeItem(at: tmp) } }
-        if url.pathExtension.lowercased() == "zip" {
-            let t = fm.temporaryDirectory.appendingPathComponent("bundle_\(UUID().uuidString)")
-            try fm.createDirectory(at: t, withIntermediateDirectories: true)
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-            p.arguments = ["-x", "-k", url.path, t.path]
-            try p.run(); p.waitUntilExit()
-            guard p.terminationStatus == 0 else { throw BundleError(message: "Cannot unzip \(url.lastPathComponent)") }
-            dir = t; tmp = t
+        let (dir, tmp) = try unpacked(url)
+        defer { if let tmp { try? FileManager.default.removeItem(at: tmp) } }
+        return try load(dir: dir, fps: fps, frames: frames, copyTo: copyTo) { try SVGToLottie.convert(svgData: $1) }
+    }
+
+    /// Как `load`, но SVG конвертируются через `SVGToLottie.convertAsync` (на iOS растр — через WebKit).
+    @MainActor
+    static func loadAsync(_ url: URL, fps: Int = 60, frames: Int = 120, copyTo: URL? = nil) async throws -> Report {
+        #if os(iOS)
+        let (dir, tmp) = try unpacked(url)
+        defer { if let tmp { try? FileManager.default.removeItem(at: tmp) } }
+        var converted: [String: SVGToLottie.Result] = [:]
+        let en = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+        var svgs: [URL] = []
+        while let f = en?.nextObject() as? URL {
+            if !f.path.contains("__MACOSX"), f.pathExtension.lowercased() == "svg" { svgs.append(f) }
         }
+        for f in svgs {
+            if let data = try? Data(contentsOf: f), let r = try? await SVGToLottie.convertAsync(svgData: data) {
+                converted[f.standardizedFileURL.path] = r
+            }
+        }
+        return try load(dir: dir, fps: fps, frames: frames, copyTo: copyTo) { file, data in
+            if let r = converted[file.standardizedFileURL.path] { return r }
+            return try SVGToLottie.convert(svgData: data)
+        }
+        #else
+        return try load(url, fps: fps, frames: frames, copyTo: copyTo)
+        #endif
+    }
+
+    /// zip → временная папка (её надо удалить), иначе сама папка.
+    private static func unpacked(_ url: URL) throws -> (dir: URL, tmp: URL?) {
+        guard url.pathExtension.lowercased() == "zip" else { return (url, nil) }
+        let fm = FileManager.default
+        let t = fm.temporaryDirectory.appendingPathComponent("bundle_\(UUID().uuidString)")
+        try fm.createDirectory(at: t, withIntermediateDirectories: true)
+        do { try AssetFiles.unzip(url, to: t) }
+        catch { try? fm.removeItem(at: t); throw BundleError(message: "Cannot unzip \(url.lastPathComponent)") }
+        return (t, t)
+    }
+
+    private static func load(dir: URL, fps: Int, frames: Int, copyTo: URL?,
+                             convertSVG: (URL, Data) throws -> SVGToLottie.Result) throws -> Report {
+        let fm = FileManager.default
 
         // Файлы и их размеры.
         struct Item { let url: URL; let kind: String; let size: CGSize }
@@ -83,7 +114,7 @@ enum AssetBundle {
             let origin = CGPoint(x: (canvas.width - item.size.width) / 2, y: (canvas.height - item.size.height) / 2)
             switch item.kind {
             case "svg":
-                let r = try SVGToLottie.convert(svgData: raw)
+                let r = try convertSVG(item.url, raw)
                 warnings += r.warnings.map { "\(item.url.lastPathComponent): \($0)" }
                 let (d, g) = try LottieMerge.add(r.data, to: data, group: name, origin: origin)
                 data = d; parts.insert(g, at: 0); keep(item.url, g)

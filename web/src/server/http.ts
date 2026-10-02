@@ -12,6 +12,9 @@ import { pixelSize } from "../core/images.ts";
 import { writeFileSync, mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname } from "node:path";
+import { DeviceHub } from "./device.ts";
+// @ts-ignore — исходник библиотеки встраиваем как текст для страницы
+import qrSource from "../../node_modules/qrcode-generator/dist/qrcode.js" with { type: "text" };
 import indexHtml from "../viewer/index.html" with { type: "text" };
 import lottieJs from "lottie-web/build/player/lottie.min.js" with { type: "text" };
 
@@ -39,23 +42,55 @@ function signature(store: Store): string {
 
 const MIME: Record<string, string> = { svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", json: "application/json" };
 
+export let deviceHub: DeviceHub | null = null;
+
 export function startViewer(store: Store, tools: Tools): boolean {
+  const hub = (deviceHub = new DeviceHub(store.base));
   const json = (v: any, status = 200) => new Response(JSON.stringify(v), { status, headers: { "content-type": "application/json" } });
   /** Действие через тот же код, что у MCP-инструментов: ошибки → 400 с текстом. */
   const act = async (name: string, args: any) => {
     try { return json((await tools.call(name, args)).json); } catch (e: any) { return json({ error: e?.message ?? String(e) }, 400); }
   };
   try {
-    Bun.serve({
-      port: PORT, hostname: "127.0.0.1",
-      async fetch(req) {
+    Bun.serve<{ info?: any }>({
+      // Слушаем локальную сеть, чтобы подключался iPhone. Запросы не с этого ПК — только с токеном из QR.
+      port: PORT, hostname: "0.0.0.0",
+      websocket: {
+        open: (ws) => hub.open(ws as any), close: (ws) => hub.close(ws as any),
+        message: (ws, m) => hub.message(ws as any, m as any), maxPayloadLength: 64 * 1024 * 1024,
+      },
+      async fetch(req, server) {
         const url = new URL(req.url);
         const p = url.pathname;
+        const ip = server.requestIP(req)?.address ?? "";
+        const local = ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+        const authed = local || url.searchParams.get("token") === hub.token || req.headers.get("x-lottie-token") === hub.token;
+        if (!authed) return new Response("Forbidden: pair this device via the QR code in the viewer", { status: 403 });
+        if (p === "/device") return server.upgrade(req, { data: {} }) ? undefined as any : new Response("WebSocket expected", { status: 400 });
+        if (p === "/qrcode.js") return new Response(qrSource, { headers: { "content-type": "text/javascript" } });
+        if (p.startsWith("/api/device/") && !local) return json({ error: "local only" }, 403);
+        if (p === "/api/device/status") return json({ devices: hub.devices() });
+        if (p === "/api/device/pair") {
+          const hosts = DeviceHub.lanAddresses();
+          return json({ token: hub.token, port: PORT, hosts, devices: hub.devices(),
+            links: hosts.map((h) => `lottiedev://connect?host=${h}&port=${PORT}&token=${hub.token}`) });
+        }
+        if (p === "/api/device/render" || p === "/api/device/check") {
+          try { return json(await hub.request({ type: p.endsWith("render") ? "render" : "check", ...(await req.json()) })); }
+          catch (e: any) { return json({ error: e.message }, 409); }
+        }
         if (p === "/" || p.startsWith("/p/")) return new Response(indexHtml as unknown as string, { headers: { "content-type": "text/html; charset=utf-8" } });
         if (p === "/lottie.js") return new Response(lottieJs, { headers: { "content-type": "text/javascript" } });
         if (p === "/api/poll") return json({ sig: signature(store), command: store.uiCommand() });
         if (p === "/api/projects") return json(store.projects());
-        if (p === "/api/state" && req.method === "POST") { store.writeAppState(await req.json()); return json({ ok: true }); }
+        if (p === "/api/state" && req.method === "POST") {
+          const st = await req.json();
+          store.writeAppState(st);
+          // iPhone показывает то же, что просмотрщик: проект, версию, кадр.
+          hub.broadcast({ type: "show", projectID: st.projectID, projectName: st.projectName, version: st.version,
+            versionID: st.versionID ?? null, frame: st.frame, playing: st.playing });
+          return json({ ok: true });
+        }
         // --- этап 2: ассеты, правки, комментарии ---
         const a = p.match(/^\/api\/project\/([0-9A-F-]+)\/(assets|asset|upload|place|edits|feedback|feedback-resolve|feedback-delete)$/i);
         if (a) {

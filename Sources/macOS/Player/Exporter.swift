@@ -35,7 +35,7 @@ enum Exporter {
             let anim = try FrameRenderer.decode(data)
             var n = 0
             for f in stride(from: anim.startFrame, through: anim.endFrame, by: 1) {
-                let (img, _) = try FrameRenderer.renderImage(animation: anim, frame: f, size: 1024, background: background)
+                let (img, _) = try FrameRenderer.renderImage(animation: anim, frame: f, size: 1024, background: background?.cgColor)
                 try FrameRenderer.png(img).write(to: dir.appendingPathComponent(String(format: "%@_%04d.png", baseName, Int(f))))
                 n += 1
             }
@@ -43,7 +43,7 @@ enum Exporter {
         case .currentFrame:
             guard let url = savePanel(name: "\(baseName)_f\(Int(frame)).png", type: .png) else { return nil }
             let (img, _) = try FrameRenderer.renderImage(animation: try FrameRenderer.decode(data), frame: frame,
-                                                         size: 1024, background: background)
+                                                         size: 1024, background: background?.cgColor)
             try FrameRenderer.png(img).write(to: url)
             return "Saved \(url.lastPathComponent)"
         }
@@ -80,7 +80,7 @@ enum Exporter {
         let delay = stepFrames / max(anim.framerate, 1)
         let props = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: delay]] as CFDictionary
         for f in frames {
-            let (img, _) = try FrameRenderer.renderImage(animation: anim, frame: f, size: 480, background: background)
+            let (img, _) = try FrameRenderer.renderImage(animation: anim, frame: f, size: 480, background: background.cgColor)
             CGImageDestinationAddImage(dest, img, props)
         }
         guard CGImageDestinationFinalize(dest) else { throw FrameRenderer.RenderError(message: "GIF finalize failed") }

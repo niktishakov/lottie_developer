@@ -11,7 +11,7 @@ struct LottieDeveloperApp: App {
         WindowGroup {
             Group {
                 if hasCompletedOnboarding {
-                    AnimationLibraryView()
+                    DeveloperRootView()
                         .environment(store)
                         .environment(purchaseStore)
                         .environment(revisionStore)

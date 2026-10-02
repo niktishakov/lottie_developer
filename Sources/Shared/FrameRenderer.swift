@@ -1,5 +1,5 @@
 import Foundation
-import AppKit
+import CoreGraphics
 import Lottie
 
 /// Офскрин-рендер кадров Lottie (main-thread engine — он умеет рисовать через `render(in:)`).
@@ -20,7 +20,7 @@ enum FrameRenderer {
     /// Кадр в CGImage. `size` — максимальная сторона в px. Начало координат картинки — сверху слева,
     /// 1 px картинки = 1/scale единиц композиции.
     static func renderImage(animation: LottieAnimation, frame: Double, size: Int,
-                            background: NSColor?) throws -> (image: CGImage, scale: Double) {
+                            background: CGColor?) throws -> (image: CGImage, scale: Double) {
         let compW = max(animation.bounds.width, 1), compH = max(animation.bounds.height, 1)
         let scale = Double(max(8, min(size, 4096))) / Double(max(compW, compH))
         let w = max(Int((compW * scale).rounded()), 1), h = max(Int((compH * scale).rounded()), 1)
@@ -42,12 +42,14 @@ enum FrameRenderer {
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
             throw RenderError(message: "Cannot create bitmap context")
         }
-        if let bg = background?.cgColor {
+        if let bg = background {
             ctx.setFillColor(bg); ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
         }
         // isGeometryFlipped + переворот контекста: только так и фигуры, и contents слоёв-картинок
         // получаются в правильной ориентации (один переворот контекста переворачивает картинки).
-        layer.isGeometryFlipped = true
+        #if os(macOS)
+        layer.isGeometryFlipped = true // на iOS слои и так «сверху вниз»; лишний флаг переворачивает картинки
+        #endif
         ctx.translateBy(x: 0, y: CGFloat(h))
         ctx.scaleBy(x: CGFloat(scale), y: -CGFloat(scale))
         layer.render(in: ctx)
@@ -57,7 +59,7 @@ enum FrameRenderer {
 
     /// - frame: номер кадра (nil → по `progress` 0…1).
     static func renderPNG(lottieData: Data, frame: Double?, progress: Double?, size: Int,
-                          background: NSColor?) throws -> (png: Data, frame: Double, width: Int, height: Int) {
+                          background: CGColor?) throws -> (png: Data, frame: Double, width: Int, height: Int) {
         let animation = try decode(lottieData)
         let target: Double
         if let frame { target = frame }
@@ -71,7 +73,7 @@ enum FrameRenderer {
     }
 
     static func png(_ img: CGImage) throws -> Data {
-        guard let data = NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:]) else {
+        guard let data = SVGDocument.pngData(img) else {
             throw RenderError(message: "PNG encode failed")
         }
         return data
@@ -115,8 +117,8 @@ enum FrameRenderer {
         return ok ? buf : nil
     }
 
-    static func color(hex: String?) -> NSColor? {
+    static func color(hex: String?) -> CGColor? {
         guard let rgb = LottieOverrides.rgb(hex: hex) else { return nil }
-        return NSColor(srgbRed: rgb[0], green: rgb[1], blue: rgb[2], alpha: 1)
+        return CGColor(srgbRed: CGFloat(rgb[0]), green: CGFloat(rgb[1]), blue: CGFloat(rgb[2]), alpha: 1)
     }
 }

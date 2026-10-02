@@ -1,5 +1,12 @@
 import Foundation
+import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
+#if os(macOS)
 import AppKit
+#elseif os(iOS)
+import WebKit
+#endif
 
 /// Минимальное DOM-дерево SVG: нужно, чтобы вырезать отдельный элемент (с его defs)
 /// и отрисовать его в картинку, когда Lottie не умеет эффект (blur, маски, сложные градиенты).
@@ -82,6 +89,83 @@ enum SVGDocument {
         return out
     }
 
+    /// PNG через ImageIO (работает на macOS и iOS).
+    static func pngData(_ img: CGImage) -> Data? {
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(out, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, img, nil)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return out as Data
+    }
+
+    #if os(iOS)
+    /// iOS: системного SVG-рендерера нет — рисуем офскрин WKWebView и снимаем snapshot.
+    /// - Returns: картинка размером canvas × scale.
+    @MainActor
+    static func rasterizeAsync(_ svg: Data, canvas: CGSize, scale: Double = 3) async -> CGImage? {
+        let w = max(canvas.width, 1), h = max(canvas.height, 1)
+        let config = WKWebViewConfiguration()
+        config.suppressesIncrementalRendering = true
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: w, height: h), configuration: config)
+        web.isOpaque = false
+        web.backgroundColor = .clear
+        web.scrollView.backgroundColor = .clear
+        web.scrollView.contentInsetAdjustmentBehavior = .never
+        let b64 = svg.base64EncodedString()
+        let html = """
+        <!doctype html><html><head><meta name="viewport" content="width=\(w),initial-scale=1,user-scalable=no">\
+        <style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}\
+        img{display:block;width:\(w)px;height:\(h)px}</style></head>\
+        <body><img src="data:image/svg+xml;base64,\(b64)"></body></html>
+        """
+        let loader = WebLoader()
+        web.navigationDelegate = loader
+        // Без окна WebKit может не отрисовать — кладём вью в ключевое окно за пределами экрана.
+        let host = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
+        web.frame.origin = CGPoint(x: -w - 100, y: 0)
+        host?.addSubview(web)
+        defer { web.removeFromSuperview() }
+        let ok = await loader.load(web, html: html)
+        guard ok else { return nil }
+        // Дожидаемся декодирования <img>.
+        _ = try? await web.evaluateJavaScript("new Promise(r => { const i = document.images[0]; if (!i || i.complete) r(1); else { i.onload = () => r(1); i.onerror = () => r(0); } })")
+        let snap = WKSnapshotConfiguration()
+        snap.rect = CGRect(x: 0, y: 0, width: w, height: h)
+        snap.snapshotWidth = NSNumber(value: Double(w) * scale)
+        snap.afterScreenUpdates = true
+        guard let image = try? await web.takeSnapshot(configuration: snap), let cg = image.cgImage else { return nil }
+        // snapshotWidth — в точках: на экране @3x пикселей втрое больше. Приводим к точному canvas × scale,
+        // иначе обрезка (cropToContent делит на scale) ставит растровые слои не туда.
+        let pw = max(Int((Double(w) * scale).rounded()), 1), ph = max(Int((Double(h) * scale).rounded()), 1)
+        if cg.width == pw && cg.height == ph { return cg }
+        guard let ctx = CGContext(data: nil, width: pw, height: ph, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return cg }
+        ctx.interpolationQuality = .high
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: pw, height: ph))
+        return ctx.makeImage() ?? cg
+    }
+
+    @MainActor
+    private final class WebLoader: NSObject, WKNavigationDelegate {
+        private var cont: CheckedContinuation<Bool, Never>?
+
+        func load(_ web: WKWebView, html: String) async -> Bool {
+            await withCheckedContinuation { c in
+                cont = c
+                web.loadHTMLString(html, baseURL: nil)
+            }
+        }
+
+        private func finish(_ ok: Bool) { cont?.resume(returning: ok); cont = nil }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finish(true) }
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish(false) }
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish(false) }
+    }
+    #endif
+
+    #if os(macOS)
     /// Растеризовать SVG целиком (системный рендерер, понимает фильтры и градиенты).
     /// - Returns: картинка размером canvas × scale и её размер в пикселях.
     static func rasterize(_ svg: Data, canvas: CGSize, scale: Double = 3) -> CGImage? {
@@ -96,6 +180,7 @@ enum SVGDocument {
         NSGraphicsContext.restoreGraphicsState()
         return rep.cgImage
     }
+    #endif
 
     /// Обрезать прозрачные поля. Возвращает PNG и прямоугольник в координатах холста.
     static func cropToContent(_ img: CGImage, scale: Double) -> (png: Data, rect: CGRect)? {
@@ -118,10 +203,19 @@ enum SVGDocument {
             }
         }
         guard maxX >= 0, let cropped = img.cropping(to: CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)),
-              let png = NSBitmapImageRep(cgImage: cropped).representation(using: .png, properties: [:]) else { return nil }
+              let png = encodeCropPNG(cropped) else { return nil }
         let rect = CGRect(x: Double(minX) / scale, y: Double(minY) / scale,
                           width: Double(maxX - minX + 1) / scale, height: Double(maxY - minY + 1) / scale)
         return (png, rect)
+    }
+
+    private static func encodeCropPNG(_ img: CGImage) -> Data? {
+        #if os(macOS)
+        // Как раньше: байт-в-байт тот же PNG, что и до порта на iOS.
+        return NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:])
+        #else
+        return pngData(img)
+        #endif
     }
 
     private final class Builder: NSObject, XMLParserDelegate {

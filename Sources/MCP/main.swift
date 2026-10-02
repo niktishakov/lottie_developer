@@ -17,9 +17,11 @@ func log(_ msg: String) {
     FileHandle.standardError.write("[lottie-mcp] \(msg)\n".data(using: .utf8)!)
 }
 
-MainActor.assumeIsolated {
+@MainActor
+func runServer() async {
     let server = MCPServer()
     log("started, storage: \(server.store.rootDir.path)")
+    // Последовательно: строка → await handle → ответ.
     while let line = readLine(strippingNewline: true) {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { continue }
@@ -29,8 +31,10 @@ MainActor.assumeIsolated {
                           "error": ["code": -32700, "message": "Parse error"]])
             continue
         }
-        if let response = server.handle(msg) {
+        if let response = await server.handle(msg) {
             writeMessage(response)
         }
     }
 }
+
+await runServer()

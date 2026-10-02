@@ -217,7 +217,7 @@ struct InspectorPanel: View {
         Binding(
             get: {
                 let hex = model.override(for: name).color ?? model.originalColor(of: name)
-                return FrameRenderer.color(hex: hex).map(Color.init(nsColor:)) ?? .white
+                return FrameRenderer.color(hex: hex).map { Color(cgColor: $0) } ?? .white
             },
             set: { c in
                 guard let ns = NSColor(c).usingColorSpace(.sRGB) else { return }

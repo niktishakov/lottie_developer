@@ -15,7 +15,8 @@
     "canvaskit-wasm": "^0.42.0",
     "fast-png": "^8.0.0",
     "fflate": "^0.8.3",
-    "lottie-web": "^5.13.0"
+    "lottie-web": "^5.13.0",
+    "qrcode-generator": "^2.0.4"
   },
   "devDependencies": {
     "bun-types": "^1.4.2",

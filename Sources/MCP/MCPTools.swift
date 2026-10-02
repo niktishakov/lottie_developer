@@ -4,6 +4,21 @@ import Foundation
 extension MCPServer {
 
     /// Отдаётся клиенту при подключении: правила работы доступны Claude в любой папке, без CLAUDE.md.
+    #if os(iOS)
+    /// На iPhone сервер работает по Wi-Fi: файлы с компьютера надо сначала загрузить.
+    static let platformNote = """
+
+    THIS SERVER RUNS ON THE DESIGNER'S iPHONE (real lottie-ios). Files on the computer are not visible to it: \
+    upload first, then use the returned iPhone path. Windows: \
+    curl.exe -T "<file>" "<server>/api/upload?name=<file name>" -H "Authorization: Bearer <token>" \
+    (server and token are in the MCP URL/header you were configured with). render_frame here is real lottie-ios. \
+    The designer watches the iPhone app (and can open <server> in a PC browser). export writes on the iPhone — \
+    after export, download the JSON to the PC: curl.exe -o "<pc path>" "<server>/api/file?path=<iphone path>" -H "Authorization: Bearer <token>".
+    """
+    #else
+    static let platformNote = ""
+    #endif
+
     static let instructions = """
     Lottie Developer: you build Lottie animations together with a designer. The designer watches the Lottie Developer \
     Mac app (it shows every change live) and gets a lottie-ios compatible JSON at the end. Talk to the designer in plain \
