@@ -38,6 +38,7 @@ targets:
           - Resources
           - macOS
           - MCP
+          - Shared
       - path: Sources/Assets.xcassets
         buildPhase: resources
       - path: Sources/Resources/en.lproj
@@ -76,6 +77,7 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
     sources:
       - path: Sources/AI/Spec
+      - path: Sources/Shared
       - path: Sources/macOS
         excludes:
           - Info.plist
@@ -98,6 +100,7 @@ targets:
     sources:
       - path: Sources/AI/Spec
       - path: Sources/MCP
+      - path: Sources/Shared
       - path: Sources/macOS/ProjectModels.swift
       - path: Sources/macOS/ProjectStore.swift
       - path: Sources/macOS/SVGToLottie.swift

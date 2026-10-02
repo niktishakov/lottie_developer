@@ -6,20 +6,20 @@ import AppKit
 struct ContentView: View {
     @State private var store = ProjectStore()
     @State private var openProjectID: UUID?
-    @State private var requestedVersionID: UUID?
+    @State private var command: ProjectStore.UICommand?
     @State private var lastCommandAt: Date?
 
     var body: some View {
         Group {
             if let id = openProjectID, store.project(id) != nil {
-                EditorView(store: store, projectID: id, requestedVersionID: requestedVersionID,
+                EditorView(store: store, projectID: id, command: command,
                            onClose: { openProjectID = nil })
                     .id(id)
             } else {
                 HomeView(store: store, onOpen: { openProjectID = $0 })
             }
         }
-        .frame(minWidth: 760, minHeight: 660)
+        .frame(minWidth: 1180, minHeight: 760)
         .task { await syncWithMCP() }
     }
 
@@ -28,12 +28,16 @@ struct ContentView: View {
         store.exportSampleForCLI()
         lastCommandAt = store.readUICommand()?.issuedAt
         while !Task.isCancelled {
+            if openProjectID == nil, store.readAppState()?.projectID != nil {
+                store.writeAppState(.init(frame: 0, playing: false, mode: "", engine: "", activeEngine: "",
+                                          overrides: [:], updatedAt: Date()))
+            }
             store.reloadIfChanged()
             if let cmd = store.readUICommand(), cmd.issuedAt != lastCommandAt {
                 lastCommandAt = cmd.issuedAt
                 if let pid = cmd.projectID, store.project(pid) != nil {
                     openProjectID = pid
-                    requestedVersionID = cmd.versionID
+                    command = cmd
                     NSApp.activate(ignoringOtherApps: true)
                 }
             }

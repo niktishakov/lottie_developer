@@ -44,6 +44,36 @@ final class ProjectStore {
         var projectID: UUID?
         var versionID: UUID?
         var issuedAt: Date
+        var frame: Double? = nil
+        var layer: String? = nil
+    }
+
+    /// Снимок UI, который приложение публикует для lottie-mcp (`get_app_state`).
+    struct AppState: Codable, Equatable {
+        var projectID: UUID?
+        var projectName: String?
+        var version: String?
+        var frame: Double
+        var playing: Bool
+        var mode: String
+        var engine: String
+        var activeEngine: String
+        var selectedLayer: String?
+        var overrides: [String: LayerOverride]
+        var updatedAt: Date
+    }
+
+    var appStateURL: URL { rootDir.deletingLastPathComponent().appendingPathComponent("ui_state.json") }
+
+    func writeAppState(_ st: AppState) {
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let data = try? enc.encode(st) { try? data.write(to: appStateURL, options: .atomic) }
+    }
+
+    func readAppState() -> AppState? {
+        let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+        guard let data = try? Data(contentsOf: appStateURL) else { return nil }
+        return try? dec.decode(AppState.self, from: data)
     }
 
     func writeUICommand(_ cmd: UICommand) {

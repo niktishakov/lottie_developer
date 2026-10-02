@@ -120,8 +120,18 @@ extension MCPServer {
                   "background": ["type": "string", "description": "Hex like #FFFFFF; default transparent"],
                   "save_dir": ["type": "string", "description": "Optional: also write PNGs here"]],
                  required: ["project_id"]),
-            tool("show_in_app", "Open a project (and optionally a version) in the running Lottie Developer app.",
-                 ["project_id": projectID, "version": versionRef], required: ["project_id"]),
+            tool("show_in_app", "Open a project in the running app; optionally jump to a version, a frame and select a layer.",
+                 ["project_id": projectID, "version": versionRef,
+                  "frame": ["type": "number", "description": "Seek to this frame (pauses playback)"],
+                  "layer": ["type": "string", "description": "Select and highlight this layer"]],
+                 required: ["project_id"]),
+            tool("get_app_state", "What the user sees in the app right now: project, version, frame, playing, mode, engine, selected layer, unsaved inspector edits."),
+            tool("apply_overrides", "Save a new version with per-layer edits baked in: color (hex, recolors fills/strokes), opacity (0-100 multiplier), hidden.",
+                 ["project_id": projectID,
+                  "version": ["type": "string", "description": "Base version; omit for static geometry"],
+                  "overrides": ["type": "object", "description": "{\"<layer name>\": {\"color\": \"#FF0000\", \"opacity\": 50, \"hidden\": false}}"],
+                  "prompt": ["type": "string"], "note": ["type": "string"], "show_in_app": ["type": "boolean"]],
+                 required: ["project_id", "overrides"]),
         ]
     }
 }

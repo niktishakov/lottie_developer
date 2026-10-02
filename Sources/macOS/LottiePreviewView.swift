@@ -6,12 +6,23 @@ import Lottie
 /// Контейнер, обнуляющий intrinsicContentSize — иначе LottieAnimationView раздувает
 /// SwiftUI-layout своим натуральным размером (как на iOS — см. FlexibleLottieContainer).
 final class FlexibleLottieContainer: NSView {
-    let animationView = LottieAnimationView()
+    private(set) var animationView = LottieAnimationView()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.masksToBounds = true
+        install(animationView)
+    }
+
+    /// Заменить вью (нужно при смене конфигурации: движок, reduced motion).
+    func replaceAnimationView(_ view: LottieAnimationView) {
+        animationView.removeFromSuperview()
+        animationView = view
+        install(view)
+    }
+
+    private func install(_ animationView: LottieAnimationView) {
         animationView.contentMode = .scaleAspectFit
         animationView.backgroundBehavior = .pauseAndRestore
         animationView.translatesAutoresizingMaskIntoConstraints = false

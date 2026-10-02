@@ -7,14 +7,16 @@ import UniformTypeIdentifiers
 struct EditorView: View {
     let store: ProjectStore
     let projectID: UUID
-    var requestedVersionID: UUID? = nil
+    var command: ProjectStore.UICommand? = nil
     var onClose: () -> Void
 
     @State private var previewURL: URL?
     @State private var selectedVersionID: UUID?
     @State private var status = ""
-    @State private var loop = true
-    @State private var speed: CGFloat = 1.0
+    @State private var player = PlayerModel()
+    @State private var compareVersionID: UUID?
+    @State private var comparing = false
+    @State private var frameCostMs: Double?
     @State private var report: LottieRuntimeReport?
     @State private var dropTargeted = false
     @State private var multiSelection: Set<UUID> = []
@@ -25,19 +27,26 @@ struct EditorView: View {
         Group {
             if let project {
                 HStack(spacing: 0) {
+                    LayersPanel(model: player)
+                        .frame(width: 200)
+                    Divider()
                     mainColumn(project)
                     Divider()
-                    versionsSidebar(project)
-                        .frame(width: 220)
+                    VStack(spacing: 0) {
+                        InspectorPanel(model: player, onSaveVersion: saveEdits)
+                        Divider()
+                        versionsSidebar(project)
+                    }
+                    .frame(width: 240)
                 }
             } else {
                 Text("Project not found").frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .onAppear { loadInitial() }
-        .onChange(of: requestedVersionID) { _, id in
-            if let id, let v = project?.versions.first(where: { $0.id == id }) { select(v) }
-        }
+        .onAppear { player.startClock(); loadInitial(); apply(command) }
+        .onDisappear { player.stopClock() }
+        .onChange(of: command) { _, cmd in apply(cmd) }
+        .task { await publishState() }
         .onChange(of: project?.versions.map(\.id) ?? []) { old, new in
             // Новая версия пришла извне (MCP) — показываем её.
             if new.count > old.count, let latest = project?.versions.max(by: { $0.index < $1.index }) {
@@ -51,7 +60,7 @@ struct EditorView: View {
     // MARK: - Main column
 
     private func mainColumn(_ project: AnimationProject) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             HStack(spacing: 10) {
                 Button { onClose() } label: { Label("Projects", systemImage: "chevron.left") }
                 Text(project.name).font(.headline).lineLimit(1)
@@ -60,47 +69,78 @@ struct EditorView: View {
                 Button("Replace SVG…") { openSVG() }
                 Button("Paste SVG") { pasteSVGFromClipboard() }
                     .keyboardShortcut("v", modifiers: [.command, .shift])
-                Toggle("Loop", isOn: $loop)
+                Menu {
+                    ForEach(Exporter.Kind.allCases) { k in Button(k.rawValue) { export(k, project) } }
+                } label: { Label("Export", systemImage: "square.and.arrow.up") }
+                .fixedSize()
             }
+
+            viewOptions(project)
 
             HStack(spacing: 8) {
-                Text("Speed")
-                Slider(value: $speed, in: 0.25...3.0)
-                Text(String(format: "%.2fx", speed)).monospacedDigit().frame(width: 52, alignment: .trailing)
-            }
-
-            ZStack {
-                CheckerboardBackground()
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                if let previewURL {
-                    LottiePreviewView(fileURL: previewURL, loop: loop, speed: speed)
-                        .id("\(previewURL.path)-\(loop)")
-                        .padding(8)
-                } else {
-                    Text("No versions yet — create them via MCP (lottie-mcp)").foregroundStyle(.secondary)
+                stageColumn(label: comparing ? currentLabel(project) : nil, compare: false)
+                if comparing {
+                    stageColumn(label: player.compareLabel ?? "—", compare: true)
                 }
             }
-            .frame(minWidth: 360, minHeight: 360)
+            .frame(minWidth: 360, minHeight: 320)
             .overlay { if dropTargeted { dropHint } }
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Text(status.isEmpty ? "\(project.layerNames.count) layers · \(project.sourceLabel)" : status)
-                        .font(.caption).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            TimelineBar(model: player)
+            FilmstripView(model: player)
+
+            Text(status.isEmpty ? "\(project.layerNames.count) layers · \(project.sourceLabel)" : status)
+                .font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
 
             if let report { reportPanel(report) }
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity)
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first else { return false }
             handleDropped(url: url); return true
         } isTargeted: { dropTargeted = $0 }
+    }
+
+    private func viewOptions(_ project: AnimationProject) -> some View {
+        HStack(spacing: 10) {
+            Picker("Background", selection: $player.backdrop) {
+                ForEach(PlayerModel.Backdrop.allCases) { Text($0.rawValue).tag($0) }
+            }.fixedSize()
+            Picker("Preview", selection: $player.stage) {
+                ForEach(PlayerModel.Stage.allCases) { Text($0.rawValue).tag($0) }
+            }.fixedSize()
+            Picker("Engine", selection: $player.engine) {
+                ForEach(PlayerModel.Engine.allCases) { Text($0.rawValue).tag($0) }
+            }.fixedSize()
+            Toggle("Reduced motion", isOn: $player.reducedMotion)
+            Spacer()
+            Menu {
+                Button("Off") { comparing = false; player.loadCompare(data: nil, label: nil) }
+                Divider()
+                Button("Static geometry") { startCompare(nil, project) }
+                ForEach(project.versions.sorted { $0.index > $1.index }) { v in
+                    Button(v.label) { startCompare(v.id, project) }
+                }
+            } label: {
+                Label(comparing ? "Compare: \(player.compareLabel ?? "")" : "Compare", systemImage: "rectangle.split.2x1")
+            }
+            .fixedSize()
+        }
+        .font(.callout)
+    }
+
+    private func stageColumn(label: String?, compare: Bool) -> some View {
+        VStack(spacing: 4) {
+            if let label { Text(label).font(.caption.weight(.semibold)).foregroundStyle(.secondary) }
+            CanvasStage(model: player, compare: compare)
+        }
+    }
+
+    private func currentLabel(_ project: AnimationProject) -> String {
+        project.versions.first { $0.id == selectedVersionID }?.label ?? "Static geometry"
     }
 
     // MARK: - Versions sidebar
@@ -171,7 +211,7 @@ struct EditorView: View {
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(Color(white: 0.09))
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private func versionRow(title: String, subtitle: String, selected: Bool, isFavourite: Bool = false, multiSelected: Bool = false, action: @escaping () -> Void) -> some View {
@@ -194,7 +234,7 @@ struct EditorView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(8)
-            .background(RoundedRectangle(cornerRadius: 8).fill(selected ? Color.accentColor.opacity(0.25) : multiSelected ? Color.accentColor.opacity(0.12) : Color(white: 0.14)))
+            .background(RoundedRectangle(cornerRadius: 8).fill(selected ? Color.accentColor.opacity(0.25) : multiSelected ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.06)))
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(selected ? Color.accentColor : multiSelected ? Color.accentColor.opacity(0.5) : .clear, lineWidth: 1.5))
         }
         .buttonStyle(.plain)
@@ -211,7 +251,7 @@ struct EditorView: View {
                     .foregroundStyle(report.passed ? .green : .orange)
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                Text("\(report.fps)fps · \(report.durationFrames)f · \(report.renderingEngine) · \(report.sampledFrames) samples")
+                Text("\(report.fps)fps · \(report.durationFrames)f · \(report.renderingEngine) · \(report.sampledFrames) samples · live: \(player.activeEngine)\(frameCostMs.map { String(format: " · %.1f ms/frame", $0) } ?? "")")
                     .font(.caption2).foregroundStyle(.secondary)
             }
             ForEach(report.findings) { f in
@@ -225,7 +265,7 @@ struct EditorView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.14)))
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.06)))
     }
 
     private func color(for severity: LottieValidationFinding.Severity) -> Color {
@@ -261,7 +301,9 @@ struct EditorView: View {
         guard let project else { return }
         selectedVersionID = nil
         previewURL = store.geometryPreviewURL(for: project)
+        player.load(data: previewURL.flatMap { try? Data(contentsOf: $0) })
         report = previewURL.map { LottieRuntimeValidator.validate(fileURL: $0) }
+        frameCostMs = player.measureFrameCost()
         status = "Static geometry · \(project.layerNames.count) layers"
     }
 
@@ -269,8 +311,80 @@ struct EditorView: View {
         selectedVersionID = v.id
         let url = store.versionURL(projectID, v.compiledFile)
         previewURL = url
+        player.load(data: try? Data(contentsOf: url))
         report = LottieRuntimeValidator.validate(fileURL: url)
+        frameCostMs = player.measureFrameCost()
         status = "Viewing \(v.label) · \(v.layerCount) layers"
+    }
+
+    /// Команда из MCP (show_in_app): версия, кадр, слой.
+    private func apply(_ cmd: ProjectStore.UICommand?) {
+        guard let cmd else { return }
+        if let id = cmd.versionID, let v = project?.versions.first(where: { $0.id == id }), v.id != selectedVersionID { select(v) }
+        if let f = cmd.frame { player.seek(f) }
+        if let l = cmd.layer { player.select(l) }
+    }
+
+    /// Публикуем состояние UI для lottie-mcp раз в 0.5 с (только при изменениях).
+    private func publishState() async {
+        var last: ProjectStore.AppState?
+        while !Task.isCancelled {
+            let st = ProjectStore.AppState(
+                projectID: projectID, projectName: project?.name,
+                version: project?.versions.first { $0.id == selectedVersionID }?.label ?? "geometry",
+                frame: player.frame.rounded(), playing: player.isPlaying, mode: player.mode.rawValue,
+                engine: player.engine.rawValue, activeEngine: player.activeEngine,
+                selectedLayer: player.selectedLayer, overrides: player.overrides, updatedAt: last?.updatedAt ?? Date())
+            if st != last {
+                var out = st; out.updatedAt = Date()
+                store.writeAppState(out)
+                last = st
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+    }
+
+    private func startCompare(_ versionID: UUID?, _ project: AnimationProject) {
+        let data: Data?
+        let label: String
+        if let versionID, let v = project.versions.first(where: { $0.id == versionID }) {
+            data = try? Data(contentsOf: store.versionURL(projectID, v.compiledFile)); label = v.label
+        } else {
+            data = store.geometryData(for: project); label = "Static geometry"
+        }
+        compareVersionID = versionID
+        player.loadCompare(data: data, label: label)
+        comparing = true
+    }
+
+    private func saveEdits() {
+        guard let project, let data = player.displayData, player.hasEdits else { return }
+        let parent = project.versions.first { $0.id == selectedVersionID }
+        let summary = player.overrides.sorted { $0.key < $1.key }.map { name, o in
+            var parts: [String] = []
+            if let c = o.color { parts.append("color \(c)") }
+            if let op = o.opacity { parts.append("opacity \(Int(op))%") }
+            if o.hidden { parts.append("hidden") }
+            return "\(name): " + parts.joined(separator: ", ")
+        }.joined(separator: "; ")
+        let base = parent?.label ?? "geometry"
+        if let v = store.addVersion(projectID: projectID, prompt: "Edits on \(base): \(summary)", compiledData: data,
+                                    layerCount: parent?.layerCount ?? player.layers.count, compilerWarnings: 0,
+                                    specJSON: nil, parentVersionID: parent?.id, note: summary, source: "edit") {
+            select(v)
+            status = "Saved \(v.label) from inspector edits"
+        }
+    }
+
+    private func export(_ kind: Exporter.Kind, _ project: AnimationProject) {
+        guard let data = player.displayData else { status = "Nothing to export"; return }
+        let base = "\(project.name)_\(currentLabel(project))".replacingOccurrences(of: " ", with: "_")
+        let bg: NSColor? = player.backdrop == .dark ? NSColor(white: 0.07, alpha: 1) : player.backdrop == .light ? .white : nil
+        do {
+            if let msg = try Exporter.run(kind, data: data, frame: player.frame, baseName: base, background: bg) { status = msg }
+        } catch {
+            status = "Export failed: \(error.localizedDescription)"
+        }
     }
 
     private func toggleMultiSelection(_ id: UUID) {
@@ -377,21 +491,4 @@ struct EditorView: View {
     }
 }
 
-/// Шахматная подложка превью — чтобы рисунок любого цвета (в т.ч. чёрный) был виден.
-private struct CheckerboardBackground: View {
-    var cell: CGFloat = 10
-    var body: some View {
-        Canvas { ctx, size in
-            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(white: 0.22)))
-            let cols = Int((size.width / cell).rounded(.up))
-            let rows = Int((size.height / cell).rounded(.up))
-            for r in 0..<max(rows, 1) {
-                for c in 0..<max(cols, 1) where (r + c).isMultiple(of: 2) {
-                    let rect = CGRect(x: CGFloat(c) * cell, y: CGFloat(r) * cell, width: cell, height: cell)
-                    ctx.fill(Path(rect), with: .color(Color(white: 0.32)))
-                }
-            }
-        }
-    }
-}
 #endif

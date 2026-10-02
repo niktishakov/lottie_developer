@@ -103,6 +103,8 @@ final class MCPServer {
         case "export": return try export(a)
         case "show_in_app": return try showInApp(a)
         case "render_frame": return try renderFrames(a)
+        case "get_app_state": return appState()
+        case "apply_overrides": return try applyOverrides(a)
         default: throw ToolError("Unknown tool: \(name)")
         }
     }
@@ -273,6 +275,55 @@ final class MCPServer {
         return ["written": url.path, "bytes": data.count]
     }
 
+    private func appState() -> Any {
+        guard let st = store.readAppState() else { return ["running": false, "note": "No state yet — is the app open?"] }
+        let age = Date().timeIntervalSince(st.updatedAt)
+        var out: [String: Any] = [
+            "projectID": st.projectID?.uuidString ?? NSNull(), "projectName": st.projectName ?? NSNull(),
+            "version": st.version ?? NSNull(), "frame": st.frame, "playing": st.playing, "mode": st.mode,
+            "engine": st.engine, "activeEngine": st.activeEngine, "selectedLayer": st.selectedLayer ?? NSNull(),
+            "updatedAt": Self.iso.string(from: st.updatedAt), "secondsSinceUpdate": Int(age),
+        ]
+        out["overrides"] = st.overrides.mapValues { o -> [String: Any] in
+            ["color": o.color ?? NSNull(), "opacity": o.opacity ?? NSNull(), "hidden": o.hidden]
+        }
+        return out
+    }
+
+    private func applyOverrides(_ a: [String: Any]) throws -> Any {
+        let p = try project(a)
+        guard let raw = a["overrides"] as? [String: Any], !raw.isEmpty else {
+            throw ToolError("Missing 'overrides': {\"<layer name>\": {\"color\": \"#FF0000\", \"opacity\": 50, \"hidden\": false}}")
+        }
+        var overrides: [String: LayerOverride] = [:]
+        for (name, v) in raw {
+            guard let d = v as? [String: Any] else { continue }
+            overrides[name] = LayerOverride(color: d["color"] as? String,
+                                            opacity: (d["opacity"] as? NSNumber)?.doubleValue,
+                                            hidden: d["hidden"] as? Bool ?? false)
+        }
+        var parent: AnimationVersion?
+        let base: Data
+        if let ref = a["version"] as? String, !ref.isEmpty {
+            let v = try findVersion(in: p, ref); parent = v
+            base = try Data(contentsOf: store.versionURL(p.id, v.compiledFile))
+        } else {
+            guard let g = store.geometryData(for: p) else { throw ToolError("Geometry unavailable") }
+            base = g
+        }
+        let known = Set(LottieOverrides.layers(in: base).map(\.name))
+        let unknown = overrides.keys.filter { !known.contains($0) }
+        guard unknown.isEmpty else { throw ToolError("Unknown layers: \(unknown.sorted().joined(separator: ", "))") }
+        let data = LottieOverrides.apply(overrides, to: base)
+        let note = a["note"] as? String ?? overrides.keys.sorted().joined(separator: ", ")
+        guard let v = store.addVersion(projectID: p.id, prompt: a["prompt"] as? String ?? "Overrides on \(parent?.label ?? "geometry")",
+                                       compiledData: data, layerCount: parent?.layerCount ?? known.count, compilerWarnings: 0,
+                                       specJSON: nil, parentVersionID: parent?.id, note: note, source: "edit")
+        else { throw ToolError("Failed to save version") }
+        if a["show_in_app"] as? Bool ?? true { store.writeUICommand(.init(projectID: p.id, versionID: v.id, issuedAt: Date())) }
+        return ["version": versionSummary(v), "summary": Self.lottieSummary(data)]
+    }
+
     struct RenderedFrames {
         let meta: [String: Any]
         let images: [Data]
@@ -328,7 +379,8 @@ final class MCPServer {
         let p = try project(a)
         var vid: UUID?
         if let ref = a["version"] as? String, !ref.isEmpty { vid = try findVersion(in: p, ref).id }
-        store.writeUICommand(.init(projectID: p.id, versionID: vid, issuedAt: Date()))
+        store.writeUICommand(.init(projectID: p.id, versionID: vid, issuedAt: Date(),
+                                   frame: (a["frame"] as? NSNumber)?.doubleValue, layer: a["layer"] as? String))
         return ["requested": true, "note": "The app opens it within ~1s if it is running."]
     }
 
