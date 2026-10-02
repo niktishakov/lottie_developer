@@ -166,6 +166,15 @@ struct LottieCompiler {
             layers.insert(insert.matte, at: insert.layerIdx)
         }
 
+        // Неанимированные слои, которые жили до конца исходной композиции, должны жить и до конца новой
+        // (иначе у статичного источника с op=1 они пропадают после первого кадра).
+        let originalOp = (root["op"] as? NSNumber)?.doubleValue ?? 0
+        for i in layers.indices {
+            if let op = (layers[i]["op"] as? NSNumber)?.doubleValue, op >= originalOp, op < Double(duration) {
+                layers[i]["op"] = duration
+            }
+        }
+
         root["layers"] = layers
         root["fr"] = fps
         root["ip"] = 0

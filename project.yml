@@ -101,6 +101,9 @@ targets:
       - path: Sources/macOS/ProjectModels.swift
       - path: Sources/macOS/ProjectStore.swift
       - path: Sources/macOS/SVGToLottie.swift
+    dependencies:
+      - package: Lottie
+        product: Lottie
     scheme: {}
   LottieCompilerTests:
     type: bundle.unit-test

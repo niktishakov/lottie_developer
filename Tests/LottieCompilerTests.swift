@@ -111,6 +111,23 @@ final class LottieCompilerTests: XCTestCase {
 
     // MARK: - Basic Primitives
 
+    func testUnanimatedLayersLiveForWholeDuration() throws {
+        // Статичный источник с op=1 (как из SVG-импорта): слой без анимации не должен пропадать после 1-го кадра.
+        var root = try JSONSerialization.jsonObject(with: minimalLottie(layerNames: ["a", "b"])) as! [String: Any]
+        root["op"] = 1
+        root["layers"] = (root["layers"] as! [[String: Any]]).map { var l = $0; l["op"] = 1; return l }
+        let src = try JSONSerialization.data(withJSONObject: root)
+        let spec = AnimationSpec(fps: 60, durationFrames: 120, layers: [
+            LayerAnimationSpec(target: "a", animations: [
+                MotionPrimitive(kind: .fadeIn, start: 0, end: 0.5, easing: .easeOut)
+            ])
+        ])
+        let out = try JSONSerialization.jsonObject(with: compiler.compile(staticLottie: src, spec: spec).data) as! [String: Any]
+        for layer in out["layers"] as! [[String: Any]] {
+            XCTAssertEqual((layer["op"] as! NSNumber).intValue, 120, "layer \(layer["nm"] ?? "")")
+        }
+    }
+
     func testFadeIn() throws {
         let spec = AnimationSpec(fps: 30, durationFrames: 30, layers: [
             LayerAnimationSpec(target: "test", animations: [

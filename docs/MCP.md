@@ -22,6 +22,6 @@ claude mcp add lottie-developer -- /ABS/PATH/build/dd/Build/Products/Release/lot
 get_guide, list_projects, get_project, create_project, rename_project, delete_project,
 replace_geometry, get_geometry, validate_spec, create_version, create_version_from_lottie,
 list_versions, get_version, diff_versions, restore_version, delete_version, set_favourite,
-set_version_note, export, show_in_app.
+set_version_note, export, show_in_app, render_frame (PNG-кадры: frame | progress | frames[] | count, до 16 шт.).
 
 Версии: UUID, `v3`, `3` или `latest`. `base_version` — строить поверх версии.

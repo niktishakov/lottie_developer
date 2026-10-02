@@ -43,6 +43,7 @@
 		5C30ACE719093EA118380E19 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 0EC0BE20CEC664BB897D452A /* Lottie */; };
 		687C08BC0804F465C355DA88 /* AnimationSpecSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB16A07A4680BA538D0602D0 /* AnimationSpecSchema.swift */; };
 		71B3E86E1ADB46D7E211B771 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B40E9D5690E71B452195CDD /* main.swift */; };
+		73A3784EBEC53BBADF7A4695 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = F56071E7FD9FEF5F5707B215 /* Lottie */; };
 		75657492ECE18F2410C9839D /* SyntaxGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21EDA6BA9CB162AF555CBDB6 /* SyntaxGate.swift */; };
 		792B9245BCCB5B8039F6B793 /* PurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 769C1C108BFE4605E17525AA /* PurchaseStore.swift */; };
 		7AD4C137362519A89904118E /* en.lproj in Resources */ = {isa = PBXBuildFile; fileRef = CB0E9FAF07269BDC49513A3B /* en.lproj */; };
@@ -50,6 +51,7 @@
 		88A27AD57DD2DBD992BDA61E /* MotionSemanticGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C747BE8CB8E54ECBCB08BE2E /* MotionSemanticGate.swift */; };
 		8BE32D05A64FA6A6E2131A12 /* PipelineTransitionRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 382BF227E873F1AB3E410501 /* PipelineTransitionRules.swift */; };
 		963AB6F8E8F1518FB8B48B0C /* SVGToLottie.swift in Sources */ = {isa = PBXBuildFile; fileRef = 586C0A782A122199111F978A /* SVGToLottie.swift */; };
+		9A0748F751B73D75D06450E3 /* FrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8D80A76C160102042CBF718 /* FrameRenderer.swift */; };
 		9B09F5160B31081A4D42D4A4 /* RevisionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87FFA8637217BF63F13D4F7E /* RevisionHistoryView.swift */; };
 		9BE660B496A8102AC99207FA /* OnboardingPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B199A1CCAF4D6A5B89AF4A1 /* OnboardingPageView.swift */; };
 		9C93D0E8AF7FEE64C1BB7888 /* PromptSpecInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79528051C0F2D3AEB67F24CD /* PromptSpecInputView.swift */; };
@@ -154,6 +156,7 @@
 		B40884352487A3077902C735 /* LottieCompilerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieCompilerTests.swift; sourceTree = "<group>"; };
 		C10BAEA1B02D4F6088BF285D /* CheckerboardBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckerboardBackground.swift; sourceTree = "<group>"; };
 		C747BE8CB8E54ECBCB08BE2E /* MotionSemanticGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionSemanticGate.swift; sourceTree = "<group>"; };
+		C8D80A76C160102042CBF718 /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
 		C97A29245F3E2C247655D631 /* LottiePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottiePreviewView.swift; sourceTree = "<group>"; };
 		CB0E9FAF07269BDC49513A3B /* en.lproj */ = {isa = PBXFileReference; path = en.lproj; sourceTree = "<group>"; };
 		D00E525636060B514282E4A3 /* PipelineOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineOrchestrator.swift; sourceTree = "<group>"; };
@@ -182,6 +185,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				C11A2CB611E2BC4D6CBBD427 /* Lottie in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9B654D7BBFE025A5E786BAC0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				73A3784EBEC53BBADF7A4695 /* Lottie in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -230,6 +241,7 @@
 		1C104B7109F38EEEB12FDAD1 /* MCP */ = {
 			isa = PBXGroup;
 			children = (
+				C8D80A76C160102042CBF718 /* FrameRenderer.swift */,
 				5B40E9D5690E71B452195CDD /* main.swift */,
 				F373B8D0B6FE472C3328F1C8 /* MCPServer.swift */,
 				EA3ED4ECE2D76D09D7C68AB4 /* MCPTools.swift */,
@@ -540,6 +552,7 @@
 			buildConfigurationList = 99EE74F5A9AFFFBE39237D36 /* Build configuration list for PBXNativeTarget "lottie-mcp" */;
 			buildPhases = (
 				B434AE707FCD1AD0D014908A /* Sources */,
+				9B654D7BBFE025A5E786BAC0 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -547,6 +560,7 @@
 			);
 			name = "lottie-mcp";
 			packageProductDependencies = (
+				F56071E7FD9FEF5F5707B215 /* Lottie */,
 			);
 			productName = "lottie-mcp";
 			productReference = 0D663D76541B079E226C0CCE /* lottie-mcp */;
@@ -739,6 +753,7 @@
 			files = (
 				16BB0AB96627B1C2C9C563EA /* AnimationSpec.swift in Sources */,
 				687C08BC0804F465C355DA88 /* AnimationSpecSchema.swift in Sources */,
+				9A0748F751B73D75D06450E3 /* FrameRenderer.swift in Sources */,
 				B68CACD2D16B20DD8057B00E /* LottieCompiler.swift in Sources */,
 				C5F18471AE5FCE7E22652D01 /* MCPServer.swift in Sources */,
 				4DFBFF6EF4B1470351645EE3 /* MCPTools.swift in Sources */,
@@ -1093,6 +1108,11 @@
 			productName = Lottie;
 		};
 		89D988112581D90066ABE88E /* Lottie */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E17FF3EDC9C82AF3DB0BB51C /* XCRemoteSwiftPackageReference "lottie-ios" */;
+			productName = Lottie;
+		};
+		F56071E7FD9FEF5F5707B215 /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E17FF3EDC9C82AF3DB0BB51C /* XCRemoteSwiftPackageReference "lottie-ios" */;
 			productName = Lottie;

@@ -48,6 +48,11 @@ final class MCPServer {
             store.load() // приложение могло изменить данные
             do {
                 let result = try callTool(name, args)
+                if let r = result as? RenderedFrames {
+                    var content: [[String: Any]] = [["type": "text", "text": Self.jsonString(r.meta)]]
+                    content += r.images.map { ["type": "image", "data": $0.base64EncodedString(), "mimeType": "image/png"] }
+                    return ok(["content": content, "isError": false])
+                }
                 return ok(["content": [["type": "text", "text": Self.jsonString(result)]], "isError": false])
             } catch {
                 return ok(["content": [["type": "text", "text": "Error: \(error.localizedDescription)"]], "isError": true])
@@ -97,6 +102,7 @@ final class MCPServer {
             return versionSummary(try version(a).1)
         case "export": return try export(a)
         case "show_in_app": return try showInApp(a)
+        case "render_frame": return try renderFrames(a)
         default: throw ToolError("Unknown tool: \(name)")
         }
     }
@@ -265,6 +271,57 @@ final class MCPServer {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
         return ["written": url.path, "bytes": data.count]
+    }
+
+    struct RenderedFrames {
+        let meta: [String: Any]
+        let images: [Data]
+    }
+
+    private func renderFrames(_ a: [String: Any]) throws -> Any {
+        let p = try project(a)
+        let data: Data
+        var label = "geometry"
+        if let ref = a["version"] as? String, !ref.isEmpty {
+            let v = try findVersion(in: p, ref)
+            label = v.label
+            data = try Data(contentsOf: store.versionURL(p.id, v.compiledFile))
+        } else {
+            guard let g = store.geometryData(for: p) else { throw ToolError("Geometry unavailable") }
+            data = g
+        }
+        let size = (a["size"] as? NSNumber)?.intValue ?? 512
+        let bg = FrameRenderer.color(hex: a["background"] as? String)
+
+        // Набор кадров: frames:[...] | count:N (равномерно) | frame | progress.
+        var requests: [(frame: Double?, progress: Double?)] = []
+        if let list = a["frames"] as? [NSNumber], !list.isEmpty {
+            requests = list.prefix(16).map { ($0.doubleValue, nil) }
+        } else if let n = (a["count"] as? NSNumber)?.intValue, n > 1 {
+            let c = min(n, 16)
+            requests = (0..<c).map { (nil, Double($0) / Double(c - 1)) }
+        } else {
+            requests = [((a["frame"] as? NSNumber)?.doubleValue, (a["progress"] as? NSNumber)?.doubleValue)]
+        }
+
+        var images: [Data] = []
+        var frames: [[String: Any]] = []
+        let savePath = (a["save_dir"] as? String).map { ($0 as NSString).expandingTildeInPath }
+        for (i, r) in requests.enumerated() {
+            let out = try FrameRenderer.renderPNG(lottieData: data, frame: r.frame, progress: r.progress,
+                                                  size: size, background: bg)
+            images.append(out.png)
+            var info: [String: Any] = ["frame": out.frame, "width": out.width, "height": out.height]
+            if let savePath {
+                let url = URL(fileURLWithPath: savePath).appendingPathComponent("\(label)_f\(Int(out.frame))_\(i).png")
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try out.png.write(to: url)
+                info["saved"] = url.path
+            }
+            frames.append(info)
+        }
+        return RenderedFrames(meta: ["project": p.name, "source": label, "frames": frames,
+                                     "summary": Self.lottieSummary(data)], images: images)
     }
 
     private func showInApp(_ a: [String: Any]) throws -> Any {
