@@ -1,0 +1,24 @@
+{
+  "name": "lottie-developer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lottie Developer for Windows/Linux/macOS: MCP server + browser viewer (single executable)",
+  "scripts": {
+    "mcp": "bun run src/server/main.ts",
+    "test": "bun test",
+    "build:win": "bun build src/server/main.ts --compile --target=bun-windows-x64 --outfile dist/lottie-developer.exe",
+    "build:mac": "bun build src/server/main.ts --compile --outfile dist/lottie-developer"
+  },
+  "dependencies": {
+    "@resvg/resvg-wasm": "^2.6.2",
+    "canvaskit-wasm": "^0.42.0",
+    "fast-png": "^8.0.0",
+    "fflate": "^0.8.3",
+    "lottie-web": "^5.13.0"
+  },
+  "devDependencies": {
+    "bun-types": "^1.4.2",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,255 @@
+{
+ "additionalProperties": false,
+ "properties": {
+  "durationFrames": {
+   "description": "Composition length in frames.",
+   "maximum": 600,
+   "minimum": 1,
+   "type": "integer"
+  },
+  "fps": {
+   "description": "Composition frame rate.",
+   "maximum": 60,
+   "minimum": 24,
+   "type": "integer"
+  },
+  "generatedLayers": {
+   "description": "Layers the compiler creates before animation (waves, halos, particles). Positioned at anchor layer's center.",
+   "items": {
+    "additionalProperties": false,
+    "properties": {
+     "anchor": {
+      "description": "Name of existing layer — generated layer copies its position.",
+      "type": "string"
+     },
+     "fillColor": {
+      "description": "Hex fill color. Omit for stroke-only shapes (rings).",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+      "type": "string"
+     },
+     "height": {
+      "description": "Shape height in px (default 100).",
+      "type": "number"
+     },
+     "name": {
+      "description": "Unique layer name for targeting in animations.",
+      "type": "string"
+     },
+     "opacity": {
+      "description": "Initial opacity 0–100 (default 0 — animate with fadeIn).",
+      "maximum": 100,
+      "minimum": 0,
+      "type": "number"
+     },
+     "shape": {
+      "description": "Shape type: ellipse or rectangle.",
+      "enum": [
+       "ellipse",
+       "rectangle"
+      ]
+     },
+     "strokeColor": {
+      "description": "Hex stroke color. Omit for filled shapes.",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+      "type": "string"
+     },
+     "strokeWidth": {
+      "description": "Stroke width in px (default 2).",
+      "type": "number"
+     },
+     "width": {
+      "description": "Shape width in px (default 100).",
+      "type": "number"
+     }
+    },
+    "required": [
+     "name",
+     "shape",
+     "anchor"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  },
+  "layers": {
+   "items": {
+    "additionalProperties": false,
+    "properties": {
+     "animations": {
+      "items": {
+       "additionalProperties": false,
+       "properties": {
+        "easing": {
+         "enum": [
+          "linear",
+          "easeIn",
+          "easeOut",
+          "easeInOut",
+          "spring",
+          "easeOutBack",
+          "easeInBack",
+          "easeInOutBack",
+          "anticipate",
+          "elastic"
+         ]
+        },
+        "end": {
+         "minimum": 0,
+         "type": "number"
+        },
+        "kind": {
+         "enum": [
+          "fadeIn",
+          "fadeOut",
+          "slideIn",
+          "slideOut",
+          "scaleIn",
+          "scaleOut",
+          "rotate",
+          "pulse",
+          "bounce",
+          "drawOn",
+          "wiggle",
+          "spin",
+          "float",
+          "breathe",
+          "swing",
+          "followPath",
+          "recolor",
+          "squash",
+          "stretch",
+          "flash",
+          "flip",
+          "colorTransition",
+          "blurIn",
+          "blurOut",
+          "removeFill",
+          "removeStroke",
+          "addStroke",
+          "addFill",
+          "hideLayer",
+          "showLayer"
+         ]
+        },
+        "params": {
+         "additionalProperties": false,
+         "properties": {
+          "amount": {
+           "type": "number"
+          },
+          "axis": {
+           "description": "Rotation axis for flip: \"x\" (vertical) or \"y\" (horizontal, default).",
+           "enum": [
+            "x",
+            "y"
+           ]
+          },
+          "blurAmount": {
+           "description": "Gaussian blur radius for blurIn/blurOut (default 20).",
+           "minimum": 0,
+           "type": "number"
+          },
+          "color": {
+           "description": "Hex color. recolor: applied instantly. colorTransition: target color.",
+           "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+           "type": "string"
+          },
+          "direction": {
+           "enum": [
+            "up",
+            "down",
+            "left",
+            "right"
+           ]
+          },
+          "distance": {
+           "type": "number"
+          },
+          "frequency": {
+           "type": "number"
+          },
+          "from": {
+           "type": "number"
+          },
+          "fromColor": {
+           "description": "Starting hex color for colorTransition. If omitted, reads current fill/stroke.",
+           "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+           "type": "string"
+          },
+          "fromDeg": {
+           "type": "number"
+          },
+          "path": {
+           "description": "Control points [[dx,dy], ...] for followPath. Offsets from layer base position.",
+           "items": {
+            "items": {
+             "type": "number"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+           },
+           "minItems": 2,
+           "type": "array"
+          },
+          "repeatCount": {
+           "minimum": 1,
+           "type": "integer"
+          },
+          "strokeWidth": {
+           "description": "Stroke width for addStroke (default 2).",
+           "minimum": 0,
+           "type": "number"
+          },
+          "to": {
+           "type": "number"
+          },
+          "toDeg": {
+           "type": "number"
+          }
+         },
+         "type": "object"
+        },
+        "start": {
+         "minimum": 0,
+         "type": "number"
+        }
+       },
+       "required": [
+        "kind",
+        "start",
+        "end",
+        "easing"
+       ],
+       "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "staggerDelay": {
+      "description": "Seconds between each matched layer when target uses wildcard. First layer starts at original time, each next adds staggerDelay.",
+      "minimum": 0,
+      "type": "number"
+     },
+     "target": {
+      "description": "Layer name (nm). Supports trailing wildcard: \"item_*\" matches all layers with that prefix.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "target",
+     "animations"
+    ],
+    "type": "object"
+   },
+   "minItems": 1,
+   "type": "array"
+  }
+ },
+ "required": [
+  "fps",
+  "durationFrames",
+  "layers"
+ ],
+ "type": "object"
+}

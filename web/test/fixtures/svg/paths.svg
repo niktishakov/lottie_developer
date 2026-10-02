@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+  <path id="abs" d="M10 10 L50 10 H80 V40 C90 50 100 60 110 40 S130 20 140 40 Q150 60 160 40 T180 40 Z" fill="#336699"/>
+  <path id="rel" d="m10 100 l40 0 h30 v30 c10 10 20 20 30 0 s20-20 30 0 q10 20 20 0 t20 0 z" stroke="#000" fill="none" stroke-width="2"/>
+  <path id="arcs" d="M10 200 A 20 20 0 0 1 50 200 a20 20 0 1 0 40 0" stroke="red"/>
+  <path id="implicit" d="M200 10 220 30 240 10 M250 10 l10 10 10-10 10 10" stroke="#0a0"/>
+  <path id="multi" d="M200,100h40v40h-40zM210,110h20v20h-20z" fill="#999" fill-rule="evenodd"/>
+  <path id="exp" d="M1e2 2.5e2L1.5E2 250l.5.5-1-1" stroke="#000"/>
+</svg>

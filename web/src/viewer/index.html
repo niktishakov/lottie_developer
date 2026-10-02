@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lottie Developer</title>
+<style>
+  :root { --bg:#f5f5f4; --panel:#fff; --text:#1c1c1a; --muted:#6b6b66; --border:#e3e2de; --accent:#2f6fec; --accent-bg:#e7efff; --chk1:#3a3a3a; --chk2:#2e2e2e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161616; --panel:#1f1f1f; --text:#ededeb; --muted:#9a9a95; --border:#2f2f2f; --accent:#5b8ff9; --accent-bg:#1e2c4a; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  button, select, input { font:inherit; color:inherit; }
+  button { background:var(--panel); border:1px solid var(--border); border-radius:7px; padding:5px 11px; cursor:pointer; }
+  button:hover { border-color:var(--muted); }
+  button.on { background:var(--accent-bg); border-color:var(--accent); color:var(--accent); }
+  header { display:flex; align-items:center; gap:12px; padding:14px 20px; }
+  h1 { font-size:22px; margin:0; font-weight:600; }
+  .muted { color:var(--muted); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:16px; padding:4px 20px 24px; }
+  .card { cursor:pointer; }
+  .thumb, .stage { background:repeating-conic-gradient(var(--chk1) 0 25%, var(--chk2) 0 50%) 0 0/16px 16px; border-radius:10px; overflow:hidden; }
+  .thumb { height:130px; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); }
+  .thumb > div { width:100%; height:100%; }
+  .card:hover .thumb { border-color:var(--muted); }
+  .name { font-weight:600; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .editor { display:grid; grid-template-columns:minmax(0,1fr) 260px; height:calc(100vh - 62px); }
+  .main { display:flex; flex-direction:column; gap:10px; padding:0 16px 16px 20px; min-height:0; }
+  .stage { flex:1; min-height:240px; position:relative; }
+  .stage.light { background:#fff; } .stage.dark { background:#111; }
+  #player { position:absolute; inset:8px; }
+  .bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  input[type=range] { flex:1; accent-color:var(--accent); }
+  .mono { font-variant-numeric:tabular-nums; }
+  .side { border-left:1px solid var(--border); background:var(--panel); overflow:auto; padding:12px; }
+  .ver { border:1px solid var(--border); border-radius:8px; padding:8px; margin-bottom:6px; cursor:pointer; }
+  .ver.sel { border-color:var(--accent); background:var(--accent-bg); }
+  .ver small { display:block; color:var(--muted); white-space:pre-wrap; }
+  .strip { display:flex; gap:4px; }
+  .strip button { flex:1; padding:2px; font-size:11px; }
+  .empty { padding:60px 20px; text-align:center; color:var(--muted); }
+  @media (max-width: 760px) { .editor { grid-template-columns:1fr; height:auto; } .side { border-left:0; } .stage { min-height:320px; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="/lottie.js"></script>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const api = (p) => fetch(p).then((r) => r.json());
+let state = { route: location.pathname, sig: null, cmdAt: null };
+let player = null, anim = null, raf = 0;
+const P = { frame: 0, playing: true, speed: 1, loop: true, bg: "checker", versionID: null, project: null, data: null };
+
+function ago(iso) {
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (s < 60) return "just now"; if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`; return `${Math.round(s / 86400)} d ago`;
+}
+
+// ---------- Projects ----------
+async function renderHome() {
+  stopPlayer();
+  const projects = await api("/api/projects");
+  $("#app").innerHTML = `
+    <header><h1>Projects</h1><span class="muted">${projects.length}</span><span style="flex:1"></span>
+      <span class="muted">Ask Claude to create or change animations — this page updates by itself.</span></header>
+    ${projects.length ? `<div class="grid">${projects.map((p) => `
+      <div class="card" data-id="${p.id}">
+        <div class="thumb"><div data-thumb="${p.id}"></div></div>
+        <div class="name">${esc(p.name)}</div>
+        <div class="muted">${p.versions.length ? p.versions.length + (p.versions.length === 1 ? " version" : " versions") : "No versions"} · ${ago(p.updatedAt)}</div>
+      </div>`).join("")}</div>` : `<div class="empty">No projects yet. Send your assets (zip, folder, SVG, PNG) to Claude and describe the motion.</div>`}`;
+  document.querySelectorAll(".card").forEach((c) => (c.onclick = () => go(`/p/${c.dataset.id}`)));
+  for (const p of projects) {
+    const latest = p.versions.reduce((a, b) => (!a || b.index > a.index ? b : a), null);
+    const fav = p.versions.find((v) => v.isFavourite) ?? latest;
+    const data = await api(fav ? `/api/project/${p.id}/version/${fav.id}` : `/api/project/${p.id}/geometry`).catch(() => null);
+    const el = document.querySelector(`[data-thumb="${p.id}"]`);
+    if (!data || !el) continue;
+    const a = lottie.loadAnimation({ container: el, renderer: "svg", loop: true, autoplay: false, animationData: data });
+    const mid = () => a.goToAndStop(Math.floor((a.totalFrames || 1) / 2), true);
+    a.addEventListener("DOMLoaded", mid);
+    const card = el.closest(".card");
+    card.onmouseenter = () => a.play(); card.onmouseleave = () => { a.pause(); mid(); };
+  }
+}
+
+// ---------- Editor ----------
+async function renderProject(id, keep = false) {
+  const p = await api(`/api/project/${id}`);
+  if (p.error) return go("/");
+  P.project = p;
+  const versions = [...p.versions].sort((a, b) => b.index - a.index);
+  if (!keep || (P.versionID && !p.versions.some((v) => v.id === P.versionID))) P.versionID = versions[0]?.id ?? null;
+  $("#app").innerHTML = `
+    <header><button id="back">‹ Projects</button><h1 style="font-size:18px">${esc(p.name)}</h1><span class="muted">${esc(p.sourceLabel)}</span>
+      <span style="flex:1"></span>
+      <span class="muted">Background</span>
+      ${["checker", "light", "dark"].map((b) => `<button data-bg="${b}" class="${P.bg === b ? "on" : ""}">${b[0].toUpperCase() + b.slice(1)}</button>`).join("")}
+    </header>
+    <div class="editor">
+      <div class="main">
+        <div class="stage ${P.bg === "checker" ? "" : P.bg}"><div id="player"></div></div>
+        <div class="bar">
+          <button id="prev" title="Previous frame">◁|</button>
+          <button id="play" style="width:42px">${P.playing ? "❚❚" : "▶"}</button>
+          <button id="next" title="Next frame">|▷</button>
+          <input id="scrub" type="range" min="0" max="1" step="1" value="0">
+          <span id="flabel" class="mono" style="min-width:86px;text-align:right">0 / 0</span>
+          <span id="tlabel" class="mono muted" style="min-width:52px;text-align:right">0.00s</span>
+        </div>
+        <div class="bar">
+          <button id="loop" class="${P.loop ? "on" : ""}">Loop</button>
+          <span class="muted">Speed</span><input id="speed" type="range" min="0.1" max="3" step="0.05" value="${P.speed}" style="max-width:160px">
+          <span id="slabel" class="mono" style="min-width:44px">${P.speed.toFixed(2)}x</span>
+          <span style="flex:1"></span><span id="status" class="muted"></span>
+        </div>
+        <div class="strip" id="strip"></div>
+      </div>
+      <div class="side">
+        <div style="font-weight:600;margin-bottom:8px">Versions</div>
+        <div class="ver ${P.versionID ? "" : "sel"}" data-v="">Static geometry<small>${esc(p.sourceLabel)} · ${p.layerNames.length} layers</small></div>
+        ${versions.map((v) => `<div class="ver ${v.id === P.versionID ? "sel" : ""}" data-v="${v.id}">
+          <b>v${v.index}</b>${v.isFavourite ? " ★" : ""} <span class="muted">${esc(v.source)} · ${ago(v.createdAt)}</span>
+          <small>${esc(v.note || v.prompt)}</small></div>`).join("")}
+        ${versions.length ? "" : `<div class="muted" style="margin-top:8px">No versions yet — ask Claude to animate.</div>`}
+      </div>
+    </div>`;
+  $("#back").onclick = () => go("/");
+  document.querySelectorAll("[data-bg]").forEach((b) => (b.onclick = () => { P.bg = b.dataset.bg; renderProject(id, true); }));
+  document.querySelectorAll(".ver").forEach((el) => (el.onclick = () => { P.versionID = el.dataset.v || null; renderProject(id, true); }));
+  $("#play").onclick = () => { P.playing = !P.playing; $("#play").textContent = P.playing ? "❚❚" : "▶"; };
+  $("#prev").onclick = () => seek(Math.round(P.frame) - 1);
+  $("#next").onclick = () => seek(Math.round(P.frame) + 1);
+  $("#scrub").oninput = (e) => seek(+e.target.value);
+  $("#loop").onclick = (e) => { P.loop = !P.loop; e.target.classList.toggle("on", P.loop); };
+  $("#speed").oninput = (e) => { P.speed = +e.target.value; $("#slabel").textContent = P.speed.toFixed(2) + "x"; };
+  await loadData();
+}
+
+async function loadData() {
+  const p = P.project;
+  P.data = await api(P.versionID ? `/api/project/${p.id}/version/${P.versionID}` : `/api/project/${p.id}/geometry`);
+  stopPlayer();
+  anim = lottie.loadAnimation({ container: $("#player"), renderer: "svg", loop: false, autoplay: false, animationData: P.data });
+  const ip = P.data.ip ?? 0, op = P.data.op ?? 1;
+  $("#scrub").min = ip; $("#scrub").max = op;
+  P.frame = Math.min(Math.max(P.frame, ip), op);
+  const strip = $("#strip");
+  strip.innerHTML = Array.from({ length: 10 }, (_, i) => Math.round(ip + ((op - ip) * i) / 9)).map((f) => `<button data-f="${f}">${f}</button>`).join("");
+  strip.querySelectorAll("button").forEach((b) => (b.onclick = () => seek(+b.dataset.f)));
+  const v = p.versions.find((x) => x.id === P.versionID);
+  $("#status").textContent = `${v ? "v" + v.index : "Static geometry"} · ${P.data.fr ?? 60} fps · ${Math.round(op - ip)} frames · ${(P.data.layers ?? []).length} layers`;
+  let last = performance.now();
+  const tick = (t) => {
+    const dt = (t - last) / 1000; last = t;
+    if (P.playing && anim) {
+      let f = P.frame + dt * (P.data.fr ?? 60) * P.speed;
+      if (f > op) { if (P.loop) f = ip + ((f - ip) % Math.max(op - ip, 1)); else { f = op; P.playing = false; $("#play").textContent = "▶"; } }
+      P.frame = f;
+    }
+    draw();
+    raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+  publish();
+}
+
+function draw() {
+  if (!anim || !P.data) return;
+  const ip = P.data.ip ?? 0;
+  anim.goToAndStop(P.frame - ip, true);
+  $("#scrub").value = P.frame;
+  $("#flabel").textContent = `${Math.round(P.frame)} / ${Math.round(P.data.op ?? 0)}`;
+  $("#tlabel").textContent = (P.frame / (P.data.fr ?? 60)).toFixed(2) + "s";
+}
+function seek(f) { P.playing = false; const pl = $("#play"); if (pl) pl.textContent = "▶"; P.frame = Math.min(Math.max(f, P.data?.ip ?? 0), P.data?.op ?? 0); draw(); publish(); }
+function stopPlayer() { cancelAnimationFrame(raf); anim?.destroy(); anim = null; }
+
+// Что видит дизайнер — для get_app_state.
+let pubTimer = 0;
+function publish() {
+  clearTimeout(pubTimer);
+  pubTimer = setTimeout(() => {
+    const p = P.project; if (!p) return;
+    const v = p.versions.find((x) => x.id === P.versionID);
+    fetch("/api/state", { method: "POST", body: JSON.stringify({ projectID: p.id, projectName: p.name, version: v ? "v" + v.index : "geometry",
+      frame: Math.round(P.frame), playing: P.playing, mode: P.loop ? "Loop" : "Once", engine: "lottie-web (svg)", activeEngine: "lottie-web",
+      selectedLayer: null, overrides: {} }) });
+  }, 400);
+}
+
+// ---------- Routing + live sync ----------
+function go(path) { history.pushState(null, "", path); state.route = path; route(); }
+window.onpopstate = () => { state.route = location.pathname; route(); };
+function route() {
+  const m = state.route.match(/^\/p\/([0-9A-F-]+)/i);
+  return m ? renderProject(m[1]) : renderHome();
+}
+
+async function poll() {
+  try {
+    const r = await api("/api/poll");
+    const cmd = r.command;
+    if (cmd && cmd.issuedAt !== state.cmdAt) {
+      const first = state.cmdAt === null; state.cmdAt = cmd.issuedAt;
+      if (!first && cmd.projectID) {
+        if (cmd.versionID) P.versionID = cmd.versionID;
+        if (typeof cmd.frame === "number") { P.frame = cmd.frame; P.playing = false; }
+        history.pushState(null, "", `/p/${cmd.projectID}`); state.route = `/p/${cmd.projectID}`;
+        state.sig = r.sig;
+        await renderProject(cmd.projectID, true);
+        return;
+      }
+    }
+    if (state.sig !== null && r.sig !== state.sig) {
+      const m = state.route.match(/^\/p\/([0-9A-F-]+)/i);
+      if (m) {
+        const before = P.project?.versions.length ?? 0;
+        const p = await api(`/api/project/${m[1]}`);
+        if (p.versions.length > before) P.versionID = [...p.versions].sort((a, b) => b.index - a.index)[0].id; // новая версия — показать её
+        await renderProject(m[1], true);
+      } else await renderHome();
+    }
+    state.sig = r.sig;
+  } catch {}
+  finally { setTimeout(poll, 800); }
+}
+
+route().then(poll);
+</script>
+</body>
+</html>

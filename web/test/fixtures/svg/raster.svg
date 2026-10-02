@@ -1,0 +1,15 @@
+<svg id="RasterDoc" xmlns="http://www.w3.org/2000/svg" width="240" height="200" viewBox="0 0 240 200">
+  <defs>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+    <mask id="m"><rect x="130" y="20" width="80" height="80" fill="white"/><circle cx="170" cy="60" r="20" fill="black"/></mask>
+    <radialGradient id="flat" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(120 160) scale(100 10)">
+      <stop stop-color="#0f0"/><stop offset="1" stop-color="#0f0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="240" height="200" fill="#222"/>
+  <circle id="blurred" cx="60" cy="60" r="30" fill="#f0f" filter="url(#blur)"/>
+  <g id="masked" mask="url(#m)"><rect x="130" y="20" width="80" height="80" fill="#0ff"/></g>
+  <rect id="flatglow" x="10" y="150" width="220" height="20" fill="url(#flat)"/>
+  <g id="outer"><g transform="translate(5 0)"><rect x="20" y="120" width="30" height="20" fill="#ff0" style="filter:url(#blur)"/></g></g>
+  <path d="M100 100h20v20z" fill="white"/>
+</svg>

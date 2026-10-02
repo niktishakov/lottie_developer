@@ -1,0 +1,318 @@
+[
+ {
+  "name": "input:rocket",
+  "lottie": null,
+  "animations": "Composition: 60fps, 1 frames (0.0s)\n  Body ctrl P: static\n  Body 3: static\n  1 wing: static\n  Body 4: static\n  2 wing: static\n  Body 2: static\n  Iilum: static\n  Body 5: static\n  Iilum 2: static\n  Body: static"
+ },
+ {
+  "name": "input:demo",
+  "lottie": null,
+  "animations": "Composition: 60fps, 120 frames (2.0s)\n  Soplo Line 13: trim path\n  Soplo Line 12: trim path\n  Soplo Line 11: trim path\n  Soplo Line 10: trim path\n  Soplo Line 9: trim path\n  Soplo Line 8: trim path\n  Soplo Line 7: trim path\n  Soplo Line 6: trim path\n  Soplo Line 5: trim path\n  Soplo Line 4: trim path\n  Soplo Line 3: trim path\n  Soplo Line 2: trim path\n  Soplo Line 1: trim path\n  Soplo R: static\n  Soplo L: static\n  Line Effect 9: trim path\n  Line Effect 8: trim path\n  Line Effect 7: trim path\n  Line Effect 6: trim path\n  Line Effect 5: trim path\n  Line Effect 4: trim path\n  Line Effect 3: trim path\n  Line Effect 2: trim path\n  Line Effect 1: trim path\n  Star ctrl R: static\n  Body ctrl P: position 0→0f [574→652→574]\n  Body 3: static\n  1 wing: static\n  Body 4: static\n  2 wing: static\n  Body 2: static\n  Iilum: position 0→0f [50→-116→212→212→107→50]\n  Body 5: static\n  Iilum 2: static\n  Body: static\n  Cross star 4: position 0→25f [-269→-269→-269→-269]\n  Cross star 3: position 0→97f [361→361→361→361]\n  Cross star 2: position 0→119f [299→299→299→299]\n  Cross star 1: position 0→119f [-321→-321→-321→-321]\n  Circle star 4: static\n  Circle star 3: static\n  Circle star 2: static\n  Circle star 1: static"
+ },
+ {
+  "name": "input:minimal",
+  "lottie": null,
+  "animations": "Composition: 30fps, 60 frames (2.0s)\n  test: static"
+ },
+ {
+  "name": "input:items",
+  "lottie": null,
+  "animations": "Composition: 30fps, 60 frames (2.0s)\n  item_1: static\n  item_2: static\n  item_3: static\n  other: static"
+ },
+ {
+  "name": "input:op1",
+  "lottie": null,
+  "animations": "Composition: 30fps, 1 frames (0.0s)\n  a: static\n  b: static\n  c: static"
+ },
+ {
+  "name": "input:shapes",
+  "lottie": null,
+  "animations": "Composition: 60fps, 90 frames (1.5s)\n  stroked: static\n  nested: static\n  twoPaths: static\n  ellipseOnly: static\n  null: static\n  noKs: static\n  animated: opacity 0→80f [0→100→50→100], scale 10→50f [100→120], effects: Existing Effect, animated color\n  star_a: static\n  b_star: static\n  dup: static\n  dup: static\n  topStroke: static\n  noGroups: static"
+ },
+ {
+  "name": "input:nowh",
+  "lottie": null,
+  "animations": "Composition: 30fps, 0 frames (0.0s)\n  test: static\n  second: static"
+ },
+ {
+  "name": "tie-rounding",
+  "lottie": {
+   "fr": 60,
+   "op": 15,
+   "ip": 0,
+   "w": 10,
+   "h": 10,
+   "layers": [
+    {
+     "ty": 4,
+     "nm": "vals",
+     "ks": {
+      "o": {
+       "a": 1,
+       "k": [
+        {
+         "t": 0,
+         "s": [
+          2.5
+         ]
+        },
+        {
+         "t": 5,
+         "s": [
+          0.5
+         ]
+        },
+        {
+         "t": 10,
+         "s": [
+          -0.4
+         ]
+        },
+        {
+         "t": 12,
+         "s": [
+          1.5
+         ]
+        },
+        {
+         "t": 14,
+         "s": [
+          -2.5
+         ]
+        }
+       ]
+      },
+      "r": {
+       "a": 1,
+       "k": [
+        {
+         "t": 0.5,
+         "s": [
+          3.5
+         ]
+        },
+        {
+         "t": 3,
+         "s": [
+          99.5
+         ]
+        },
+        {
+         "t": 7,
+         "s": [
+          100.49999
+         ]
+        }
+       ]
+      },
+      "s": {
+       "a": 1,
+       "k": [
+        {
+         "t": 0,
+         "s": [
+          1e+21,
+          1
+         ]
+        },
+        {
+         "t": 9,
+         "s": [
+          0,
+          1
+         ]
+        }
+       ]
+      },
+      "p": {
+       "a": 1,
+       "k": [
+        {
+         "t": 1.5,
+         "s": [
+          1
+         ]
+        }
+       ]
+      },
+      "rx": {
+       "a": 1,
+       "k": [
+        {
+         "t": 4,
+         "s": "x"
+        },
+        {
+         "t": 8
+        }
+       ]
+      },
+      "ry": {
+       "a": 0,
+       "k": 5
+      }
+     },
+     "ef": [
+      {
+       "nm": "A"
+      },
+      {
+       "ty": 1
+      },
+      {
+       "nm": "B"
+      }
+     ],
+     "shapes": [
+      {
+       "ty": "gr",
+       "it": [
+        {
+         "ty": "gr",
+         "it": [
+          {
+           "ty": "tm"
+          }
+         ]
+        },
+        {
+         "ty": "st",
+         "c": {
+          "a": 1,
+          "k": []
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "ty": 4,
+     "nm": "static"
+    },
+    {
+     "ty": 4,
+     "ks": {
+      "o": {
+       "a": 1,
+       "k": [
+        {
+         "t": 0,
+         "s": [
+          0
+         ]
+        }
+       ]
+      }
+     }
+    },
+    {
+     "ty": 4,
+     "nm": "emptyEf",
+     "ef": [],
+     "shapes": [
+      {
+       "ty": "fl",
+       "c": {
+        "a": 0,
+        "k": [
+         1,
+         1,
+         1
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "ty": 4,
+     "nm": "true-a",
+     "ks": {
+      "o": {
+       "a": true,
+       "k": [
+        {
+         "t": 0,
+         "s": [
+          0
+         ]
+        },
+        {
+         "t": 2,
+         "s": [
+          1
+         ]
+        }
+       ]
+      }
+     }
+    }
+   ]
+  },
+  "animations": "Composition: 60fps, 15 frames (0.2s)\n  vals: opacity 0→14f [2→0→-0→2→-2], scale 0→9f [1000000000000000000000→0], rotation 3→7f [4→100→100], rotationX 4→8f, effects: A, B, animated color, trim path\n  static: static\n  emptyEf: static\n  true-a: opacity 0→2f [0→1]"
+ },
+ {
+  "name": "no-fr-op",
+  "lottie": {
+   "layers": [
+    {
+     "nm": "x",
+     "ks": {}
+    }
+   ]
+  },
+  "animations": "Composition: 30fps, 0 frames (0.0s)\n  x: static"
+ },
+ {
+  "name": "fr-zero",
+  "lottie": {
+   "fr": 0,
+   "op": 15,
+   "layers": []
+  },
+  "animations": "Composition: 0fps, 15 frames (infs)"
+ },
+ {
+  "name": "fr-zero-op-zero",
+  "lottie": {
+   "fr": 0,
+   "op": 0,
+   "layers": []
+  },
+  "animations": "Composition: 0fps, 0 frames (nans)"
+ },
+ {
+  "name": "fractional-fr-op",
+  "lottie": {
+   "fr": 29.97,
+   "op": 100.9,
+   "layers": [
+    {
+     "nm": "a"
+    }
+   ]
+  },
+  "animations": "Composition: 29fps, 100 frames (3.4s)\n  a: static"
+ },
+ {
+  "name": "negative",
+  "lottie": {
+   "fr": 30,
+   "op": -45,
+   "layers": []
+  },
+  "animations": "Composition: 30fps, -45 frames (-1.5s)"
+ },
+ {
+  "name": "bad-layers",
+  "lottie": {
+   "fr": 30,
+   "op": 30,
+   "layers": [
+    1,
+    2
+   ]
+  },
+  "animations": null
+ }
+]

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- basic shapes -->
+<svg xmlns="http://www.w3.org/2000/svg" width="200px" height="150px">
+  <rect x="10" y="10" width="50" height="30" rx="5" fill="#f00"/>
+  <rect id="zero" x="0" y="0" width="0" height="10"/>
+  <circle cx="100" cy="40" r="20" fill="blue" stroke="black" stroke-width="3"/>
+  <ellipse cx="150" cy="40" rx="30" ry="15" style="fill: rgb(10, 200, 30); stroke:none"/>
+  <line x1="10" y1="100" x2="190" y2="110" stroke="orange" stroke-width="4"/>
+  <polygon points="20,120 40,140 60,120" fill="green"/>
+  <polyline points="80 120, 100 140 120 120&#10;140 140" stroke="#123456" fill="none"/>
+  <rect x="150" y="100" width="40" height="40"/>
+  <rect x="160" y="110" width="10" height="10" opacity="0"/>
+</svg>

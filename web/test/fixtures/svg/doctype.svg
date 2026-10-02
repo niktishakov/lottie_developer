@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [
+  <!ENTITY ns_svg "http://www.w3.org/2000/svg">
+  <!ENTITY brand "#e91e63">
+]>
+<svg xmlns="&ns_svg;" width="64" height="64">
+  <style><![CDATA[ .x { fill: red; } ]]></style>
+  <!-- a comment with <rect/> inside -->
+  <rect x="4" y="4" width="56" height="56" rx="8" fill="&brand;"/>
+  <circle cx="32" cy="32" r="12" fill="#fff" fill-opacity=".5"/>
+</svg>

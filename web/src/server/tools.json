@@ -1,0 +1,885 @@
+{
+ "instructions": "Lottie Developer: you build Lottie animations together with a designer. The designer watches the Lottie Developer viewer in the browser (open_viewer gives its URL; it shows every change live) and gets a lottie-ios compatible JSON at the end. Talk to the designer in plain words, in their language, without internal terms (spec, null layer).\n\nWorkflow:\n1. Assets → project. zip/folder: create_project(bundle: path). Files the designer put in the app's Assets tab: list_assets (open the returned paths to look at files) → place_asset. Single files: add_svg / add_image. A screenshot pasted into chat cannot be saved as a file — ask the designer to drag the file itself into the chat.\n2. Scene. render_frame and LOOK at the image yourself → place_layer / rename_layer until it matches the design. Imported layers are named path-3, rect-2 — rename the meaningful ones before animating.\n3. Motion. get_guide (schema + motion kinds) → validate_spec → create_version with prompt (intent) and note (one line: what changed).\n4. Check. render_frame(version: latest, count: 8) and look at every frame before saying it is done.\n5. Comments. get_feedback → fix in a new version → resolve_feedback with a short reply. get_app_state tells what the designer is looking at.\n6. Deliver. export(path) → give the designer the JSON path.\n\nRules: never delete projects, versions or assets unless the designer asks (rollback = restore_version). Image layers (raster, SVG parts with blur/masks) animate with transforms only (fade, slide, scale, rotate, followPath). A group (layer named after its file) moves all its parts. show_in_app(frame, layer) shows the designer an exact moment.",
+ "tools": [
+  {
+   "inputSchema": {
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "description": "Rules, motion tips and the full AnimationSpec JSON schema. Call first.",
+   "name": "get_guide"
+  },
+  {
+   "name": "open_viewer",
+   "description": "Open the Lottie Developer viewer (projects, player, timeline, versions, assets, comments) in the default browser and return its URL. Do this at the start of a session so the designer can watch.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+   }
+  },
+  {
+   "inputSchema": {
+    "type": "object",
+    "required": [],
+    "properties": {}
+   },
+   "name": "list_projects",
+   "description": "All projects with version counts."
+  },
+  {
+   "name": "get_project",
+   "description": "Project details: layer names, geometry summary, full version history.",
+   "inputSchema": {
+    "type": "object",
+    "required": [
+     "project_id"
+    ],
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     }
+    }
+   }
+  },
+  {
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "height": {
+      "type": "integer"
+     },
+     "lottie": {
+      "description": "Lottie JSON (object or string)"
+     },
+     "lottie_path": {
+      "description": "Path to Lottie .json file",
+      "type": "string"
+     },
+     "images": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "PNG/JPEG paths, first = top; each becomes an image layer named after the file. Canvas = largest image unless width/height given"
+     },
+     "frames": {
+      "description": "Default 120",
+      "type": "integer"
+     },
+     "svg_path": {
+      "description": "Path to .svg file",
+      "type": "string"
+     },
+     "svg": {
+      "type": "string",
+      "description": "SVG markup"
+     },
+     "width": {
+      "type": "integer"
+     },
+     "fps": {
+      "type": "integer",
+      "description": "Default 60"
+     },
+     "bundle": {
+      "description": "Path to a .zip or folder with SVG / PNG / JPEG / Lottie JSON — all combined into one scene (canvas = largest file, larger files below, SVG/Lottie as groups centered)",
+      "type": "string"
+     }
+    },
+    "required": []
+   },
+   "description": "Create a project from SVG or Lottie geometry, OR a raster project: pass images (file paths; first = top layer, like Figma's layer panel) and/or width+height for a blank composition (size defaults to the first image).",
+   "name": "create_project"
+  },
+  {
+   "description": "Add a raster image (PNG/JPEG) as a new top image layer to the project's geometry. Optional placement rect in composition coords (top-left + size); default: centered, natural size.",
+   "inputSchema": {
+    "properties": {
+     "path": {
+      "type": "string"
+     },
+     "height": {
+      "type": "number"
+     },
+     "base64": {
+      "type": "string"
+     },
+     "x": {
+      "type": "number"
+     },
+     "name": {
+      "type": "string",
+      "description": "Layer name (default: file name)"
+     },
+     "y": {
+      "type": "number"
+     },
+     "width": {
+      "type": "number"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     }
+    },
+    "required": [
+     "project_id"
+    ],
+    "type": "object"
+   },
+   "name": "add_image"
+  },
+  {
+   "name": "place_layer",
+   "description": "Arrange the static scene before animating. Image layer: x,y,width,height = exact rect. Group (imported SVG/Lottie) or other layer: x,y = top-left, scale = %. z = 'top' | 'bottom' | index (0 = top).",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "z": {
+      "description": "'top', 'bottom' or index"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     },
+     "layer": {
+      "type": "string"
+     },
+     "scale": {
+      "type": "number"
+     },
+     "height": {
+      "type": "number"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "width": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "project_id",
+     "layer"
+    ]
+   }
+  },
+  {
+   "description": "Add an SVG (or Lottie JSON) to the scene as a group named after the file (null layer parenting its parts). Gradients become native; blur/masks become exact image layers. Default: centered.",
+   "inputSchema": {
+    "properties": {
+     "x": {
+      "type": "number"
+     },
+     "path": {
+      "type": "string"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "y": {
+      "type": "number"
+     },
+     "svg": {
+      "type": "string",
+      "description": "SVG markup"
+     },
+     "name": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "project_id"
+    ],
+    "type": "object"
+   },
+   "name": "add_svg"
+  },
+  {
+   "name": "list_assets",
+   "inputSchema": {
+    "required": [
+     "project_id"
+    ],
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     }
+    }
+   },
+   "description": "The project's asset folder (original SVG/PNG/Lottie files the designer added): absolute paths you can open to look at them, sizes, and which scene layers use each file."
+  },
+  {
+   "name": "add_assets",
+   "description": "Copy files, folders or a .zip into the project's asset folder (shows in the app's Assets tab). place=true also puts each into the scene.",
+   "inputSchema": {
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "paths": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "place": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "project_id",
+     "paths"
+    ],
+    "type": "object"
+   }
+  },
+  {
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "height": {
+      "type": "number"
+     },
+     "width": {
+      "type": "number"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "y": {
+      "type": "number"
+     },
+     "name": {
+      "description": "File name from list_assets",
+      "type": "string"
+     },
+     "x": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "project_id",
+     "name"
+    ]
+   },
+   "name": "place_asset",
+   "description": "Put a file from the asset folder into the scene: SVG/Lottie as a group (x,y = top-left, default centered), image as an image layer (x,y,width,height, default centered natural size)."
+  },
+  {
+   "inputSchema": {
+    "required": [
+     "project_id",
+     "name"
+    ],
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "name": {
+      "type": "string"
+     }
+    }
+   },
+   "name": "delete_asset",
+   "description": "Move a file from the asset folder to the project's .trash folder (recoverable). Layers already in the scene are not removed. Only when the designer asks."
+  },
+  {
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "status": {
+      "type": "string",
+      "description": "Default open",
+      "enum": [
+       "open",
+       "resolved",
+       "all"
+      ]
+     }
+    },
+    "required": []
+   },
+   "name": "get_feedback",
+   "description": "Designer's comments from the app, each pinned to a version + frame (+ layer). Start every iteration with this. Omit project_id for all projects."
+  },
+  {
+   "name": "resolve_feedback",
+   "description": "Mark a comment resolved (or reopen with resolved=false) and leave a short reply the designer sees in the app. Only after checking the fix with render_frame.",
+   "inputSchema": {
+    "type": "object",
+    "required": [
+     "project_id",
+     "id"
+    ],
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "id": {
+      "type": "string"
+     },
+     "reply": {
+      "type": "string"
+     },
+     "resolved": {
+      "type": "boolean"
+     }
+    }
+   }
+  },
+  {
+   "name": "rename_layer",
+   "description": "Rename a layer (give imported path-1… meaningful names before animating).",
+   "inputSchema": {
+    "type": "object",
+    "required": [
+     "project_id",
+     "layer",
+     "name"
+    ],
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "layer": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  {
+   "inputSchema": {
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     }
+    },
+    "required": [
+     "project_id",
+     "name"
+    ],
+    "type": "object"
+   },
+   "description": "Rename a project.",
+   "name": "rename_project"
+  },
+  {
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     }
+    },
+    "required": [
+     "project_id"
+    ]
+   },
+   "name": "delete_project",
+   "description": "Delete a project and all its versions. Irreversible."
+  },
+  {
+   "inputSchema": {
+    "properties": {
+     "svg_path": {
+      "description": "Path to .svg file",
+      "type": "string"
+     },
+     "svg": {
+      "type": "string",
+      "description": "SVG markup"
+     },
+     "lottie_path": {
+      "description": "Path to Lottie .json file",
+      "type": "string"
+     },
+     "lottie": {
+      "description": "Lottie JSON (object or string)"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     }
+    },
+    "required": [
+     "project_id"
+    ],
+    "type": "object"
+   },
+   "name": "replace_geometry",
+   "description": "Replace the project's static geometry (SVG or Lottie). Existing versions are kept."
+  },
+  {
+   "description": "Static geometry: layers, summary, existing animations; optional raw Lottie.",
+   "name": "get_geometry",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "include_lottie": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "project_id"
+    ]
+   }
+  },
+  {
+   "description": "Compile an AnimationSpec without saving. Returns compiler warnings (and Lottie if include_lottie).",
+   "name": "validate_spec",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "base_version": {
+      "type": "string",
+      "description": "Optional: compile on top of this version instead of static geometry"
+     },
+     "spec": {
+      "type": "object",
+      "description": "AnimationSpec (see get_guide.schema)"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "include_lottie": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "project_id",
+     "spec"
+    ]
+   }
+  },
+  {
+   "name": "create_version",
+   "inputSchema": {
+    "required": [
+     "project_id",
+     "spec"
+    ],
+    "type": "object",
+    "properties": {
+     "base_version": {
+      "type": "string",
+      "description": "Optional: compile on top of this version instead of static geometry"
+     },
+     "prompt": {
+      "type": "string",
+      "description": "What this version is meant to do"
+     },
+     "show_in_app": {
+      "type": "boolean",
+      "description": "Default true"
+     },
+     "spec": {
+      "type": "object",
+      "description": "AnimationSpec (see get_guide.schema)"
+     },
+     "note": {
+      "type": "string"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     }
+    }
+   },
+   "description": "Compile an AnimationSpec and save it as a new version (shown in the app)."
+  },
+  {
+   "description": "Save a raw, hand-made Lottie JSON as a new version (full manual control).",
+   "name": "create_version_from_lottie",
+   "inputSchema": {
+    "required": [
+     "project_id"
+    ],
+    "type": "object",
+    "properties": {
+     "lottie_path": {
+      "type": "string"
+     },
+     "show_in_app": {
+      "type": "boolean"
+     },
+     "base_version": {
+      "description": "Parent version (history only)",
+      "type": "string"
+     },
+     "prompt": {
+      "type": "string"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "lottie": {
+      "description": "Lottie JSON object or string"
+     },
+     "note": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  {
+   "name": "list_versions",
+   "description": "Version history in order, with parent links, notes, favourites.",
+   "inputSchema": {
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     }
+    },
+    "required": [
+     "project_id"
+    ],
+    "type": "object"
+   }
+  },
+  {
+   "description": "One version: metadata, spec, animation summary; optional raw Lottie.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "include_spec": {
+      "type": "boolean"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "include_lottie": {
+      "type": "boolean"
+     },
+     "version": {
+      "type": "string",
+      "description": "Version UUID, \"v3\", \"3\" or \"latest\""
+     }
+    },
+    "required": [
+     "project_id",
+     "version"
+    ]
+   },
+   "name": "get_version"
+  },
+  {
+   "description": "Diff two versions: spec changes (path: old → new), summaries, optional raw Lottie diff.",
+   "name": "diff_versions",
+   "inputSchema": {
+    "required": [
+     "project_id",
+     "from",
+     "to"
+    ],
+    "type": "object",
+    "properties": {
+     "include_lottie_diff": {
+      "type": "boolean"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "from": {
+      "type": "string",
+      "description": "Version UUID, \"v3\", \"3\" or \"latest\""
+     },
+     "to": {
+      "type": "string",
+      "description": "Version UUID, \"v3\", \"3\" or \"latest\""
+     }
+    }
+   }
+  },
+  {
+   "description": "Roll back: copy an old version as a new latest version.",
+   "name": "restore_version",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "note": {
+      "type": "string"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "version": {
+      "type": "string",
+      "description": "Version UUID, \"v3\", \"3\" or \"latest\""
+     }
+    },
+    "required": [
+     "project_id",
+     "version"
+    ]
+   }
+  },
+  {
+   "description": "Delete a version. Irreversible.",
+   "inputSchema": {
+    "required": [
+     "project_id",
+     "version"
+    ],
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "version": {
+      "type": "string",
+      "description": "Version UUID, \"v3\", \"3\" or \"latest\""
+     }
+    }
+   },
+   "name": "delete_version"
+  },
+  {
+   "description": "Mark/unmark a version as favourite.",
+   "name": "set_favourite",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "favourite": {
+      "type": "boolean"
+     },
+     "version": {
+      "type": "string",
+      "description": "Version UUID, \"v3\", \"3\" or \"latest\""
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     }
+    },
+    "required": [
+     "project_id",
+     "version"
+    ]
+   }
+  },
+  {
+   "name": "set_version_note",
+   "description": "Set a note on a version.",
+   "inputSchema": {
+    "type": "object",
+    "required": [
+     "project_id",
+     "version",
+     "note"
+    ],
+    "properties": {
+     "note": {
+      "type": "string"
+     },
+     "version": {
+      "type": "string",
+      "description": "Version UUID, \"v3\", \"3\" or \"latest\""
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     }
+    }
+   }
+  },
+  {
+   "name": "export",
+   "description": "Write a version's Lottie (or the static geometry if no version) to a file path.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "path": {
+      "type": "string"
+     },
+     "version": {
+      "type": "string",
+      "description": "Version UUID, \"v3\", \"3\" or \"latest\""
+     }
+    },
+    "required": [
+     "project_id",
+     "path"
+    ]
+   }
+  },
+  {
+   "description": "Render frames to PNG so you can SEE the result. Returns images. Use count for a filmstrip.",
+   "inputSchema": {
+    "properties": {
+     "frame": {
+      "description": "Frame number",
+      "type": "number"
+     },
+     "version": {
+      "description": "Version ref; omit for static geometry",
+      "type": "string"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "count": {
+      "description": "N evenly spaced frames (max 16)",
+      "type": "integer"
+     },
+     "size": {
+      "type": "integer",
+      "description": "Max side in px, default 512"
+     },
+     "progress": {
+      "type": "number",
+      "description": "0…1 of the timeline (if no frame)"
+     },
+     "save_dir": {
+      "description": "Optional: also write PNGs here",
+      "type": "string"
+     },
+     "frames": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "description": "Several frames (max 16)"
+     },
+     "background": {
+      "type": "string",
+      "description": "Hex like #FFFFFF; default transparent"
+     }
+    },
+    "type": "object",
+    "required": [
+     "project_id"
+    ]
+   },
+   "name": "render_frame"
+  },
+  {
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "frame": {
+      "description": "Seek to this frame (pauses playback)",
+      "type": "number"
+     },
+     "tap": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "description": "[x, y] in composition coords: like a click on the canvas (selects the top layer there, or triggers Button/Switch mode)"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "version": {
+      "type": "string",
+      "description": "Version UUID, \"v3\", \"3\" or \"latest\""
+     },
+     "layer": {
+      "type": "string",
+      "description": "Select and highlight this layer"
+     },
+     "open_browser": {
+      "type": "boolean",
+      "description": "Also open the viewer page in the default browser"
+     }
+    },
+    "required": [
+     "project_id"
+    ]
+   },
+   "name": "show_in_app",
+   "description": "Show a project in the designer's viewer (browser); optionally jump to a version, a frame and select a layer."
+  },
+  {
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+   },
+   "description": "What the user sees in the app right now: project, version, frame, playing, mode, engine, selected layer, unsaved inspector edits.",
+   "name": "get_app_state"
+  },
+  {
+   "name": "apply_overrides",
+   "inputSchema": {
+    "required": [
+     "project_id",
+     "overrides"
+    ],
+    "type": "object",
+    "properties": {
+     "note": {
+      "type": "string"
+     },
+     "overrides": {
+      "type": "object",
+      "description": "{\"<layer name>\": {\"color\": \"#FF0000\", \"opacity\": 50, \"hidden\": false}}"
+     },
+     "prompt": {
+      "type": "string"
+     },
+     "show_in_app": {
+      "type": "boolean"
+     },
+     "project_id": {
+      "type": "string",
+      "description": "Project UUID or exact name"
+     },
+     "version": {
+      "description": "Base version; omit for static geometry",
+      "type": "string"
+     }
+    }
+   },
+   "description": "Save a new version with per-layer edits baked in: color (hex, recolors fills/strokes), opacity (0-100 multiplier), hidden."
+  }
+ ]
+}
