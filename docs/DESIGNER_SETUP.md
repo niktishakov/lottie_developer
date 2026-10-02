@@ -11,12 +11,16 @@
 
 ## 2. Подключить Claude
 
-1. В Lottie Developer на экране Projects нажми **Set up Claude…** и выбери папку (по умолчанию `Документы/Lottie Workspace`).
-2. Открой эту папку в Claude:
-   - приложение Claude → вкладка **Code** → новая сессия → выбери папку;
-   - или в Терминале: `cd ~/Documents/Lottie\ Workspace` и `claude`.
-3. Когда Claude спросит про сервер **lottie-developer** — разреши.
-4. Проверь: напиши Claude «покажи мои проекты».
+Напиши в Claude Code (приложение Claude → вкладка **Code**, любая папка) — он всё сделает сам:
+
+```
+Подключи MCP-сервер Lottie Developer для всех сессий:
+claude mcp add -s user lottie-developer -- "/Applications/Lottie Developer.app/Contents/MacOS/lottie-mcp"
+```
+
+Потом начни **новую сессию** и напиши «покажи мои проекты». Если Claude спросит про сервер **lottie-developer** — разреши.
+
+Другой способ: в Lottie Developer нажми **Set up Claude…** — появится папка `Документы/Lottie Workspace`, открой её в Claude.
 
 Lottie Developer держи открытым — всё, что делает Claude, появляется в нём сразу.
 
@@ -37,6 +41,7 @@ Lottie Developer держи открытым — всё, что делает Cla
 
 | Проблема | Решение |
 |---|---|
-| Claude не видит инструменты lottie-developer | Lottie Developer → **Set up Claude…** ещё раз, перезапусти сессию Claude в этой папке |
-| Перенесла приложение в другое место | запусти его один раз — папка для Claude обновится сама |
+| Claude не видит инструменты lottie-developer | запусти Lottie Developer один раз, потом новая сессия Claude. Не помогло — попроси Claude выполнить команду из шага 2 ещё раз |
+| Claude пишет, что lottie-mcp заблокирован macOS | запусти Lottie Developer из Applications (он снимает блокировку) и начни новую сессию |
+| Приложение лежит не в Applications | в команде из шага 2 замени путь на свой |
 | Изменения не появляются в приложении | проверь, что приложение открыто; открой проект заново |

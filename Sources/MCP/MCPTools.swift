@@ -3,11 +3,26 @@ import Foundation
 /// Описания инструментов (tools/list) и гайд для агента.
 extension MCPServer {
 
+    /// Отдаётся клиенту при подключении: правила работы доступны Claude в любой папке, без CLAUDE.md.
     static let instructions = """
-    Lottie Developer: you drive animation development from outside. Workflow: get_guide → list_projects / \
-    create_project (from SVG or Lottie) → get_project (layer names) → validate_spec → create_version → \
-    get_version / diff_versions → iterate (base_version to build on top of a version) → restore_version / export. \
-    Every version is kept in history; the running app shows changes live.
+    Lottie Developer: you build Lottie animations together with a designer. The designer watches the Lottie Developer \
+    Mac app (it shows every change live) and gets a lottie-ios compatible JSON at the end. Talk to the designer in plain \
+    words, in their language, without internal terms (spec, null layer).
+
+    Workflow:
+    1. Assets → project. zip/folder: create_project(bundle: path). Files the designer put in the app's Assets tab: \
+    list_assets (open the returned paths to look at files) → place_asset. Single files: add_svg / add_image. \
+    A screenshot pasted into chat cannot be saved as a file — ask the designer to drag the file itself into the chat.
+    2. Scene. render_frame and LOOK at the image yourself → place_layer / rename_layer until it matches the design. \
+    Imported layers are named path-3, rect-2 — rename the meaningful ones before animating.
+    3. Motion. get_guide (schema + motion kinds) → validate_spec → create_version with prompt (intent) and note (one line: what changed).
+    4. Check. render_frame(version: latest, count: 8) and look at every frame before saying it is done.
+    5. Comments. get_feedback → fix in a new version → resolve_feedback with a short reply. get_app_state tells what the designer is looking at.
+    6. Deliver. export(path) → give the designer the JSON path.
+
+    Rules: never delete projects, versions or assets unless the designer asks (rollback = restore_version). \
+    Image layers (raster, SVG parts with blur/masks) animate with transforms only (fade, slide, scale, rotate, followPath). \
+    A group (layer named after its file) moves all its parts. show_in_app(frame, layer) shows the designer an exact moment.
     """
 
     func guide() -> [String: Any] {
