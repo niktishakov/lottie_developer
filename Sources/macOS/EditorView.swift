@@ -323,6 +323,7 @@ struct EditorView: View {
         if let id = cmd.versionID, let v = project?.versions.first(where: { $0.id == id }), v.id != selectedVersionID { select(v) }
         if let f = cmd.frame { player.seek(f) }
         if let l = cmd.layer { player.select(l) }
+        if let t = cmd.tap, t.count == 2 { player.tap(atComp: CGPoint(x: t[0], y: t[1])) }
     }
 
     /// Публикуем состояние UI для lottie-mcp раз в 0.5 с (только при изменениях).

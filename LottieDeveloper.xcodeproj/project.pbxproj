@@ -82,6 +82,7 @@
 		C5F18471AE5FCE7E22652D01 /* MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F373B8D0B6FE472C3328F1C8 /* MCPServer.swift */; };
 		CC50607ECCA9D2183DC7D924 /* LottieCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 454AC4DF6BDC424B83701A42 /* LottieCanvas.swift */; };
 		CE3C46B0FBDD7700B31E92D9 /* PlaybackState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DA34E272FFE143DAC8BFAEA /* PlaybackState.swift */; };
+		D5E6F75B4041C0505107DAB1 /* EditorToolsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 682FD1FF9105EED92EBA0251 /* EditorToolsTests.swift */; };
 		D8A0D9F942108088FDAF2D5F /* ProjectModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AF62EDD0B0FFE46B32C221A /* ProjectModels.swift */; };
 		DBCFE7ED71AE9C5C28B6666B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9A6A5CA82266E5FBEEEFA228 /* Assets.xcassets */; };
 		DC0ECFA67371CD32DF5BE5FC /* CanonicalizationResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12FAB8B7AA6DD84CC5E28B48 /* CanonicalizationResultView.swift */; };
@@ -144,6 +145,7 @@
 		555915C7173D710F7D33D037 /* ReleaseCandidateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseCandidateService.swift; sourceTree = "<group>"; };
 		586C0A782A122199111F978A /* SVGToLottie.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SVGToLottie.swift; sourceTree = "<group>"; };
 		5B40E9D5690E71B452195CDD /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		682FD1FF9105EED92EBA0251 /* EditorToolsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorToolsTests.swift; sourceTree = "<group>"; };
 		6CFB1EF0178CD394407CB18D /* PipelineEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineEnums.swift; sourceTree = "<group>"; };
 		6DF1CB8BA12C83362C1422D9 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		70A9CC870838DD4765EE0CE2 /* QAReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QAReportView.swift; sourceTree = "<group>"; };
@@ -468,6 +470,7 @@
 		A7D594DEFED37786C9465E6D /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				682FD1FF9105EED92EBA0251 /* EditorToolsTests.swift */,
 				B40884352487A3077902C735 /* LottieCompilerTests.swift */,
 			);
 			path = Tests;
@@ -702,6 +705,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D5E6F75B4041C0505107DAB1 /* EditorToolsTests.swift in Sources */,
 				4B69A227B371565F21ECC2C9 /* LottieCompilerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

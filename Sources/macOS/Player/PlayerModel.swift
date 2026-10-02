@@ -67,7 +67,7 @@ final class PlayerModel {
     var frame: Double = 0
     var isPlaying = true
     var speed: Double = 1
-    var mode: PlayMode = .loop { didSet { if mode == .loop { isPlaying = true } } }
+    var mode: PlayMode = .loop { didSet { isPlaying = mode == .loop; toggleOn = false } }
     /// Активный диапазон кадров (маркер или весь таймлайн).
     var range: ClosedRange<Double> = 0...1
     var activeMarker: String?
@@ -77,7 +77,20 @@ final class PlayerModel {
     // MARK: View options
 
     var engine: Engine = .automatic { didSet { revision += 1; compareRevision += 1 } }
-    var reducedMotion = false { didSet { revision += 1; compareRevision += 1 } }
+    /// Как в Lottie: при reduced motion анимация не играет, показываем кадр маркера
+    /// "reduced motion" (если есть) или последний кадр.
+    var reducedMotion = false {
+        didSet {
+            revision += 1; compareRevision += 1
+            if reducedMotion { isPlaying = false; frame = reducedMotionFrame; updateSelectionBox() }
+        }
+    }
+
+    private var reducedMotionFrame: Double {
+        if let anim = animation, let name = anim.markerNames.first(where: { $0.lowercased() == "reduced motion" }),
+           let f = anim.frameTime(forMarker: name) { return Double(f) }
+        return endFrame
+    }
     /// Движок, который Lottie реально выбрал (для Automatic может отличаться).
     var activeEngine = "—"
     var backdrop: Backdrop = .checker
@@ -157,11 +170,12 @@ final class PlayerModel {
     func stopClock() { clock?.cancel(); clock = nil }
 
     private func tick(_ dt: TimeInterval) {
-        guard isPlaying, animation != nil else { return }
+        guard isPlaying, animation != nil, !reducedMotion else { return }
         let next = frame + dt * fps * speed
         switch mode {
         case .loop:
-            frame = next > range.upperBound ? range.lowerBound + (next - range.upperBound) : next
+            let len = max(range.upperBound - range.lowerBound, 1)
+            frame = next > range.upperBound ? range.lowerBound + (next - range.lowerBound).truncatingRemainder(dividingBy: len) : next
         case .once, .button, .toggle:
             let end = playbackEnd
             if next >= end { frame = end; isPlaying = false } else { frame = next }
@@ -180,6 +194,7 @@ final class PlayerModel {
     // MARK: - Transport
 
     func togglePlay() {
+        guard !reducedMotion else { return }
         if !isPlaying && mode != .loop && frame >= playbackEnd { frame = range.lowerBound }
         isPlaying.toggle()
     }
@@ -214,7 +229,11 @@ final class PlayerModel {
         if let name, let start = animation.frameTime(forMarker: name),
            let dur = animation.durationFrameTime(forMarker: name) {
             activeMarker = name
-            range = start...max(start + dur, start + 1)
+            let s = min(max(Double(start), startFrame), endFrame)
+            // Маркер без длительности — точка входа: играем от неё до конца.
+            let e = dur > 0 ? min(Double(start + dur), endFrame) : endFrame
+            let lo = max(min(s, endFrame - 1), startFrame)
+            range = lo...max(min(e, endFrame), lo + 1)
         } else {
             activeMarker = nil
             range = startFrame...max(endFrame, startFrame + 1)
@@ -256,6 +275,11 @@ final class PlayerModel {
     }
 
     /// Выбор слоя кликом: офскрин-рендер каждого слоя отдельно, берём верхний непрозрачный в точке.
+    /// Тап по точке композиции — так же, как клик по холсту (выбор слоя или срабатывание контрола).
+    func tap(atComp p: CGPoint) {
+        if mode == .button || mode == .toggle { triggerControl() } else { pickLayer(atComp: p) }
+    }
+
     func pickLayer(atComp p: CGPoint) {
         guard let data = displayData, let anim = animation else { return }
         _ = anim

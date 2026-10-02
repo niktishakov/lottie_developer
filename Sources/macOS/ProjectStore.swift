@@ -46,6 +46,8 @@ final class ProjectStore {
         var issuedAt: Date
         var frame: Double? = nil
         var layer: String? = nil
+        /// Тап по точке [x, y] в координатах композиции (как клик по холсту).
+        var tap: [Double]? = nil
     }
 
     /// Снимок UI, который приложение публикует для lottie-mcp (`get_app_state`).

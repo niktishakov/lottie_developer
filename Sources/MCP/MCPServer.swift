@@ -380,7 +380,8 @@ final class MCPServer {
         var vid: UUID?
         if let ref = a["version"] as? String, !ref.isEmpty { vid = try findVersion(in: p, ref).id }
         store.writeUICommand(.init(projectID: p.id, versionID: vid, issuedAt: Date(),
-                                   frame: (a["frame"] as? NSNumber)?.doubleValue, layer: a["layer"] as? String))
+                                   frame: (a["frame"] as? NSNumber)?.doubleValue, layer: a["layer"] as? String,
+                                   tap: (a["tap"] as? [NSNumber]).map { $0.map(\.doubleValue) }))
         return ["requested": true, "note": "The app opens it within ~1s if it is running."]
     }
 

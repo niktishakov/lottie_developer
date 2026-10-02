@@ -83,8 +83,8 @@ struct HomeView: View {
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(white: 0.16))
+                    CheckerboardBackground()
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     if let v = previewVersion(for: project) {
                         LottiePreviewView(fileURL: store.versionURL(project.id, v.compiledFile), loop: true, speed: 1)
                             .id(v.id)
@@ -112,7 +112,8 @@ struct HomeView: View {
                     .lineLimit(1)
             }
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.11)))
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
         }
         .buttonStyle(.plain)
         .contextMenu {
