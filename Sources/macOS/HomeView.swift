@@ -209,9 +209,11 @@ private struct ProjectCard: View {
     private var meta: String {
         let n = project.versions.count
         let versions = n == 0 ? "No versions" : n == 1 ? "1 version" : "\(n) versions"
+        let now = Date()
+        guard now.timeIntervalSince(project.updatedAt) >= 60 else { return "\(versions) · just now" }
         let rel = RelativeDateTimeFormatter()
         rel.unitsStyle = .full
-        return "\(versions) · \(rel.localizedString(for: project.updatedAt, relativeTo: Date()))"
+        return "\(versions) · \(rel.localizedString(for: project.updatedAt, relativeTo: now))"
     }
 }
 
