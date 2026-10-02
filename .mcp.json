@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "lottie-developer": {
+      "command": "./bin/lottie-mcp",
+      "args": []
+    }
+  }
+}

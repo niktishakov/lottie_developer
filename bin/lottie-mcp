@@ -1,0 +1,25 @@
+#!/bin/zsh
+# Запуск MCP-сервера Lottie Developer. Сам пересобирает lottie-mcp (Release), если исходники новее бинарника.
+# Весь вывод сборки — в stderr: stdout занят протоколом MCP.
+#   bin/lottie-mcp           — запустить сервер (так его запускает Claude Code через .mcp.json)
+#   bin/lottie-mcp --build   — только собрать (первый раз дольше: подтягивается lottie-ios)
+set -e
+ROOT="${0:A:h:h}"
+BIN="$ROOT/build/mcp/Build/Products/Release/lottie-mcp"
+
+needs_build() {
+  [[ ! -x "$BIN" ]] && return 0
+  [[ -n "$(find "$ROOT/Sources" "$ROOT/project.yml" -newer "$BIN" -type f 2>/dev/null | head -1)" ]]
+}
+
+if needs_build || [[ "$1" == "--build" ]]; then
+  echo "[lottie-mcp] building…" >&2
+  if command -v xcodegen >/dev/null && [[ "$ROOT/project.yml" -nt "$ROOT/LottieDeveloper.xcodeproj/project.pbxproj" ]]; then
+    (cd "$ROOT" && xcodegen generate >&2)
+  fi
+  xcodebuild -project "$ROOT/LottieDeveloper.xcodeproj" -scheme lottie-mcp -configuration Release \
+    -derivedDataPath "$ROOT/build/mcp" build -quiet >&2
+  echo "[lottie-mcp] built: $BIN" >&2
+fi
+[[ "$1" == "--build" ]] && exit 0
+exec "$BIN"

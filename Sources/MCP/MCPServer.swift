@@ -105,6 +105,13 @@ final class MCPServer {
         case "render_frame": return try renderFrames(a)
         case "add_image": return try addImage(a)
         case "add_svg": return try addSVG(a)
+        case "get_feedback": return try getFeedback(a)
+        case "resolve_feedback":
+            let p = try project(a)
+            guard let id = UUID(uuidString: try str(a, "id")) else { throw ToolError("Bad feedback id") }
+            guard let f = store.resolveFeedback(projectID: p.id, id: id, reply: a["reply"] as? String,
+                                                resolved: a["resolved"] as? Bool ?? true) else { throw ToolError("Feedback not found") }
+            return Self.feedbackDict(f, project: p)
         case "rename_layer":
             let p = try project(a)
             let from = try str(a, "layer"), to = try str(a, "name")
@@ -412,6 +419,25 @@ final class MCPServer {
         let after = store.geometryData(for: try project(a)) ?? Data()
         return ["layer": layer, "imageFrame": Self.rectDict(LottieImageLayers.imageFrames(in: after)[layer]),
                 "order": LottieOverrides.layers(in: after).map(\.name)]
+    }
+
+    private func getFeedback(_ a: [String: Any]) throws -> Any {
+        let status = (a["status"] as? String) ?? "open"
+        let projects: [AnimationProject] = a["project_id"] != nil ? [try project(a)] : store.projects
+        var out: [[String: Any]] = []
+        for p in projects {
+            for f in store.feedback(projectID: p.id) where status == "all" || (status == "open") != f.resolved {
+                out.append(Self.feedbackDict(f, project: p))
+            }
+        }
+        return ["count": out.count, "items": out.sorted { ($0["createdAt"] as? String ?? "") < ($1["createdAt"] as? String ?? "") }]
+    }
+
+    private static func feedbackDict(_ f: FeedbackItem, project p: AnimationProject) -> [String: Any] {
+        ["id": f.id.uuidString, "project_id": p.id.uuidString, "project": p.name,
+         "version": f.versionLabel, "versionID": f.versionID?.uuidString ?? NSNull(),
+         "frame": f.frame, "layer": f.layer ?? NSNull(), "text": f.text,
+         "resolved": f.resolved, "reply": f.reply ?? NSNull(), "createdAt": iso.string(from: f.createdAt)]
     }
 
     private func addSVG(_ a: [String: Any]) throws -> Any {

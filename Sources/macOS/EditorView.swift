@@ -17,6 +17,9 @@ struct EditorView: View {
     @State private var compareVersionID: UUID?
     @State private var comparing = false
     @State private var frameCostMs: Double?
+    @State private var sideTab = SideTab.versions
+
+    private enum SideTab: String, CaseIterable { case versions = "Versions", comments = "Comments" }
     @State private var report: LottieRuntimeReport?
     @State private var dropTargeted = false
     @State private var multiSelection: Set<UUID> = []
@@ -35,7 +38,19 @@ struct EditorView: View {
                     VStack(spacing: 0) {
                         InspectorPanel(model: player, onSaveVersion: saveEdits)
                         Divider()
-                        versionsSidebar(project)
+                        Picker("", selection: $sideTab) {
+                            ForEach(SideTab.allCases, id: \.self) { t in
+                                Text(t == .comments ? "Comments\(openComments > 0 ? " (\(openComments))" : "")" : t.rawValue).tag(t)
+                            }
+                        }
+                        .pickerStyle(.segmented).labelsHidden().padding(8)
+                        if sideTab == .versions {
+                            versionsSidebar(project)
+                        } else {
+                            FeedbackPanel(store: store, projectID: projectID, player: player,
+                                          versionID: selectedVersionID, versionLabel: currentLabel(project),
+                                          onJump: jump(to:))
+                        }
                     }
                     .frame(width: 240)
                 }
@@ -318,6 +333,22 @@ struct EditorView: View {
         report = LottieRuntimeValidator.validate(fileURL: url)
         frameCostMs = player.measureFrameCost()
         status = "Viewing \(v.label) · \(v.layerCount) layers"
+    }
+
+    private var openComments: Int {
+        _ = store.feedbackRevision
+        return store.feedback(projectID: projectID).filter { !$0.resolved }.count
+    }
+
+    /// Клик по комментарию: та версия, тот кадр, тот слой.
+    private func jump(to f: FeedbackItem) {
+        if let id = f.versionID, let v = project?.versions.first(where: { $0.id == id }) {
+            if v.id != selectedVersionID { select(v) }
+        } else if f.versionID == nil, selectedVersionID != nil {
+            showGeometry()
+        }
+        player.seek(Double(f.frame))
+        player.select(f.layer)
     }
 
     /// Команда из MCP (show_in_app): версия, кадр, слой.

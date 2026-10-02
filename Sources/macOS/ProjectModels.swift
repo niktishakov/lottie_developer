@@ -81,4 +81,17 @@ struct AnimationVersion: Codable, Identifiable, Equatable {
         source = try c.decodeIfPresent(String.self, forKey: .source) ?? "mcp"
     }
 }
+/// Комментарий дизайнера к месту в анимации (версия + кадр + опционально слой).
+struct FeedbackItem: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var versionID: UUID?
+    var versionLabel: String
+    var frame: Int
+    var layer: String?
+    var text: String
+    var createdAt = Date()
+    var resolved = false
+    var reply: String?
+    var resolvedAt: Date?
+}
 #endif

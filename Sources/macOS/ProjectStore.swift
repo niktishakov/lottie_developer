@@ -23,15 +23,18 @@ final class ProjectStore {
         let sig = currentDiskSignature()
         guard sig != diskSignature else { return false }
         load()
+        feedbackRevision += 1
         return true
     }
 
     private func currentDiskSignature() -> String {
         guard let entries = try? fm.contentsOfDirectory(at: rootDir, includingPropertiesForKeys: nil) else { return "" }
         return entries.filter(\.hasDirectoryPath).map { dir -> String in
-            let f = dir.appendingPathComponent("project.json")
-            let m = (try? fm.attributesOfItem(atPath: f.path)[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
-            return "\(dir.lastPathComponent):\(m)"
+            let m = ["project.json", "feedback.json"].map { name -> Double in
+                let f = dir.appendingPathComponent(name)
+                return (try? fm.attributesOfItem(atPath: f.path)[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+            }
+            return "\(dir.lastPathComponent):\(m[0]):\(m[1])"
         }.sorted().joined(separator: "|")
     }
 
@@ -261,6 +264,48 @@ final class ProjectStore {
         let (data, layer) = try LottieImageLayers.addImage(to: geom, image: image, name: name, frame: frame)
         setImportedLottie(projectID: projectID, data: data, sourceLabel: p.sourceLabel)
         return layer
+    }
+
+    // MARK: - Feedback (комментарии дизайнера)
+
+    /// Растёт при каждом чтении изменившегося с диска состояния — UI комментариев перечитывает по нему.
+    private(set) var feedbackRevision = 0
+
+    private func feedbackURL(_ id: UUID) -> URL { projectDir(id).appendingPathComponent("feedback.json") }
+
+    func feedback(projectID: UUID) -> [FeedbackItem] {
+        let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+        guard let data = try? Data(contentsOf: feedbackURL(projectID)) else { return [] }
+        return (try? dec.decode([FeedbackItem].self, from: data)) ?? []
+    }
+
+    private func saveFeedback(_ items: [FeedbackItem], projectID: UUID) {
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let data = try? enc.encode(items) { try? data.write(to: feedbackURL(projectID), options: .atomic) }
+        feedbackRevision += 1
+        diskSignature = currentDiskSignature()
+    }
+
+    @discardableResult
+    func addFeedback(projectID: UUID, _ item: FeedbackItem) -> FeedbackItem {
+        var all = feedback(projectID: projectID)
+        all.append(item)
+        saveFeedback(all, projectID: projectID)
+        return item
+    }
+
+    func resolveFeedback(projectID: UUID, id: UUID, reply: String?, resolved: Bool = true) -> FeedbackItem? {
+        var all = feedback(projectID: projectID)
+        guard let i = all.firstIndex(where: { $0.id == id }) else { return nil }
+        all[i].resolved = resolved
+        all[i].reply = reply ?? all[i].reply
+        all[i].resolvedAt = resolved ? Date() : nil
+        saveFeedback(all, projectID: projectID)
+        return all[i]
+    }
+
+    func deleteFeedback(projectID: UUID, id: UUID) {
+        saveFeedback(feedback(projectID: projectID).filter { $0.id != id }, projectID: projectID)
     }
 
     /// Новый проект из zip/папки ассетов (SVG, картинки, Lottie) — одной композицией.
