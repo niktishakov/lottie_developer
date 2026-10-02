@@ -5,7 +5,7 @@ description: Сделать или доработать Lottie-анимацию 
 
 # /animate — цикл работы с дизайнером
 
-Инструменты: MCP `lottie-developer` (если их нет — `bin/lottie-mcp --build` и перезапустить сессию).
+Инструменты: MCP `lottie-developer`. Если их нет: в репозитории — `bin/lottie-mcp --build`; у дизайнера — Lottie Developer → **Set up Claude…**; потом перезапустить сессию.
 
 ## 0. Понять задачу
 - Есть ли проект? `list_projects` / `get_app_state` (что дизайнер сейчас смотрит).

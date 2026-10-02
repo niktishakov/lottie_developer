@@ -3,6 +3,11 @@ import SwiftUI
 
 @main
 struct LottieDeveloperMacApp: App {
+    init() {
+        WorkspaceSetup.stripQuarantine()
+        WorkspaceSetup.refreshIfInstalled()
+    }
+
     var body: some Scene {
         WindowGroup("Lottie Developer") {
             ContentView()

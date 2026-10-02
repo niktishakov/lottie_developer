@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var renaming: UUID?
     @State private var renameText = ""
     @State private var query = ""
+    @State private var workspaceMessage: String?
 
     private var filtered: [AnimationProject] {
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -29,6 +30,8 @@ struct HomeView: View {
                 TextField("Search", text: $query)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 200)
+                Button { setUpClaude() } label: { Label("Set up Claude…", systemImage: "sparkles") }
+                    .help("Create a folder to open in Claude: it connects Claude to this app")
                 Button { openImagesAsProject() } label: { Label("New from images…", systemImage: "photo.on.rectangle") }
                 Button { openLottieAsProject() } label: { Label("Import Lottie…", systemImage: "doc.badge.arrow.up") }
                 Button { _ = openSVGAsProject() } label: { Label("New from SVG…", systemImage: "square.and.arrow.down") }
@@ -77,6 +80,34 @@ struct HomeView: View {
             return false
         } isTargeted: { dropTargeted = $0 }
         .overlay { if dropTargeted { dropHint } }
+        .alert("Claude workspace is ready", isPresented: Binding(get: { workspaceMessage != nil }, set: { if !$0 { workspaceMessage = nil } })) {
+            Button("Show in Finder") { if let u = WorkspaceSetup.savedURL { NSWorkspace.shared.activateFileViewerSelecting([u]) } }
+            Button("Copy path") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(WorkspaceSetup.savedURL?.path ?? "", forType: .string)
+            }
+            Button("OK", role: .cancel) {}
+        } message: { Text(workspaceMessage ?? "") }
+    }
+
+    private func setUpClaude() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Use this folder"
+        panel.message = "Choose or create a folder for working with Claude"
+        let def = WorkspaceSetup.savedURL ?? WorkspaceSetup.defaultURL
+        try? FileManager.default.createDirectory(at: def, withIntermediateDirectories: true)
+        panel.directoryURL = def
+        guard panel.runModal() == .OK, let dir = panel.url else { return }
+        do {
+            try WorkspaceSetup.install(at: dir)
+            let warn = WorkspaceSetup.isMCPBundled ? "" : "\n\nlottie-mcp not found inside the app: use the build from the DMG."
+            workspaceMessage = "Open this folder in Claude:\n\(dir.path)\n\nClaude desktop: new Code session, choose this folder. Terminal: cd to the folder and run claude.\n\nApprove the lottie-developer server when Claude asks. Keep this app open to see changes live.\(warn)"
+        } catch {
+            workspaceMessage = "Setup failed: \(error.localizedDescription)"
+        }
     }
 
     private var emptyState: some View {

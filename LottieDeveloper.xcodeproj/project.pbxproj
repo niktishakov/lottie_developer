@@ -54,6 +54,7 @@
 		739477BE4518CE64D405F21C /* SVGDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDBDA811F30BC07DD37985E /* SVGDocument.swift */; };
 		73A3784EBEC53BBADF7A4695 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = F56071E7FD9FEF5F5707B215 /* Lottie */; };
 		75657492ECE18F2410C9839D /* SyntaxGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21EDA6BA9CB162AF555CBDB6 /* SyntaxGate.swift */; };
+		775C7C7DF2C82570F8C413C4 /* SKILL.md in Resources */ = {isa = PBXBuildFile; fileRef = 8D08A84A19D6C78A0766B75A /* SKILL.md */; };
 		792B9245BCCB5B8039F6B793 /* PurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 769C1C108BFE4605E17525AA /* PurchaseStore.swift */; };
 		7AD4C137362519A89904118E /* en.lproj in Resources */ = {isa = PBXBuildFile; fileRef = CB0E9FAF07269BDC49513A3B /* en.lproj */; };
 		86DE4F0B617208344AC9105D /* LottieAnimationUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F457F0D1FC6B946F568AF6 /* LottieAnimationUIView.swift */; };
@@ -86,7 +87,9 @@
 		B2F96164738FB52F5D25ECD5 /* QAReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E117602F91882CECFE7E62A /* QAReportBuilder.swift */; };
 		B6892493915A8A01FA22FC64 /* ImportSourcePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0017B4069A322A1C14D21403 /* ImportSourcePickerView.swift */; };
 		B68CACD2D16B20DD8057B00E /* LottieCompiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC64D92C434D99E2176BDFEA /* LottieCompiler.swift */; };
+		BAB869747215245913B9C6EE /* Workspace in Resources */ = {isa = PBXBuildFile; fileRef = D99797080100D2332F627ED0 /* Workspace */; };
 		BB9324EC45039DD4F0EF8911 /* CheckerboardBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10BAEA1B02D4F6088BF285D /* CheckerboardBackground.swift */; };
+		BE99482CA8C98AC534A16F8F /* WorkspaceSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1342279CF870CE6946C522F7 /* WorkspaceSetup.swift */; };
 		C11A2CB611E2BC4D6CBBD427 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 89D988112581D90066ABE88E /* Lottie */; };
 		C373F804C741B9D149FA7256 /* RevisionDiffService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19E2C16C628A31CB7CF8B577 /* RevisionDiffService.swift */; };
 		C5F18471AE5FCE7E22652D01 /* MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F373B8D0B6FE472C3328F1C8 /* MCPServer.swift */; };
@@ -120,6 +123,13 @@
 			remoteGlobalIDString = F09DF0603482A913A862EA4F;
 			remoteInfo = LottieDeveloperMac;
 		};
+		BC681B6D8E0EB0C66BD8084D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF2EE42DA226682311905BC1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B8ED6621A370D9590AFDFEB1;
+			remoteInfo = "lottie-mcp";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -132,6 +142,7 @@
 		0DFEF41D5297AE67220AB362 /* OnboardingPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingPage.swift; sourceTree = "<group>"; };
 		120066EC9701A9514C8E445A /* PublishSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishSheet.swift; sourceTree = "<group>"; };
 		12FAB8B7AA6DD84CC5E28B48 /* CanonicalizationResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalizationResultView.swift; sourceTree = "<group>"; };
+		1342279CF870CE6946C522F7 /* WorkspaceSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSetup.swift; sourceTree = "<group>"; };
 		18244D7B6FE44F10C3D1033D /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
 		18F57BFE09AF7A8CA679365C /* AnimationPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationPlayerView.swift; sourceTree = "<group>"; };
 		19E2C16C628A31CB7CF8B577 /* RevisionDiffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevisionDiffService.swift; sourceTree = "<group>"; };
@@ -174,6 +185,7 @@
 		85DA8974432AA92AE5143D6C /* LottieRuntimeValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieRuntimeValidator.swift; sourceTree = "<group>"; };
 		87FFA8637217BF63F13D4F7E /* RevisionHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevisionHistoryView.swift; sourceTree = "<group>"; };
 		8AF378D34C6B71B8E881DA25 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		8D08A84A19D6C78A0766B75A /* SKILL.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SKILL.md; sourceTree = "<group>"; };
 		945C59E8559C087E0901E265 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		955EC145A88132A2DC8AC499 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		95CB137404AD644E7EB22CE7 /* AssetFiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetFiles.swift; sourceTree = "<group>"; };
@@ -194,6 +206,7 @@
 		D00E525636060B514282E4A3 /* PipelineOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineOrchestrator.swift; sourceTree = "<group>"; };
 		D37C5ED4094DDA896EDD9A6D /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		D39549059849D69D271A9781 /* AnimationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStore.swift; sourceTree = "<group>"; };
+		D99797080100D2332F627ED0 /* Workspace */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Workspace; path = Sources/Resources/Workspace; sourceTree = SOURCE_ROOT; };
 		DB60AFE266A6F7F6A4B0677C /* AnimationLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationLibraryView.swift; sourceTree = "<group>"; };
 		DC5CB9EF86693DE7580F33C0 /* LottieDeveloperMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieDeveloperMacApp.swift; sourceTree = "<group>"; };
 		DCE14400D9D4116EB4EF82E6 /* AnimationSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationSpec.swift; sourceTree = "<group>"; };
@@ -252,6 +265,8 @@
 		0BD335F98F192968D4D3E345 = {
 			isa = PBXGroup;
 			children = (
+				D99797080100D2332F627ED0 /* Workspace */,
+				E9CBFE1136210ECF67310F42 /* animate */,
 				844F36F012F049D43FB13DBC /* macOS */,
 				1C104B7109F38EEEB12FDAD1 /* MCP */,
 				40566BB3F9B11DFF40610916 /* Resources */,
@@ -431,6 +446,7 @@
 				2AF62EDD0B0FFE46B32C221A /* ProjectModels.swift */,
 				7CB257DB5B46F59853B63D69 /* ProjectStore.swift */,
 				586C0A782A122199111F978A /* SVGToLottie.swift */,
+				1342279CF870CE6946C522F7 /* WorkspaceSetup.swift */,
 				F9904F9DA59669F99412F704 /* Player */,
 			);
 			name = macOS;
@@ -546,6 +562,15 @@
 			path = Pipeline;
 			sourceTree = "<group>";
 		};
+		E9CBFE1136210ECF67310F42 /* animate */ = {
+			isa = PBXGroup;
+			children = (
+				8D08A84A19D6C78A0766B75A /* SKILL.md */,
+			);
+			name = animate;
+			path = .claude/skills/animate;
+			sourceTree = "<group>";
+		};
 		F9904F9DA59669F99412F704 /* Player */ = {
 			isa = PBXGroup;
 			children = (
@@ -636,10 +661,12 @@
 				A10782A26CBBADD7CFD59E6B /* Sources */,
 				3302BC8712E9481965A5E8D0 /* Resources */,
 				0D2B41BDAD8619E06D847D0B /* Frameworks */,
+				55E4478E0AC6C53A73F7810A /* Embed lottie-mcp */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B9715D5110E04A9F9D531881 /* PBXTargetDependency */,
 			);
 			name = LottieDeveloperMac;
 			packageProductDependencies = (
@@ -720,11 +747,35 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				775C7C7DF2C82570F8C413C4 /* SKILL.md in Resources */,
+				BAB869747215245913B9C6EE /* Workspace in Resources */,
 				1AD2C59902042A2238915262 /* rocket_static_simplified.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		55E4478E0AC6C53A73F7810A /* Embed lottie-mcp */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed lottie-mcp";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# MCP-сервер внутри приложения: дизайнеру не нужен Xcode, Claude запускает его из .app.\nset -e\nDST=\"$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/lottie-mcp\"\ncp -f \"$BUILT_PRODUCTS_DIR/lottie-mcp\" \"$DST\"\nIDENTITY=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\n[ -z \"$IDENTITY\" ] && IDENTITY=\"-\"\ncodesign --force --options runtime --timestamp=none --sign \"$IDENTITY\" \"$DST\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		6825179B2BD73EB0F5AFF330 /* Sources */ = {
@@ -821,6 +872,7 @@
 				B0D1ECDBD793FDCDFA2C5A87 /* ProjectStore.swift in Sources */,
 				739477BE4518CE64D405F21C /* SVGDocument.swift in Sources */,
 				3901B2880416B36879391B2F /* SVGToLottie.swift in Sources */,
+				BE99482CA8C98AC534A16F8F /* WorkspaceSetup.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -850,6 +902,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		B9715D5110E04A9F9D531881 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B8ED6621A370D9590AFDFEB1 /* lottie-mcp */;
+			targetProxy = BC681B6D8E0EB0C66BD8084D /* PBXContainerItemProxy */;
+		};
 		D39AB80FD60F0965A14E5B2C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = F09DF0603482A913A862EA4F /* LottieDeveloperMac */;
@@ -901,6 +958,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Sources/macOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -996,6 +1054,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Sources/macOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

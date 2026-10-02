@@ -1,67 +1,52 @@
 #!/bin/bash
-# Сборка распространяемого macOS-приложения: Release → Developer ID подпись → DMG.
-# Нотаризация (submit/staple) — отдельный шаг, его запускаешь ТЫ со своими Apple ID креденшлами
-# (см. вывод в конце): это outward-действие, требующее app-specific password.
-#
-# Требования: Developer ID Application сертификат в keychain (team LWV5ZRPC43).
+# DMG для дизайнера: Lottie Developer.app (внутри — MCP-сервер lottie-mcp) + ярлык Applications + инструкция.
+# Universal (arm64 + x86_64), Release.
+# Подпись: Developer ID Application, если он есть в keychain (тогда в конце — команды нотаризации),
+# иначе ad-hoc — дизайнеру один раз нужно разрешить запуск в «Конфиденциальность и безопасность».
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SCHEME="LottieDeveloperMac"
-APP="LottieDeveloperMac"
-TEAM="LWV5ZRPC43"
 OUT="$ROOT/build/macos"
-PKGS="$ROOT/.packages"
+NAME="Lottie Developer"
+TEAM="LWV5ZRPC43"
+VERSION="$(grep -m1 'MARKETING_VERSION' "$ROOT/project.yml" | sed 's/.*: *//')"
 
-rm -rf "$OUT"
-mkdir -p "$OUT"
+IDENTITY="$(security find-identity -v -p codesigning | grep -m1 'Developer ID Application' | sed -E 's/.*"(.*)"/\1/' || true)"
+if [[ -n "$IDENTITY" ]]; then SIGN="$IDENTITY"; MODE="developer-id"; TS="--timestamp"; else SIGN="-"; MODE="ad-hoc"; TS=""; fi
+echo "==> Signing: $MODE ${IDENTITY:+($IDENTITY)}"
 
-echo "==> [1/4] Archive (Release, Developer ID, hardened runtime)"
-xcrun xcodebuild archive \
-  -project "$ROOT/LottieDeveloper.xcodeproj" \
-  -scheme "$SCHEME" \
-  -configuration Release \
-  -destination "generic/platform=macOS" \
-  -archivePath "$OUT/$APP.xcarchive" \
-  -derivedDataPath "$OUT/dd" \
-  -clonedSourcePackagesDirPath "$PKGS" \
-  -disableAutomaticPackageResolution \
-  DEVELOPMENT_TEAM="$TEAM" \
-  CODE_SIGN_STYLE=Automatic \
-  CODE_SIGN_IDENTITY="Developer ID Application" \
-  ENABLE_HARDENED_RUNTIME=YES \
-  OTHER_CODE_SIGN_FLAGS="--timestamp"
+rm -rf "$OUT"; mkdir -p "$OUT"
+command -v xcodegen >/dev/null && (cd "$ROOT" && xcodegen generate >/dev/null)
 
-echo "==> [2/4] Export Developer ID app"
-cat > "$OUT/ExportOptions.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>method</key><string>developer-id</string>
-  <key>teamID</key><string>$TEAM</string>
-  <key>signingStyle</key><string>automatic</string>
-</dict>
-</plist>
-PLIST
+echo "==> [1/4] Build Release (universal)"
+xcodebuild -project "$ROOT/LottieDeveloper.xcodeproj" -scheme LottieDeveloperMac -configuration Release \
+  -destination "generic/platform=macOS" -derivedDataPath "$OUT/dd" \
+  ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
+  CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGN" DEVELOPMENT_TEAM="$TEAM" \
+  ENABLE_HARDENED_RUNTIME=YES OTHER_CODE_SIGN_FLAGS="$TS" \
+  build -quiet
 
-xcrun xcodebuild -exportArchive \
-  -archivePath "$OUT/$APP.xcarchive" \
-  -exportPath "$OUT/export" \
-  -exportOptionsPlist "$OUT/ExportOptions.plist"
+SRC="$OUT/dd/Build/Products/Release/LottieDeveloperMac.app"
+STAGE="$OUT/dmg"
+mkdir -p "$STAGE"
+cp -R "$SRC" "$STAGE/$NAME.app"
 
-echo "==> [3/4] Create DMG"
-hdiutil create -volname "Lottie Developer" \
-  -srcfolder "$OUT/export/$APP.app" \
-  -ov -format UDZO \
-  "$OUT/$APP.dmg"
+echo "==> [2/4] Verify"
+lipo -archs "$STAGE/$NAME.app/Contents/MacOS/lottie-mcp"
+codesign --verify --deep --strict "$STAGE/$NAME.app"
+ln -s /Applications "$STAGE/Applications"
+cp "$ROOT/docs/DESIGNER_SETUP.md" "$STAGE/Как начать.md"
 
-echo "==> [4/4] Done. App + DMG at: $OUT"
-echo ""
-echo "NEXT — notarize (run with YOUR Apple ID + app-specific password):"
-echo "  xcrun notarytool submit \"$OUT/$APP.dmg\" \\"
-echo "    --apple-id <your-apple-id> --team-id $TEAM --password <app-specific-password> --wait"
-echo "  xcrun stapler staple \"$OUT/$APP.dmg\""
-echo ""
-echo "(Сохранить креды один раз: xcrun notarytool store-credentials \"lottie-notary\" \\"
-echo "   --apple-id <id> --team-id $TEAM --password <app-specific-pw>, затем --keychain-profile lottie-notary)"
+echo "==> [3/4] DMG"
+DMG="$OUT/LottieDeveloper-$VERSION.dmg"
+hdiutil create -volname "$NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+[[ "$MODE" == "developer-id" ]] && codesign --sign "$SIGN" --timestamp "$DMG"
+
+echo "==> [4/4] Done: $DMG ($(du -h "$DMG" | cut -f1))"
+if [[ "$MODE" == "developer-id" ]]; then
+  echo "Notarize (your Apple ID + app-specific password):"
+  echo "  xcrun notarytool submit \"$DMG\" --apple-id <id> --team-id $TEAM --password <app-specific-pw> --wait"
+  echo "  xcrun stapler staple \"$DMG\""
+else
+  echo "Ad-hoc signed: the designer allows it once in System Settings → Privacy & Security → Open Anyway."
+fi
