@@ -11,6 +11,12 @@ struct HomeView: View {
     @State private var dropTargeted = false
     @State private var renaming: UUID?
     @State private var renameText = ""
+    @State private var query = ""
+
+    private var filtered: [AnimationProject] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        return q.isEmpty ? store.projects : store.projects.filter { $0.name.localizedCaseInsensitiveContains(q) }
+    }
 
     private let columns = [GridItem(.adaptive(minimum: 200), spacing: 16)]
 
@@ -20,6 +26,9 @@ struct HomeView: View {
                 Text("Projects")
                     .font(.largeTitle.weight(.bold))
                 Spacer()
+                TextField("Search", text: $query)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 200)
                 Button { openLottieAsProject() } label: { Label("Import Lottie…", systemImage: "doc.badge.arrow.up") }
                 Button { _ = openSVGAsProject() } label: { Label("New from SVG…", systemImage: "square.and.arrow.down") }
                 Button { pasteSVGAsProject() } label: { Label("Paste SVG", systemImage: "doc.on.clipboard") }
@@ -37,7 +46,7 @@ struct HomeView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(store.projects) { project in
+                        ForEach(filtered) { project in
                             projectCard(project)
                         }
                     }
@@ -78,46 +87,16 @@ struct HomeView: View {
     }
 
     private func projectCard(_ project: AnimationProject) -> some View {
-        Button {
-            onOpen(project.id)
-        } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                ZStack {
-                    CheckerboardBackground()
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    if let v = previewVersion(for: project) {
-                        LottiePreviewView(fileURL: store.versionURL(project.id, v.compiledFile), loop: true, speed: 1)
-                            .id(v.id)
-                            .padding(4)
-                    } else if let url = store.geometryPreviewURL(for: project) {
-                        LottiePreviewView(fileURL: url, loop: false, speed: 1)
-                            .padding(4)
-                    } else {
-                        Image(systemName: "play.rectangle.on.rectangle")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(height: 110)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                Text(project.name)
-                    .font(.headline)
-                    .lineLimit(1)
-                Text("\(project.versions.count) version(s) · \(project.layerNames.count) layers")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(project.sourceLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
-            .padding(10)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
+        Button { onOpen(project.id) } label: {
+            ProjectCard(project: project, previewURL: previewURL(for: project))
         }
         .buttonStyle(.plain)
         .contextMenu {
+            Button("Open") { onOpen(project.id) }
             Button("Rename") { renaming = project.id; renameText = project.name }
+            Button("Duplicate") { store.duplicate(projectID: project.id) }
+            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([store.projectDir(project.id)]) }
+            Divider()
             Button("Delete", role: .destructive) { store.delete(projectID: project.id) }
         }
         .alert("Rename project", isPresented: Binding(get: { renaming == project.id }, set: { if !$0 { renaming = nil } })) {
@@ -125,6 +104,11 @@ struct HomeView: View {
             Button("Save") { store.rename(projectID: project.id, to: renameText); renaming = nil }
             Button("Cancel", role: .cancel) { renaming = nil }
         }
+    }
+
+    private func previewURL(for project: AnimationProject) -> URL? {
+        if let v = previewVersion(for: project) { return store.versionURL(project.id, v.compiledFile) }
+        return store.geometryPreviewURL(for: project)
     }
 
     private var dropHint: some View {
@@ -174,7 +158,7 @@ struct HomeView: View {
               str.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<") else { return }
         guard let data = str.data(using: .utf8) else { return }
         guard let result = try? SVGToLottie.convert(svgData: data) else { return }
-        let p = store.createProjectFromSVG(name: "Pasted SVG", svgStaticData: result.data,
+        let p = store.createProjectFromSVG(name: store.uniqueName(SVGToLottie.title(svgData: data) ?? "SVG"), svgStaticData: result.data,
                                             layerNames: result.layerNames, sourceLabel: "clipboard")
         onOpen(p.id)
     }
@@ -187,6 +171,73 @@ struct HomeView: View {
         let p = store.createProjectFromSVG(name: name, svgStaticData: result.data,
                                             layerNames: result.layerNames, sourceLabel: url.lastPathComponent)
         return p.id
+    }
+}
+/// Карточка проекта: в покое — статичный «лучший» кадр, при наведении — анимация.
+private struct ProjectCard: View {
+    let project: AnimationProject
+    let previewURL: URL?
+    @State private var hovering = false
+    @State private var still: NSImage?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ZStack {
+                CheckerboardBackground()
+                if hovering, let previewURL {
+                    LottiePreviewView(fileURL: previewURL, loop: true, speed: 1).padding(6)
+                } else if let still {
+                    Image(nsImage: still).resizable().scaledToFit().padding(6)
+                } else {
+                    Image(systemName: "play.rectangle.on.rectangle").font(.system(size: 28)).foregroundStyle(.secondary)
+                }
+            }
+            .frame(height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(hovering ? 0.35 : 0.1)))
+
+            Text(project.name).font(.headline).lineLimit(1).padding(.top, 4)
+            Text(meta).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .task(id: stillKey) { still = previewURL.flatMap(StillCache.image(for:)) }
+    }
+
+    private var stillKey: String { "\(previewURL?.path ?? "")|\(project.updatedAt.timeIntervalSince1970)" }
+
+    private var meta: String {
+        let n = project.versions.count
+        let versions = n == 0 ? "No versions" : n == 1 ? "1 version" : "\(n) versions"
+        let rel = RelativeDateTimeFormatter()
+        rel.unitsStyle = .full
+        return "\(versions) · \(rel.localizedString(for: project.updatedAt, relativeTo: Date()))"
+    }
+}
+
+/// Статичные превью: из нескольких кадров берём тот, где больше всего нарисовано
+/// (у многих анимаций кадр 0 пустой). Кэш по пути и времени изменения файла.
+@MainActor
+private enum StillCache {
+    private static var cache: [String: NSImage] = [:]
+
+    static func image(for url: URL) -> NSImage? {
+        let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        let key = "\(url.path)|\(mtime)"
+        if let img = cache[key] { return img }
+        guard let data = try? Data(contentsOf: url), let anim = try? FrameRenderer.decode(data) else { return nil }
+        let start = Double(anim.startFrame), end = Double(anim.endFrame)
+        var best: (CGImage, Double)?
+        for i in 0..<6 {
+            let f = start + (end - start) * Double(i) / 5
+            guard let (img, scale) = try? FrameRenderer.renderImage(animation: anim, frame: f, size: 240, background: nil) else { continue }
+            let area = Double(FrameRenderer.opaqueBounds(img, scale: scale).map { $0.width * $0.height } ?? 0)
+            if best == nil || area > best!.1 { best = (img, area) }
+        }
+        guard let (img, _) = best else { return nil }
+        let ns = NSImage(cgImage: img, size: NSSize(width: img.width, height: img.height))
+        cache[key] = ns
+        return ns
     }
 }
 #endif

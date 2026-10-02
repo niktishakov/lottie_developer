@@ -245,6 +245,35 @@ final class ProjectStore {
         save(projects[idx])
     }
 
+    /// Имя без повторов: "Name", "Name 2", "Name 3"…
+    func uniqueName(_ base: String) -> String {
+        let names = Set(projects.map(\.name))
+        guard names.contains(base) else { return base }
+        var i = 2
+        while names.contains("\(base) \(i)") { i += 1 }
+        return "\(base) \(i)"
+    }
+
+    /// Копия проекта со всеми версиями (новые id).
+    @discardableResult
+    func duplicate(projectID: UUID) -> AnimationProject? {
+        guard let src = project(projectID) else { return nil }
+        var copy = AnimationProject(name: uniqueName(src.name + " copy"), hasImportedStatic: src.hasImportedStatic,
+                                    layerNames: src.layerNames, sourceLabel: src.sourceLabel)
+        if src.hasImportedStatic { try? fm.copyItem(at: staticURL(src.id), to: staticURL(copy.id)) }
+        copy.versions = src.versions.map { v in
+            var nv = AnimationVersion(index: v.index, prompt: v.prompt, compiledFile: v.compiledFile,
+                                      layerCount: v.layerCount, compilerWarnings: v.compilerWarnings, specJSON: v.specJSON,
+                                      isFavourite: v.isFavourite, parentVersionID: nil, note: v.note, source: v.source)
+            nv.createdAt = v.createdAt
+            try? fm.copyItem(at: versionURL(src.id, v.compiledFile), to: versionURL(copy.id, v.compiledFile))
+            return nv
+        }
+        projects.insert(copy, at: 0)
+        save(copy)
+        return copy
+    }
+
     func rename(projectID: UUID, to newName: String) {
         guard let idx = projects.firstIndex(where: { $0.id == projectID }) else { return }
         projects[idx].name = newName

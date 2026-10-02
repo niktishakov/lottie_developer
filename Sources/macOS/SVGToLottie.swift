@@ -25,6 +25,19 @@ enum SVGToLottie {
         let warnings: [String]
     }
 
+    /// Человекочитаемое имя из SVG: <title>, иначе id корневого <svg>.
+    static func title(svgData: Data) -> String? {
+        guard let text = String(data: svgData, encoding: .utf8) else { return nil }
+        func first(_ pattern: String) -> String? {
+            guard let re = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]),
+                  let m = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+                  let r = Range(m.range(at: 1), in: text) else { return nil }
+            let v = text[r].trimmingCharacters(in: .whitespacesAndNewlines)
+            return v.isEmpty ? nil : String(v.prefix(60))
+        }
+        return first("<title[^>]*>(.*?)</title>") ?? first("<svg[^>]*?\\sid=\"([^\"]+)\"")
+    }
+
     static func convert(svgData: Data) throws -> Result {
         let parser = XMLParser(data: svgData)
         let collector = Collector()

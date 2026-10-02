@@ -118,7 +118,9 @@ final class MCPServer {
             switch geom {
             case let .svg(data, label):
                 let r = try SVGToLottie.convert(svgData: data)
-                p = store.createProjectFromSVG(name: name, svgStaticData: r.data, layerNames: r.layerNames, sourceLabel: label)
+                let svgName = (a["name"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                    ?? store.uniqueName(SVGToLottie.title(svgData: data) ?? (label == "SVG (MCP)" ? "SVG" : (label as NSString).deletingPathExtension))
+                p = store.createProjectFromSVG(name: svgName, svgStaticData: r.data, layerNames: r.layerNames, sourceLabel: label)
                 return ["project": try projectDetails(p), "svgWarnings": r.warnings]
             case let .lottie(data, label):
                 p = store.createProjectFromLottie(name: name, lottieData: data, sourceLabel: label)
