@@ -18,9 +18,14 @@ struct ProjectPlayerView: View {
     @AppStorage("player.backgroundHex") private var backgroundHex = "#FFFFFF"
     @State private var choosingBackground = false
     @State private var fullscreen = false
-    /// Пока открыт полный экран (и пока идёт переход), в холсте застывший кадр: zoom-переход увеличивает картинку, а не пустоту.
-    @State private var stillProgress: Double?
-    @Namespace private var heroNS
+    @State private var showFullscreenControls = true
+    /// 0 — холст на своём месте, 1 — на весь экран. Анимируется только это число: рамка и скругление считаются из него.
+    @State private var expanded = false
+    /// Где холст в плеере (глобальные координаты) — откуда растёт и куда возвращается полный экран.
+    @State private var canvasRect: CGRect = .zero
+    @State private var sourceRect: CGRect = .zero
+    /// Шапка и панель вкладок прячутся, только когда анимация уже на весь экран: иначе страница под ней прыгает.
+    @State private var barsHidden = false
     @State private var newComment = ""
     @State private var composing = false
     @State private var appliedCommandAt: Date?
@@ -47,6 +52,15 @@ struct ProjectPlayerView: View {
     }
 
     @ViewBuilder private var content: some View {
+        ZStack {
+            page
+            if fullscreen { fullscreenLayer }
+        }
+        .toolbar(barsHidden ? .hidden : .visible, for: .navigationBar, .tabBar)
+        .statusBarHidden(barsHidden)
+    }
+
+    @ViewBuilder private var page: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 canvas
@@ -112,43 +126,123 @@ struct ProjectPlayerView: View {
 
     // MARK: - Canvas
 
-    private var canvas: some View {
+    /// Холст: фон + живая анимация. Один и тот же вид в плеере и на весь экран — matchedGeometryEffect
+    /// плавно меняет ему рамку и скругление, без наложения двух картинок.
+    private func canvasCore(cornerRadius: CGFloat) -> some View {
         ZStack {
             DevBackgroundView(kind: background, customHex: backgroundHex)
-            // Вид Lottie один: на весь экран он переезжает, здесь в это время его застывший кадр.
-            if let p = stillProgress {
-                DevLottieStill(url: currentURL, progress: p)
-            } else {
-                DevLottieCanvas(controller: player)
-            }
+            DevLottieCanvas(controller: player).aspectRatio(player.aspect, contentMode: .fit)
             if let err = player.loadError {
                 Text(err).font(.callout).foregroundStyle(.red).padding()
             }
         }
         // Скругление по самому холсту (UIKit-вид Lottie иначе выходит за маску).
-        .mask(RoundedRectangle(cornerRadius: 24))
+        .mask(RoundedRectangle(cornerRadius: cornerRadius))
+    }
+
+    private var canvas: some View {
+        Group {
+            if fullscreen { Color.clear } else { canvasCore(cornerRadius: 24) }
+        }
+        .background(GeometryReader { g in
+            Color.clear
+                .onAppear { canvasRect = g.frame(in: .global) }
+                .onChange(of: g.frame(in: .global)) { _, r in canvasRect = r }
+        })
         // Форма анимации, но не выше 60% экрана: вертикальный экран не вытесняет панель управления.
         .aspectRatio(player.aspect, contentMode: .fit)
         .overlay(alignment: .topTrailing) {
-            Button { stillProgress = progress; fullscreen = true } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.subheadline.weight(.semibold)).foregroundStyle(.white)
-                    .frame(width: 36, height: 36).background(Circle().fill(.black.opacity(0.45)))
+            if !fullscreen {
+                Button { setFullscreen(true) } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                        .frame(width: 36, height: 36).background(Circle().fill(.black.opacity(0.45)))
+                }
+                .accessibilityLabel("Full screen")
+                .padding(10)
             }
-            .accessibilityLabel("Full screen")
-            .padding(10)
         }
         .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
-        .heroSource(id: "canvas", in: heroNS)
         .frame(maxWidth: .infinity)
         .onTapGesture { player.toggle() }
-        .fullScreenCover(isPresented: $fullscreen, onDismiss: { stillProgress = nil }) {
-            FullscreenPlayer(player: player, background: background, backgroundHex: backgroundHex) {
-                stillProgress = progress
+    }
+
+    private static let heroSpring = Animation.spring(duration: 0.42, bounce: 0.1)
+
+    /// Открытие: слой встаёт ровно на место холста (живой вид Lottie переезжает в него), потом рамка растёт до экрана.
+    /// Закрытие: рамка сжимается обратно, после этого вид возвращается в холст. Наложения двух картинок нет.
+    private func setFullscreen(_ on: Bool) {
+        showFullscreenControls = true
+        if on {
+            sourceRect = canvasRect
+            expanded = false
+            fullscreen = true
+            Task { @MainActor in
+                withAnimation(Self.heroSpring) { expanded = true } completion: { barsHidden = true }
+            }
+        } else {
+            barsHidden = false
+            withAnimation(Self.heroSpring, completionCriteria: .logicallyComplete) { expanded = false } completion: {
                 fullscreen = false
             }
-                .heroZoom(sourceID: "canvas", in: heroNS)
         }
+    }
+
+    // MARK: - Полный экран
+
+    /// Тап — пауза/воспроизведение, внизу шкала, ✕ или свайп вниз — выход. Управление прячется через 2 с воспроизведения.
+    private var fullscreenLayer: some View {
+        GeometryReader { g in
+            let full = g.frame(in: .global)
+            let r = expanded ? full : sourceRect
+            ZStack(alignment: .topLeading) {
+                Color.black.opacity(expanded ? 1 : 0)
+                canvasCore(cornerRadius: expanded ? 0 : 24)
+                    .frame(width: r.width, height: r.height)
+                    .offset(x: r.minX - full.minX, y: r.minY - full.minY)
+            }
+        }
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+            .onTapGesture { player.toggle(); withAnimation { showFullscreenControls = true } }
+            .gesture(DragGesture(minimumDistance: 20).onEnded { v in
+                if v.translation.height > 100 { setFullscreen(false) }
+            })
+            .overlay(alignment: .topTrailing) {
+                if showFullscreenControls && expanded {
+                    Button { setFullscreen(false) } label: {
+                        Image(systemName: "xmark").font(.headline).foregroundStyle(.white)
+                            .frame(width: 44, height: 44).background(Circle().fill(.black.opacity(0.5)))
+                    }
+                    .accessibilityLabel("Close full screen")
+                    .padding()
+                    .transition(.opacity)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if showFullscreenControls && expanded {
+                    HStack(spacing: 12) {
+                        Button { player.toggle() } label: {
+                            Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                                .font(.title3).foregroundStyle(.white).frame(width: 44, height: 44)
+                        }
+                        Scrubber(frame: player.frame, start: player.startFrame, end: player.endFrame, markers: []) {
+                            player.seek($0.rounded())
+                        }
+                        Text(timeText).font(.subheadline.monospacedDigit()).foregroundStyle(.white)
+                            .frame(minWidth: 58, alignment: .trailing)
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 8)
+                    .background(Capsule().fill(.black.opacity(0.55)))
+                    .padding()
+                    .transition(.opacity)
+                }
+            }
+            .task(id: player.isPlaying) {
+                guard player.isPlaying else { showFullscreenControls = true; return }
+                try? await Task.sleep(for: .seconds(2))
+                withAnimation { showFullscreenControls = false }
+            }
     }
 
     // MARK: - Transport
@@ -198,12 +292,6 @@ struct ProjectPlayerView: View {
     }
 
     private var timeText: String { seconds(player.frame) }
-
-    /// 0…1 — текущий момент для застывшего кадра.
-    private var progress: Double {
-        let span = player.endFrame - player.startFrame
-        return span > 0 ? min(max((player.frame - player.startFrame) / span, 0), 1) : 0
-    }
 
     /// Кадр → время от начала, «2.77 s». Дизайнеру понятнее секунды, чем номер кадра.
     private func seconds(_ frame: Double) -> String {
@@ -387,74 +475,4 @@ private struct Chip: View {
 }
 #endif
 
-#if os(iOS)
-/// Анимация на весь экран: выбранный фон, тап — пауза/воспроизведение, внизу шкала.
-/// Выход — ✕, на iOS 18 ещё и свайп вниз (встроен в zoom-переход).
-private struct FullscreenPlayer: View {
-    let player: DevPlayerController
-    let background: DevBackground
-    let backgroundHex: String
-    let onClose: () -> Void
-    @State private var showControls = true
 
-    var body: some View {
-        ZStack {
-            DevBackgroundView(kind: background, customHex: backgroundHex)
-            // Форма анимации по центру всего экрана (вместе с зонами под вырезом и полоской).
-            DevLottieCanvas(controller: player)
-                .aspectRatio(player.aspect, contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .ignoresSafeArea()
-        .contentShape(Rectangle())
-        .onTapGesture { player.toggle(); withAnimation { showControls = true } }
-        .overlay(alignment: .topTrailing) {
-            if showControls {
-                Button(action: onClose) {
-                    Image(systemName: "xmark").font(.headline).foregroundStyle(.white)
-                        .frame(width: 44, height: 44).background(Circle().fill(.black.opacity(0.5)))
-                }
-                .accessibilityLabel("Close full screen")
-                .padding()
-            }
-        }
-        .overlay(alignment: .bottom) {
-            if showControls {
-                HStack(spacing: 12) {
-                    Button { player.toggle() } label: {
-                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.title3).foregroundStyle(.white).frame(width: 44, height: 44)
-                    }
-                    Scrubber(frame: player.frame, start: player.startFrame, end: player.endFrame, markers: []) {
-                        player.seek($0.rounded())
-                    }
-                    Text(String(format: "%.2f s", max(0, player.frame - player.startFrame) / max(player.framerate, 1))).font(.subheadline.monospacedDigit()).foregroundStyle(.white).frame(minWidth: 58, alignment: .trailing)
-                }
-                .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(Capsule().fill(.black.opacity(0.55)))
-                .padding()
-            }
-        }
-        .statusBarHidden()
-        .task(id: player.isPlaying) {
-            // Во время воспроизведения управление прячется через 2 с.
-            guard player.isPlaying else { showControls = true; return }
-            try? await Task.sleep(for: .seconds(2))
-            withAnimation { showControls = false }
-        }
-    }
-}
-#endif
-
-#if os(iOS)
-/// Hero-переход холста в полный экран (zoom, iOS 18+). На iOS 17 — обычное появление снизу.
-private extension View {
-    @ViewBuilder func heroSource(id: String, in ns: Namespace.ID) -> some View {
-        if #available(iOS 18.0, *) { matchedTransitionSource(id: id, in: ns) { $0.clipShape(RoundedRectangle(cornerRadius: 24)) } } else { self }
-    }
-
-    @ViewBuilder func heroZoom(sourceID: String, in ns: Namespace.ID) -> some View {
-        if #available(iOS 18.0, *) { navigationTransition(.zoom(sourceID: sourceID, in: ns)) } else { self }
-    }
-}
-#endif
