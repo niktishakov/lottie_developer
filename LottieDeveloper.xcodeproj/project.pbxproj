@@ -245,6 +245,7 @@
 		C916981ABA1B9D2E6E6B15AA /* FeedbackPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackPanel.swift; sourceTree = "<group>"; };
 		C97A29245F3E2C247655D631 /* LottiePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottiePreviewView.swift; sourceTree = "<group>"; };
 		CB0E9FAF07269BDC49513A3B /* en.lproj */ = {isa = PBXFileReference; path = en.lproj; sourceTree = "<group>"; };
+		CBD3F59BC4DFCF0FD9C908C4 /* LottieDeveloper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LottieDeveloper.entitlements; sourceTree = "<group>"; };
 		D00CAD993588044AA4E115FB /* HTTPTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPTypes.swift; sourceTree = "<group>"; };
 		D00E525636060B514282E4A3 /* PipelineOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineOrchestrator.swift; sourceTree = "<group>"; };
 		D245BE4D8C29DE1E7CA0ACDF /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
@@ -554,6 +555,7 @@
 			isa = PBXGroup;
 			children = (
 				9A6A5CA82266E5FBEEEFA228 /* Assets.xcassets */,
+				CBD3F59BC4DFCF0FD9C908C4 /* LottieDeveloper.entitlements */,
 				317C7EC0D68C63A7A96E7137 /* LottieDeveloperApp.swift */,
 				6DF1CB8BA12C83362C1422D9 /* PrivacyInfo.xcprivacy */,
 				585E3C01B4E4DF4AD45A6AF9 /* AI */,
@@ -1057,6 +1059,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/LottieDeveloper.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = Sources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Lottie Dev";
@@ -1191,6 +1194,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/LottieDeveloper.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				EMIT_FRONTEND_COMMAND_LINES = YES;
 				INFOPLIST_FILE = Sources/Info.plist;

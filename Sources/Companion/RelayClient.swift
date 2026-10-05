@@ -1,6 +1,8 @@
 import Foundation
 import Observation
 import Security
+import DeviceCheck
+import CryptoKit
 
 /// Подключение айфона к посреднику в интернете (relay/): Claude на любом ПК ходит на https-адрес,
 /// посредник пересылает запросы сюда по WebSocket. Айфон сам подключается наружу — сеть, IP и брандмауэр не мешают.
@@ -73,7 +75,16 @@ final class RelayClient {
         if let id = Keychain.read(Self.idKey), let secret = Keychain.read(Self.secretKey) { return (id, secret) }
         var req = URLRequest(url: Self.baseURL.appending(path: "register"))
         req.httpMethod = "POST"
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // С App Attest — основная квота посредника. Без него (симулятор, сбой у Apple) — маленькая, но регистрация пройдёт.
+        let attested = try? await Self.attestationBody()
+        req.httpBody = attested ?? Data("{}".utf8)
+        var (data, resp) = try await URLSession.shared.data(for: req)
+        // Аттест не принят (например, сбой проверки) — регистрируемся без него, чтобы приложение всё равно работало.
+        if attested != nil, (resp as? HTTPURLResponse)?.statusCode != 200 {
+            req.httpBody = Data("{}".utf8)
+            (data, resp) = try await URLSession.shared.data(for: req)
+        }
         guard (resp as? HTTPURLResponse)?.statusCode == 200,
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let id = obj["deviceId"] as? String, let secret = obj["deviceSecret"] as? String
@@ -81,6 +92,25 @@ final class RelayClient {
         Keychain.write(Self.idKey, id)
         Keychain.write(Self.secretKey, secret)
         return (id, secret)
+    }
+
+    /// {keyId, attestation, challenge}: ключ в Secure Enclave, Apple подписывает, что это наше приложение на настоящем айфоне.
+    private static func attestationBody() async throws -> Data? {
+        let service = DCAppAttestService.shared
+        guard service.isSupported else { return nil }
+        var ch = URLRequest(url: baseURL.appending(path: "attest/challenge"))
+        ch.timeoutInterval = 10
+        let (cd, cr) = try await URLSession.shared.data(for: ch)
+        guard (cr as? HTTPURLResponse)?.statusCode == 200,
+              let challenge = (try? JSONSerialization.jsonObject(with: cd) as? [String: Any])?["challenge"] as? String
+        else { return nil }
+        let keyId = try await service.generateKey()
+        let hash = Data(SHA256.hash(data: Data(challenge.utf8)))
+        let attestation = try await service.attestKey(keyId, clientDataHash: hash)
+        Keychain.write(attestKeyKey, keyId)
+        return try JSONSerialization.data(withJSONObject: [
+            "keyId": keyId, "attestation": attestation.base64EncodedString(), "challenge": challenge,
+        ])
     }
 
     private func session(id: String, secret: String) async throws {
@@ -161,6 +191,7 @@ final class RelayClient {
 
     private static let idKey = "relay.deviceId"
     private static let secretKey = "relay.deviceSecret"
+    private static let attestKeyKey = "relay.attestKeyId"
 }
 
 /// Строки в Keychain (только этот айфон, после первой разблокировки).

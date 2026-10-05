@@ -2,6 +2,7 @@
 // Адрес айфона: /d/<deviceId>/mcp. Браузер после /d/<deviceId>/ ходит по обычным путям, айфон выбирается по cookie.
 
 import { PAIR_HTML } from "./pair-page";
+import { checkChallenge, makeChallenge, verifyAttestation } from "./attest";
 import { DailyUsage, DeviceSession, globalCap, PinIndex, RegistrationQuota, json, limitReached, sha256, type Env } from "./session";
 
 export { DailyUsage, DeviceSession, PinIndex, RegistrationQuota };
@@ -25,9 +26,14 @@ export default {
       return json({ day: new Date().toISOString().slice(0, 10), used: total, cap: globalCap(env), freePlan: 100_000, blocked: Date.now() < blockedUntil });
     }
     const ip = req.headers.get("cf-connecting-ip") ?? "unknown";
+    // App Attest: одноразовый challenge для регистрации (без хранилища, подписан секретом).
+    if (p === "/attest/challenge" && req.method === "GET") {
+      if (!env.ATTEST_SECRET) return json({ error: "App Attest is not configured" }, 501);
+      return json({ challenge: await makeChallenge(env.ATTEST_SECRET) });
+    }
     if (p === "/register" && req.method === "POST") {
       if (!(await env.REGISTER_LIMIT.limit({ key: ip })).success) return json({ error: "Too many registrations. Wait a minute." }, 429);
-      return register(env, url);
+      return register(req, env, url);
     }
     // Короткий вход: только PIN, айфон находим по нему.
     if (p === "/pair") {
@@ -67,15 +73,31 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-async function register(env: Env, url: URL): Promise<Response> {
+/// Тело: {keyId, attestation, challenge} — настоящее приложение (основная квота); пустое — без аттеста (маленькая квота).
+async function register(req: Request, env: Env, url: URL): Promise<Response> {
+  let body: { keyId?: string; attestation?: string; challenge?: string } = {};
+  try { body = await req.json(); } catch {}
+  let attested = false;
   const quota = env.QUOTA.get(env.QUOTA.idFromName("global"));
-  if (!(await quota.take())) return json({ error: "The relay is not accepting new devices today. Try again tomorrow." }, 503);
+  if (body.attestation && body.keyId && body.challenge) {
+    if (!env.ATTEST_SECRET || !(await checkChallenge(env.ATTEST_SECRET, body.challenge))) {
+      return json({ error: "Challenge expired. Try again." }, 400);
+    }
+    const r = await verifyAttestation(body.attestation, body.keyId, body.challenge);
+    if (!r.ok) return json({ error: "This app could not be verified by Apple.", reason: r.reason }, 403);
+    if (!(await quota.claimKey(body.keyId))) return json({ error: "This key is already registered." }, 409);
+    attested = true;
+  }
+  if (!(await quota.take(attested))) {
+    return json({ error: attested ? "The relay is not accepting new devices today. Try again tomorrow."
+                                  : "Verification with Apple is unavailable and today's limit for unverified devices is used. Try again tomorrow." }, 503);
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
     const deviceId = randomBase32(20);
     const secret = randomHex(32);
     const stub = env.DEVICE.get(env.DEVICE.idFromName(deviceId));
     if (await stub.init(await sha256(secret))) {
-      return json({ deviceId, deviceSecret: secret, base: `${url.origin}/d/${deviceId}` });
+      return json({ deviceId, deviceSecret: secret, base: `${url.origin}/d/${deviceId}`, attested });
     }
   }
   return json({ error: "Try again" }, 500);

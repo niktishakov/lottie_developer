@@ -9,6 +9,8 @@ export interface Env {
   /// Только для проверки на wrangler dev: занизить лимиты (--var LIMIT_GLOBAL:300 --var LIMIT_DEVICE:50).
   LIMIT_GLOBAL?: string;
   LIMIT_DEVICE?: string;
+  /// Секрет для подписи challenge App Attest (wrangler secret put ATTEST_SECRET).
+  ATTEST_SECRET?: string;
   REGISTER_LIMIT: RateLimit;
   PAIR_LIMIT: RateLimit;
   IP_LIMIT: RateLimit;
@@ -97,19 +99,35 @@ export class PinIndex extends DurableObject<Env> {
 }
 
 /// Счётчик регистраций за сутки (UTC), один объект на весь посредник.
+/// Регистрации без App Attest (симулятор, старый айфон, сбой у Apple) — маленькая отдельная квота.
+export const UNATTESTED_PER_DAY = 20;
+
 export class RegistrationQuota extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS days (day TEXT PRIMARY KEY, count INTEGER NOT NULL)");
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS days_plain (day TEXT PRIMARY KEY, count INTEGER NOT NULL)");
+    // Ключ App Attest регистрирует устройство один раз: повтор того же аттеста не пройдёт.
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS attest_keys (key_id TEXT PRIMARY KEY, created INTEGER NOT NULL)");
   }
 
-  /// true — ещё можно регистрировать сегодня.
-  async take(): Promise<boolean> {
+  /// true — ещё можно регистрировать сегодня. attested — прошёл App Attest (основная квота), иначе маленькая.
+  async take(attested = true): Promise<boolean> {
+    const table = attested ? "days" : "days_plain";
+    const limit = attested ? REGISTRATIONS_PER_DAY : UNATTESTED_PER_DAY;
     const day = new Date().toISOString().slice(0, 10);
-    const row = this.ctx.storage.sql.exec<{ count: number }>("SELECT count FROM days WHERE day = ?", day).toArray()[0];
-    if ((row?.count ?? 0) >= REGISTRATIONS_PER_DAY) return false;
-    this.ctx.storage.sql.exec("INSERT INTO days (day, count) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET count = count + 1", day);
-    this.ctx.storage.sql.exec("DELETE FROM days WHERE day < ?", new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
+    const row = this.ctx.storage.sql.exec<{ count: number }>(`SELECT count FROM ${table} WHERE day = ?`, day).toArray()[0];
+    if ((row?.count ?? 0) >= limit) return false;
+    this.ctx.storage.sql.exec(`INSERT INTO ${table} (day, count) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET count = count + 1`, day);
+    const old = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
+    this.ctx.storage.sql.exec(`DELETE FROM ${table} WHERE day < ?`, old);
+    return true;
+  }
+
+  /// false — этот ключ уже регистрировался.
+  async claimKey(keyId: string): Promise<boolean> {
+    if (this.ctx.storage.sql.exec("SELECT 1 FROM attest_keys WHERE key_id = ?", keyId).toArray().length) return false;
+    this.ctx.storage.sql.exec("INSERT INTO attest_keys (key_id, created) VALUES (?, ?)", keyId, Date.now());
     return true;
   }
 }
@@ -187,6 +205,12 @@ export class DeviceSession extends DurableObject<Env> {
   // MARK: - Запрос от Claude или браузера → айфон
 
   private async forward(req: Request, url: URL): Promise<Response> {
+    // Тело читаем сразу: ответ раньше чтения (айфон не в сети, лимит) Workers считает ошибкой потока.
+    const body = new Uint8Array(await req.arrayBuffer());
+    return this.forwardInner(req, url, body);
+  }
+
+  private async forwardInner(req: Request, url: URL, body: Uint8Array): Promise<Response> {
     if (!this.secretHash()) return json({ error: "Unknown device. Check the address in the iPhone app." }, 404);
     const ws = this.ctx.getWebSockets()[0];
     if (!ws) return json({ error: "iPhone is offline. Open Lottie Developer on the iPhone and keep it on screen." }, 503);
@@ -195,7 +219,6 @@ export class DeviceSession extends DurableObject<Env> {
     if (u.globalBlocked) return limitReached("The relay has used today's free limit.");
     if (u.count > deviceCap(this.env)) return limitReached("This iPhone has used today's limit.");
 
-    const body = new Uint8Array(await req.arrayBuffer());
     if (body.length > MAX_BODY) return json({ error: "Body is larger than 100 MB" }, 413);
 
     const headers: Record<string, string> = {};

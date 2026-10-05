@@ -52,6 +52,11 @@ targets:
             UTTypeConformsTo: [public.data, public.zip-archive]
             UTTypeTagSpecification: { public.filename-extension: [lottie] }
         LSSupportsOpeningDocumentsInPlace: true
+    # App Attest: посредник регистрирует только настоящее приложение. production — для TestFlight и App Store.
+    entitlements:
+      path: Sources/LottieDeveloper.entitlements
+      properties:
+        com.apple.developer.devicecheck.appattest-environment: production
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nikapps.lottie.developer
