@@ -16,7 +16,7 @@ struct DeveloperRootView: View {
     var body: some View {
         TabView(selection: $tab) {
             NavigationStack(path: $path) {
-                ProjectsListView(store: server.store)
+                ProjectsListView(store: server.store, claudeOnline: server.relay?.state == .online)
                     .navigationDestination(for: UUID.self) { id in
                         ProjectPlayerView(store: server.store, projectID: id,
                                           command: command?.projectID == id ? command : nil)
@@ -58,7 +58,10 @@ struct DeveloperRootView: View {
                 lastCommandAt = cmd.issuedAt
                 if let pid = cmd.projectID, server.store.project(pid) != nil {
                     command = cmd
+                    let switching = tab != .projects
                     tab = .projects
+                    // Переход внутрь вкладки во время её переключения теряется — ждём кадр.
+                    if switching { try? await Task.sleep(for: .milliseconds(350)) }
                     if path.last != pid { path = [pid] }
                 }
             }

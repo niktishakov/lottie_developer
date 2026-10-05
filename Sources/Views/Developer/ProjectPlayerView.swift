@@ -1,7 +1,8 @@
 #if os(iOS)
 import SwiftUI
 
-/// Плеер проекта на настоящем lottie-ios: версии, play/pause, кадр, скорость, loop, движок, фон, комментарии.
+/// Плеер проекта на настоящем lottie-ios. Сверху крупная анимация, под ней одна панель управления
+/// (шкала с метками комментариев, скорость, повтор, фон, остальное в «•••»), заметка Claude и кнопка комментария.
 struct ProjectPlayerView: View {
     let store: ProjectStore
     let projectID: UUID
@@ -13,6 +14,7 @@ struct ProjectPlayerView: View {
     @State private var player = DevPlayerController()
     @State private var background: DevBackground = .checker
     @State private var newComment = ""
+    @State private var composing = false
     @State private var appliedCommandAt: Date?
 
     private var project: AnimationProject? { store.project(projectID) }
@@ -37,14 +39,14 @@ struct ProjectPlayerView: View {
             VStack(alignment: .leading, spacing: 16) {
                 canvas
                 transport
-                settings
-                if let v = selectedVersion, !v.prompt.isEmpty || !v.note.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        if !v.prompt.isEmpty { Text(v.prompt).font(.callout) }
-                        if !v.note.isEmpty { Text(v.note).font(.caption).foregroundStyle(.secondary) }
-                    }
-                    .devCard()
+                if let v = selectedVersion, !v.prompt.isEmpty || !v.note.isEmpty { claudeNote(v) }
+                Button { player.pause(); composing = true } label: {
+                    // Без номера кадра: при воспроизведении он бы постоянно менялся. Кадр видно в окне комментария.
+                    Label("Add comment", systemImage: "text.bubble")
+                        .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 8)
                 }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
                 comments
             }
             .padding()
@@ -57,11 +59,14 @@ struct ProjectPlayerView: View {
         .onAppear {
             if !didPickInitial { didPickInitial = true; selectedVersionID = versions.first?.id }
             applyCommand()
+            if let project { SeenVersions.markSeen(project) }
         }
+        .sheet(isPresented: $composing) { commentSheet }
         .onChange(of: command?.issuedAt) { _, _ in applyCommand() }
         .onChange(of: versions.first?.id) { old, new in
             // Пришла новая версия от Claude — показываем её, если смотрели последнюю.
             if selectedVersionID == old, let new { selectedVersionID = new }
+            if let project { SeenVersions.markSeen(project) }
         }
         .task(id: loadKey) {
             guard let url = currentURL else { return }
@@ -84,7 +89,10 @@ struct ProjectPlayerView: View {
                 return
             }
         }
-        if let f = cmd.frame { player.seek(f) }
+        if let f = cmd.frame {
+            // Плеер ещё не загрузил файл (только открыли проект) — кадр применит загрузка.
+            if player.endFrame == 0 { pendingCommandFrame = f } else { player.pause(); player.seek(f) }
+        }
     }
 
     // MARK: - Canvas
@@ -98,51 +106,75 @@ struct ProjectPlayerView: View {
             }
         }
         .aspectRatio(1, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
         .onTapGesture { player.toggle() }
     }
 
     // MARK: - Transport
 
     private var transport: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 14) {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
                 Button { player.toggle() } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title2).frame(width: 44, height: 44)
+                        .font(.title3).foregroundStyle(.white)
+                        .frame(width: 44, height: 44).background(Circle().fill(.tint))
                 }
-                .buttonStyle(.borderedProminent)
-                Slider(value: Binding(get: { player.frame }, set: { player.seek($0.rounded()) }),
-                       in: player.startFrame...max(player.endFrame, player.startFrame + 1))
-                Text("\(Int(player.frame.rounded())) / \(Int(player.endFrame))")
-                    .font(.caption.monospacedDigit()).frame(minWidth: 64, alignment: .trailing)
+                .buttonStyle(.plain)
+                Scrubber(frame: player.frame, start: player.startFrame, end: player.endFrame,
+                         markers: commentFrames) { player.seek($0.rounded()) }
+                Text(timeText).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                    .frame(minWidth: 58, alignment: .trailing)
             }
-            HStack {
-                Toggle("Loop", isOn: $player.loop).toggleStyle(.button)
-                Spacer()
-                Picker("Speed", selection: $player.speed) {
-                    ForEach([0.25, 0.5, 1.0, 1.5, 2.0], id: \.self) { s in
-                        Text(s == 1 ? "1×" : "\(s.formatted())×").tag(s)
+            HStack(spacing: 8) {
+                Menu {
+                    Picker("Speed", selection: $player.speed) {
+                        ForEach([0.25, 0.5, 1.0, 1.5, 2.0], id: \.self) { s in Text(Self.speedText(s)).tag(s) }
                     }
-                }
-                .pickerStyle(.segmented).frame(maxWidth: 240)
+                } label: { Chip(text: Self.speedText(player.speed)) }
+                Button { player.loop.toggle() } label: { Chip(text: "Loop", on: player.loop) }
+                    .buttonStyle(.plain)
+                Menu {
+                    Picker("Background", selection: $background) {
+                        ForEach(DevBackground.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                } label: { Chip(text: background.rawValue) }
+                Spacer()
+                Menu {
+                    Picker("Engine", selection: $player.engine) {
+                        ForEach(DevEngineChoice.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    Text("Engine in use: \(player.activeEngine)")
+                } label: { Chip(text: "•••") }
             }
         }
         .devCard()
     }
 
-    private var settings: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Picker("Engine", selection: $player.engine) {
-                ForEach(DevEngineChoice.allCases) { Text($0.rawValue).tag($0) }
+    private var timeText: String { seconds(player.frame) }
+
+    /// Кадр → время от начала, «2.77 s». Дизайнеру понятнее секунды, чем номер кадра.
+    private func seconds(_ frame: Double) -> String {
+        String(format: "%.2f s", max(0, frame - player.startFrame) / max(player.framerate, 1))
+    }
+
+    static func speedText(_ s: Double) -> String { s == 1 ? "1×" : "\(s.formatted())×" }
+
+    /// Кадры открытых комментариев к этой версии — красные метки на шкале.
+    private var commentFrames: [Double] {
+        feedback.filter { !$0.resolved && $0.versionID == selectedVersion?.id }.map { Double($0.frame) }
+    }
+
+    private func claudeNote(_ v: AnimationVersion) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "sparkle").foregroundStyle(Color(red: 0.85, green: 0.47, blue: 0.34))
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Claude · \(v.label)").font(.subheadline.weight(.semibold))
+                if !v.note.isEmpty { Text(v.note).font(.subheadline).foregroundStyle(.secondary) }
+                if !v.prompt.isEmpty, v.prompt != v.note {
+                    Text(v.prompt).font(.footnote).foregroundStyle(.tertiary)
+                }
             }
-            .pickerStyle(.segmented)
-            Text("Engine in use: \(player.activeEngine)")
-                .font(.caption).foregroundStyle(.secondary)
-            Picker("Background", selection: $background) {
-                ForEach(DevBackground.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
         }
         .devCard()
     }
@@ -156,7 +188,10 @@ struct ProjectPlayerView: View {
                 Text("Static geometry").tag(UUID?.none)
             }
         } label: {
-            Label(selectedVersion?.label ?? "Static", systemImage: "clock.arrow.circlepath")
+            HStack(spacing: 4) {
+                Text(selectedVersion?.label ?? "Static").font(.subheadline.weight(.semibold))
+                Image(systemName: "chevron.down").font(.caption2.weight(.bold))
+            }
         }
     }
 
@@ -172,17 +207,11 @@ struct ProjectPlayerView: View {
     private var comments: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Comments").font(.headline)
-            HStack {
-                TextField("Comment at frame \(Int(player.frame.rounded()))", text: $newComment, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                Button("Add") { addComment() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
             let items = feedback
             let _ = feedbackTick
             if items.isEmpty {
-                Text("No comments yet.").font(.caption).foregroundStyle(.secondary)
+                Text("Pause on a frame and leave a comment. Claude reads them and makes a fix.")
+                    .font(.callout).foregroundStyle(.secondary)
             }
             ForEach(items) { item in
                 Button { jump(to: item) } label: { commentRow(item) }
@@ -195,7 +224,7 @@ struct ProjectPlayerView: View {
     private func commentRow(_ item: FeedbackItem) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("\(item.versionLabel) · frame \(item.frame)").font(.caption.bold())
+                Text("\(item.versionLabel) · \(seconds(Double(item.frame)))").font(.caption.bold())
                 if let layer = item.layer { Text(layer).font(.caption).foregroundStyle(.secondary) }
                 Spacer()
                 if item.resolved { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green) }
@@ -209,6 +238,31 @@ struct ProjectPlayerView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 10).fill(.background.opacity(0.6)))
         .opacity(item.resolved ? 0.6 : 1)
+    }
+
+    private var commentSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("\(selectedVersion?.label ?? "Static") · at \(seconds(player.frame))")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                TextField("What should change here?", text: $newComment, axis: .vertical)
+                    .lineLimit(3...8)
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(uiColor: .secondarySystemBackground)))
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Comment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { composing = false } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") { addComment(); composing = false }
+                        .disabled(newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 
     private func addComment() {
@@ -231,6 +285,52 @@ struct ProjectPlayerView: View {
         } else {
             player.seek(Double(item.frame))
         }
+    }
+}
+#endif
+
+#if os(iOS)
+/// Шкала кадров с метками комментариев. Тянется пальцем, тап — переход к кадру.
+private struct Scrubber: View {
+    let frame: Double
+    let start: Double
+    let end: Double
+    let markers: [Double]
+    let onSeek: (Double) -> Void
+
+    var body: some View {
+        GeometryReader { g in
+            let w = g.size.width
+            let span = max(end - start, 1)
+            let x = { (f: Double) in CGFloat((f - start) / span) * w }
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.secondary.opacity(0.3)).frame(height: 4)
+                Capsule().fill(.tint).frame(width: max(0, x(frame)), height: 4)
+                ForEach(Array(markers.enumerated()), id: \.offset) { _, m in
+                    Circle().fill(.red).frame(width: 9, height: 9).offset(x: x(m) - 4.5, y: -11)
+                }
+                Circle().fill(.white).frame(width: 18, height: 18).shadow(radius: 1)
+                    .offset(x: x(frame) - 9)
+            }
+            .frame(height: g.size.height)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onChanged { v in
+                onSeek(start + Double(min(max(v.location.x / w, 0), 1)) * span)
+            })
+        }
+        .frame(height: 34)
+    }
+}
+
+/// Маленькая кнопка-капсула в панели плеера.
+private struct Chip: View {
+    let text: String
+    var on = false
+    var body: some View {
+        Text(text).font(.subheadline.weight(.semibold))
+            .foregroundStyle(on ? Color.accentColor : Color.primary)
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(Capsule().fill(on ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.18)))
     }
 }
 #endif

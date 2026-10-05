@@ -1,6 +1,7 @@
 import Foundation
 
-enum RequestKind { case mcp, viewer }
+/// Что пришло на сервер. Для MCP — имена вызванных инструментов (для ленты действий на экране Claude).
+enum RequestKind: Equatable { case mcp(tools: [String]), viewer }
 
 /// Маршрутизация запросов к серверу на iPhone:
 /// - `/mcp` — MCP по Streamable HTTP для Claude Code на ПК;
@@ -50,12 +51,22 @@ final class CompanionRoutes: @unchecked Sendable {
         }
 
         if p == "/mcp" {
-            onRequest(.mcp)
+            onRequest(.mcp(tools: Self.toolNames(req.body)))
             return await handleMCP(req)
         }
 
         onRequest(.viewer)
         return await viewer(req, path: p, method: method)
+    }
+
+    /// Имена инструментов из tools/call (одиночный запрос или пачка).
+    private static func toolNames(_ body: Data) -> [String] {
+        guard let obj = try? JSONSerialization.jsonObject(with: body) else { return [] }
+        let messages = (obj as? [[String: Any]]) ?? [(obj as? [String: Any]) ?? [:]]
+        return messages.compactMap { m in
+            guard m["method"] as? String == "tools/call" else { return nil }
+            return (m["params"] as? [String: Any])?["name"] as? String
+        }
     }
 
     // MARK: - Auth
@@ -106,6 +117,8 @@ final class CompanionRoutes: @unchecked Sendable {
         case .wrong:
             return .json(["error": "Wrong PIN"], status: 403)
         case .ok:
+            // PIN одноразовый: следующий компьютер получит новый.
+            auth.regeneratePIN()
             let token = auth.token
             // Через посредника — его https-адрес, по Wi-Fi — адрес айфона в сети.
             let relayBase = req.remoteIP == "relay" ? req.headers["x-relay-base"] : nil

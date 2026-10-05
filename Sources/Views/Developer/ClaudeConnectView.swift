@@ -2,20 +2,28 @@
 import SwiftUI
 import UIKit
 
-/// Экран подключения Claude на ПК к iPhone: через посредника в интернете, если он доступен, иначе по Wi-Fi.
+/// Экран Claude: подключён ли Claude, PIN для нового компьютера, что Claude сейчас делает. Инструкции свёрнуты.
 struct ClaudeConnectView: View {
     let server: CompanionServer
     @State private var copied = false
+    @State private var showSetup = false
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                statusCard
-                stepsCard
-                pinCard
-                commandCard
+            VStack(alignment: .leading, spacing: 16) {
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in statusCard(now: ctx.date) }
+                pairCard
                 activityCard
-                Label("Keep this app open on screen while Claude works. If it is closed, Claude sees “iPhone is offline”.", systemImage: "iphone")
+                DisclosureGroup("Setup steps and command", isExpanded: $showSetup) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        stepsCard
+                        commandCard
+                    }
+                    .padding(.top, 12)
+                }
+                .font(.callout).tint(.secondary)
+                .padding(.horizontal, 4)
+                Label("Keep this app open on screen while Claude works. If it's closed, Claude sees “iPhone is offline”.", systemImage: "iphone")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             .padding()
@@ -28,74 +36,104 @@ struct ClaudeConnectView: View {
         }
     }
 
-    private var statusCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Circle().fill(statusColor).frame(width: 14, height: 14)
-                Text(statusText).font(.title2.bold())
-            }
-            if let error = server.error {
-                Text(error).font(.callout).foregroundStyle(.red)
-                Button("Try again") { server.stop(); server.start() }
-                    .buttonStyle(.borderedProminent)
-            }
-            relayRow
-            Text(isOnline ? "Address for Claude" : "iPhone address on Wi-Fi").font(.caption).foregroundStyle(.secondary)
-            Text(server.viewerURL)
-                .font(.title3.monospaced()).textSelection(.enabled)
-            if server.addresses.isEmpty, server.relay?.state != .online {
-                Text("No internet relay and no Wi-Fi address. Check the iPhone's internet connection.")
-                    .font(.callout).foregroundStyle(.orange)
-            }
-        }
-        .devCard()
-    }
-
-    /// Посредник в интернете: с ним Claude подключается с любого ПК, без общей Wi-Fi сети.
-    private var relayRow: some View {
-        let state = server.relay?.state ?? .off
-        let (color, text): (Color, String) = switch state {
-        case .online: (.green, "Online. Your PC can be on any network.")
-        case .connecting: (.orange, "Connecting to the internet…")
-        case .failed(let message): (.red, "\(message) Until then the PC must be on the same Wi-Fi.")
-        case .off: (.gray, "Internet connection is off. The PC must be on the same Wi-Fi.")
-        }
-        return Label {
-            Text(text).font(.callout)
-        } icon: {
-            Image(systemName: "globe").foregroundStyle(color)
-        }
-    }
+    // MARK: - Статус
 
     private var isOnline: Bool { server.relay?.state == .online }
 
-    private var statusColor: Color {
-        server.error != nil ? .red : (server.isRunning ? .green : .gray)
-    }
-    private var statusText: String {
-        server.error != nil ? "Server error" : (server.isRunning ? "Ready for Claude" : "Server stopped")
+    private enum Status { case connected(Date), ready, connecting, wifiOnly, error(String) }
+
+    /// Claude обращался меньше минуты назад — «подключён», иначе «готов» и ждёт.
+    private func status(now: Date) -> Status {
+        if let e = server.error { return .error(e) }
+        if let t = server.lastMCPAt, now.timeIntervalSince(t) < 60 { return .connected(t) }
+        switch server.relay?.state ?? .off {
+        case .online: return .ready
+        case .connecting: return .connecting
+        case .failed, .off: return .wifiOnly
+        }
     }
 
-    private var pinCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("PIN for the pairing page").font(.caption).foregroundStyle(.secondary)
-            Text(server.pin.map(String.init).joined(separator: " "))
-                .font(.system(size: 52, weight: .bold, design: .monospaced))
-                .minimumScaleFactor(0.5).lineLimit(1)
-                .textSelection(.enabled)
+    private func statusCard(now: Date) -> some View {
+        let s = status(now: now)
+        let (title, detail, color, icon): (String, String, Color, String) = switch s {
+        case .connected(let t): ("Claude connected", "Last request \(Self.ago(t, now: now)) ago · works from any network", .green, "bolt.horizontal.circle.fill")
+        case .ready: ("Ready for Claude", "Online. Your computer can be on any network.", .green, "checkmark.circle.fill")
+        case .connecting: ("Connecting…", "Connecting to the internet.", .orange, "arrow.triangle.2.circlepath")
+        case .wifiOnly: ("Wi-Fi only", relayMessage, .orange, "wifi")
+        case .error(let e): ("Server error", e, .red, "exclamationmark.triangle.fill")
         }
+        return VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: icon).font(.title3.bold()).foregroundStyle(color)
+            Text(detail).font(.callout).foregroundStyle(color.opacity(0.8))
+            if case .error = s {
+                Button("Try again") { server.stop(); server.start() }.buttonStyle(.borderedProminent).padding(.top, 4)
+            }
+        }
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 20).fill(color.opacity(0.16)))
+    }
+
+    private var relayMessage: String {
+        if case .failed(let m) = server.relay?.state ?? .off { return "\(m) The computer must be on the same Wi-Fi." }
+        return server.addresses.isEmpty ? "No internet and no Wi-Fi. Check the connection." : "The computer must be on the same Wi-Fi."
+    }
+
+    // MARK: - PIN
+
+    private var pairCard: some View {
+        VStack(spacing: 8) {
+            Text("To connect a new computer, open").font(.callout).foregroundStyle(.secondary)
+            Text(server.pairURL).font(.headline).textSelection(.enabled).multilineTextAlignment(.center)
+            Text(Self.groupedPIN(server.pin))
+                .font(.system(size: 48, weight: .bold, design: .monospaced))
+                .minimumScaleFactor(0.5).lineLimit(1).textSelection(.enabled)
+                .padding(.top, 6)
+            Text("New PIN after each pairing").font(.footnote).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
         .devCard()
     }
 
+    static func groupedPIN(_ pin: String) -> String {
+        guard pin.count == 6 else { return pin }
+        return "\(pin.prefix(3)) \(pin.suffix(3))"
+    }
+
+    // MARK: - Лента
+
+    private var activityCard: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { ctx in
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Activity").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).textCase(.uppercase)
+                    .padding(.bottom, 8)
+                if server.activity.isEmpty {
+                    Text("Claude hasn't done anything yet. Ask it to make an animation.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+                ForEach(Array(server.activity.prefix(6).enumerated()), id: \.element.id) { i, item in
+                    if i > 0 { Divider() }
+                    HStack {
+                        Text(item.count > 1 ? "\(item.text) ×\(item.count)" : item.text)
+                        Spacer()
+                        Text(Self.ago(item.at, now: ctx.date)).font(.footnote).foregroundStyle(.secondary).monospacedDigit()
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+        .devCard()
+    }
+
+    // MARK: - Инструкции (свёрнуты)
+
     private var stepsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("How to connect").font(.headline)
             if !isOnline {
-                Text("The PC must be on the same Wi-Fi as this iPhone.").font(.callout).foregroundStyle(.orange)
+                Text("The computer must be on the same Wi-Fi as this iPhone.").font(.callout).foregroundStyle(.orange)
             }
-            step(1, "On your PC open this page in a browser: \(server.pairURL)")
-            step(2, "Enter the PIN shown below.")
+            step(1, "On your computer open \(server.pairURL) in a browser.")
+            step(2, "Enter the PIN shown above.")
             step(3, "Copy the command from the page. Paste it into PowerShell (Windows) or Terminal (Mac) and press Enter.")
             step(4, "Quit Claude completely and open it again. On Windows also close it in the tray.")
         }
@@ -133,24 +171,10 @@ struct ClaudeConnectView: View {
         .devCard()
     }
 
-    private var activityCard: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            VStack(alignment: .leading, spacing: 6) {
-                Label(activity("Claude", server.lastMCPAt, now: ctx.date),
-                      systemImage: server.lastMCPAt == nil ? "circle.dashed" : "checkmark.circle.fill")
-                Label(activity("Browser", server.lastViewerAt, now: ctx.date), systemImage: "globe")
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .devCard()
-    }
-
-    private func activity(_ who: String, _ date: Date?, now: Date) -> String {
-        guard let date else { return "\(who) not connected yet" }
+    /// «2 s», «5 min», «3 h». Будущее время (часы чуть разошлись) считаем «0 s».
+    static func ago(_ date: Date, now: Date) -> String {
         let s = max(0, Int(now.timeIntervalSince(date)))
-        let ago = s < 60 ? "\(s) s" : (s < 3600 ? "\(s / 60) min" : "\(s / 3600) h")
-        return "\(who) connected \(ago) ago"
+        return s < 60 ? "\(s) s" : (s < 3600 ? "\(s / 60) min" : "\(s / 3600) h")
     }
 }
 
@@ -158,7 +182,7 @@ extension View {
     func devCard() -> some View {
         padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Color(uiColor: .secondarySystemBackground)))
+            .background(RoundedRectangle(cornerRadius: 20).fill(Color(uiColor: .secondarySystemBackground)))
     }
 }
 #endif

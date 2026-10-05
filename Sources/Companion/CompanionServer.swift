@@ -22,6 +22,8 @@ final class CompanionServer {
     /// Когда последний раз обращался Claude (MCP) / браузер.
     private(set) var lastMCPAt: Date?
     private(set) var lastViewerAt: Date?
+    /// Последние действия Claude, новые сверху.
+    private(set) var activity: [ClaudeActivity] = []
 
     var pin: String { auth.pin }
     var token: String { auth.token }
@@ -59,7 +61,13 @@ final class CompanionServer {
         addresses = NetworkAddresses.wifiIPv4()
         let routes = CompanionRoutes(store: store, mcp: mcp, auth: auth) { [weak self] kind in
             Task { @MainActor in
-                if kind == .mcp { self?.lastMCPAt = Date() } else { self?.lastViewerAt = Date() }
+                switch kind {
+                case .mcp(let tools):
+                    self?.lastMCPAt = Date()
+                    for t in tools { self?.record(tool: t) }
+                case .viewer:
+                    self?.lastViewerAt = Date()
+                }
             }
         }
         self.routes = routes
@@ -78,5 +86,41 @@ final class CompanionServer {
     func pauseRelay() { relay?.disconnect() }
     func resumeRelay() { relay?.connect() }
 
+    private func record(tool: String) {
+        guard let text = ClaudeActivity.describe(tool) else { return }
+        if let first = activity.first, first.text == text {
+            activity[0].at = Date(); activity[0].count += 1
+        } else {
+            activity.insert(ClaudeActivity(text: text, at: Date()), at: 0)
+            if activity.count > 20 { activity.removeLast(activity.count - 20) }
+        }
+    }
+
     func refreshAddresses() { addresses = NetworkAddresses.wifiIPv4() }
+}
+
+/// Одна строка в ленте «Activity» на экране Claude.
+struct ClaudeActivity: Identifiable, Equatable {
+    let id = UUID()
+    let text: String
+    var at: Date
+    var count = 1
+
+    /// Инструмент MCP → понятная дизайнеру фраза. nil — не показываем (служебные чтения).
+    static func describe(_ tool: String) -> String? {
+        switch tool {
+        case "create_project": "Created a project"
+        case "create_version", "create_version_from_lottie", "apply_overrides": "Made a new version"
+        case "restore_version": "Restored a version"
+        case "render_frame": "Checked frames"
+        case "get_feedback": "Read your comments"
+        case "resolve_feedback": "Answered a comment"
+        case "place_layer", "rename_layer", "replace_geometry", "place_asset": "Edited the scene"
+        case "add_svg", "add_image", "add_assets": "Added files"
+        case "export": "Exported JSON"
+        case "show_in_app": "Showed you a moment"
+        case "list_projects", "get_project", "list_versions", "get_version", "get_geometry", "list_assets", "diff_versions": "Looked at the project"
+        default: nil
+        }
+    }
 }

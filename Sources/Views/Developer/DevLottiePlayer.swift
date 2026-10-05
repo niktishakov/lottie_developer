@@ -24,6 +24,7 @@ final class DevPlayerController {
     private(set) var frame: Double = 0
     private(set) var startFrame: Double = 0
     private(set) var endFrame: Double = 0
+    private(set) var framerate: Double = 30
     private(set) var activeEngine = "—"
     private(set) var loadError: String?
     /// Меняется при пересоздании view — сигнал representable'у заменить subview.
@@ -58,6 +59,7 @@ final class DevPlayerController {
         view = v
         startFrame = Double(animation?.startFrame ?? 0)
         endFrame = Double(animation?.endFrame ?? 0)
+        framerate = Double(animation?.framerate ?? 30)
         isPlaying = false
         viewGeneration += 1
         seek(min(max(resume, startFrame), endFrame))
@@ -154,6 +156,7 @@ final class DevLottieHost: UIView {
 struct DevLottieStill: UIViewRepresentable {
     let url: URL?
     var progress: Double = 0.5
+    var fill = false
 
     func makeUIView(context: Context) -> DevLottieHost { DevLottieHost() }
 
@@ -162,7 +165,8 @@ struct DevLottieStill: UIViewRepresentable {
         context.coordinator.url = url
         guard let url, let anim = LottieAnimation.filepath(url.path) else { host.show(nil); return }
         let v = LottieAnimationView(animation: anim, configuration: LottieConfiguration(renderingEngine: .mainThread))
-        v.contentMode = .scaleAspectFit
+        v.contentMode = fill ? .scaleAspectFill : .scaleAspectFit
+        v.clipsToBounds = true
         v.currentProgress = progress
         host.show(v)
     }
