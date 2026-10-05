@@ -94,7 +94,7 @@ struct ClaudeConnectView: View {
             if !isOnline {
                 Text("The PC must be on the same Wi-Fi as this iPhone.").font(.callout).foregroundStyle(.orange)
             }
-            step(1, "On your PC open this page in a browser: \(server.viewerURL)/pair")
+            step(1, "On your PC open this page in a browser: \(server.pairURL)")
             step(2, "Enter the PIN shown below.")
             step(3, "Copy the command from the page. Paste it into PowerShell (Windows) or Terminal (Mac) and press Enter.")
             step(4, "Quit Claude completely and open it again. On Windows also close it in the tray.")

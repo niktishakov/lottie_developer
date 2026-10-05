@@ -4,7 +4,9 @@ import { MAX_BODY, requestFrames, ResponseAssembler, type Frame } from "./protoc
 export interface Env {
   DEVICE: DurableObjectNamespace<DeviceSession>;
   QUOTA: DurableObjectNamespace<RegistrationQuota>;
+  PINS: DurableObjectNamespace<PinIndex>;
   REGISTER_LIMIT: RateLimit;
+  PAIR_LIMIT: RateLimit;
   IP_LIMIT: RateLimit;
 }
 
@@ -12,6 +14,51 @@ export interface Env {
 export const REGISTRATIONS_PER_DAY = 300;
 /// Зарегистрированный, но ни разу не подключившийся айфон удаляется через неделю.
 const UNUSED_TTL_MS = 7 * 24 * 3600 * 1000;
+
+/// Неверных PIN в минуту на весь посредник, после этого вход по PIN закрыт до конца минуты (защита от перебора).
+export const PIN_FAILS_PER_MIN = 60;
+
+/// PIN → айфоны, которые сейчас онлайн с этим PIN. Нужен для короткого входа /pair без адреса айфона.
+export class PinIndex extends DurableObject<Env> {
+  private failWindow = 0;
+  private fails = 0;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS pins (device TEXT PRIMARY KEY, pin TEXT NOT NULL, updated INTEGER NOT NULL)");
+    ctx.storage.sql.exec("CREATE INDEX IF NOT EXISTS pins_pin ON pins (pin)");
+  }
+
+  async set(device: string, pin: string) {
+    this.ctx.storage.sql.exec("INSERT INTO pins (device, pin, updated) VALUES (?, ?, ?) ON CONFLICT(device) DO UPDATE SET pin = excluded.pin, updated = excluded.updated", device, pin, Date.now());
+  }
+
+  async remove(device: string) {
+    this.ctx.storage.sql.exec("DELETE FROM pins WHERE device = ?", device);
+  }
+
+  /// Айфоны с этим PIN (обычно один). Записи старше суток считаем устаревшими.
+  async lookup(pin: string): Promise<string[]> {
+    this.ctx.storage.sql.exec("DELETE FROM pins WHERE updated < ?", Date.now() - 86400_000);
+    return this.ctx.storage.sql.exec<{ device: string }>("SELECT device FROM pins WHERE pin = ? LIMIT 5", pin).toArray().map((r) => r.device);
+  }
+
+  /// false — слишком много неверных PIN за минуту.
+  async allowed(): Promise<boolean> {
+    this.roll();
+    return this.fails < PIN_FAILS_PER_MIN;
+  }
+
+  async fail() {
+    this.roll();
+    this.fails++;
+  }
+
+  private roll() {
+    const now = Date.now();
+    if (now - this.failWindow > 60_000) { this.failWindow = now; this.fails = 0; }
+  }
+}
 
 /// Счётчик регистраций за сутки (UTC), один объект на весь посредник.
 export class RegistrationQuota extends DurableObject<Env> {
@@ -90,6 +137,8 @@ export class DeviceSession extends DurableObject<Env> {
     if (!stored || !given || !equal(await sha256(given), stored)) return json({ error: "Unknown device or wrong secret" }, 401);
 
     // Новое подключение заменяет старое (айфон переподключился).
+    const id = req.headers.get("x-device-id");
+    if (id) this.ctx.storage.kv.put("id", id);
     for (const old of this.ctx.getWebSockets()) old.close(4000, "replaced");
     this.ctx.storage.sql.exec("UPDATE device SET connected = 1 WHERE connected = 0");
     const [client, server] = Object.values(new WebSocketPair());
@@ -127,6 +176,8 @@ export class DeviceSession extends DurableObject<Env> {
     return response;
   }
 
+  private pins() { return this.env.PINS.get(this.env.PINS.idFromName("global")); }
+
   private allow(): boolean {
     const now = Date.now();
     if (now - this.windowStart > 60_000) { this.windowStart = now; this.windowCount = 0; }
@@ -145,8 +196,14 @@ export class DeviceSession extends DurableObject<Env> {
 
   async webSocketMessage(_ws: WebSocket, message: string | ArrayBuffer) {
     if (typeof message !== "string") return;
-    let f: Frame;
+    let f: Frame | { t: "pin"; pin: string };
     try { f = JSON.parse(message); } catch { return; }
+    // Айфон сообщает свой текущий PIN для короткого входа.
+    if (f.t === "pin") {
+      const id = this.ctx.storage.kv.get<string>("id");
+      if (id && /^\d{6}$/.test(f.pin)) await this.pins().set(id, f.pin);
+      return;
+    }
     if (f.t !== "res" && f.t !== "res-body") return;
     const p = this.pending.get(f.id);
     if (!p) return;
@@ -162,6 +219,8 @@ export class DeviceSession extends DurableObject<Env> {
   async webSocketClose(ws: WebSocket, code: number) {
     if (this.ctx.getWebSockets().filter((s) => s !== ws).length > 0) return;
     for (const id of [...this.pending.keys()]) this.finish(id, json({ error: "iPhone disconnected" }, 502));
+    const device = this.ctx.storage.kv.get<string>("id");
+    if (device) await this.pins().remove(device);
     try { ws.close(code === 1005 ? 1000 : code); } catch {}
   }
 }

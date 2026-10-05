@@ -1,9 +1,10 @@
 // Посредник Lottie Developer: Claude на ПК → https → этот Worker → WebSocket → айфон.
 // Адрес айфона: /d/<deviceId>/mcp. Браузер после /d/<deviceId>/ ходит по обычным путям, айфон выбирается по cookie.
 
-import { DeviceSession, RegistrationQuota, json, sha256, type Env } from "./session";
+import { PAIR_HTML } from "./pair-page";
+import { DeviceSession, PinIndex, RegistrationQuota, json, sha256, type Env } from "./session";
 
-export { DeviceSession, RegistrationQuota };
+export { DeviceSession, PinIndex, RegistrationQuota };
 
 const DEVICE_RE = /^[a-z2-7]{20}$/;
 const COOKIE = "lottie_device";
@@ -20,6 +21,14 @@ export default {
       if (!(await env.REGISTER_LIMIT.limit({ key: ip })).success) return json({ error: "Too many registrations. Wait a minute." }, 429);
       return register(env, url);
     }
+    // Короткий вход: только PIN, айфон находим по нему.
+    if (p === "/pair") {
+      if (req.method === "GET") return new Response(PAIR_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
+      if (req.method === "POST") {
+        if (!(await env.PAIR_LIMIT.limit({ key: ip })).success) return json({ error: "Too many attempts. Wait a minute and try again." }, 429);
+        return pairByPin(req, env);
+      }
+    }
     // Лимит на IP до обращения к Durable Object: перебор адресов не тратит дневной лимит.
     if (!(await env.IP_LIMIT.limit({ key: ip })).success) return json({ error: "Too many requests. Wait a minute." }, 429);
 
@@ -29,7 +38,11 @@ export default {
       if (!DEVICE_RE.test(id)) return json({ error: "Bad device id" }, 400);
       const rest = m[2] ?? "/";
       const stub = env.DEVICE.get(env.DEVICE.idFromName(id));
-      if (rest === "/connect") return stub.fetch(new Request("https://device/__connect", req));
+      if (rest === "/connect") {
+        const r = new Request("https://device/__connect", req);
+        r.headers.set("x-device-id", id);
+        return stub.fetch(r);
+      }
       const res = await stub.fetch(inner(req, url, rest));
       return withDeviceCookie(res, id);
     }
@@ -55,6 +68,22 @@ async function register(env: Env, url: URL): Promise<Response> {
     }
   }
   return json({ error: "Try again" }, 500);
+}
+
+async function pairByPin(req: Request, env: Env): Promise<Response> {
+  const body = await req.text();
+  let pin = "";
+  try { pin = String(JSON.parse(body).pin ?? "").trim(); } catch {}
+  if (!/^\d{6}$/.test(pin)) return json({ error: "Enter the 6-digit PIN" }, 400);
+  const index = env.PINS.get(env.PINS.idFromName("global"));
+  if (!(await index.allowed())) return json({ error: "Too many attempts. Wait a minute and try again." }, 429);
+  for (const id of await index.lookup(pin)) {
+    const stub = env.DEVICE.get(env.DEVICE.idFromName(id));
+    const res = await stub.fetch(new Request("https://device/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pin }) }));
+    if (res.ok) return withDeviceCookie(res, id);
+  }
+  await index.fail();
+  return json({ error: "Wrong PIN, or the iPhone app is closed. Open Lottie Developer on the iPhone and try again." }, 403);
 }
 
 function inner(req: Request, url: URL, path: string): Request {

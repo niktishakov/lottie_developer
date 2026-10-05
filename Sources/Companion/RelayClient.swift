@@ -18,13 +18,16 @@ final class RelayClient {
     var base: String? { deviceID.map { "\(Self.baseURL.absoluteString)/d/\($0)" } }
 
     private let handler: HTTPHandler
+    /// Текущий PIN: посредник по нему находит айфон для короткого входа …/pair.
+    private let pin: @MainActor () -> String
     private var task: URLSessionWebSocketTask?
     private var loop: Task<Void, Never>?
     private var assembler = RelayFrames.Assembler()
     private var wanted = false
 
-    init(handler: @escaping HTTPHandler) {
+    init(handler: @escaping HTTPHandler, pin: @escaping @MainActor () -> String) {
         self.handler = handler
+        self.pin = pin
         deviceID = Keychain.read(Self.idKey)
     }
 
@@ -90,10 +93,18 @@ final class RelayClient {
         defer { ws.cancel(with: .goingAway, reason: nil); if task === ws { task = nil } }
 
         // Ping раз в 20 с: Cloudflare отвечает "pong" сам, соединение не засыпает.
-        let pinger = Task {
+        // PIN отправляем только при подключении и когда он поменялся: каждый такой кадр — платный запрос.
+        let pinger = Task { [pin] in
+            var sentPIN: String?
+            var tick = 0
             while !Task.isCancelled {
-                try? await ws.send(.string("ping"))
-                try? await Task.sleep(for: .seconds(20))
+                let current = pin()
+                if current != sentPIN, let frame = Self.pinFrame(current) {
+                    if (try? await ws.send(.string(frame))) != nil { sentPIN = current }
+                }
+                if tick % 20 == 0 { try? await ws.send(.string("ping")) }
+                tick += 1
+                try? await Task.sleep(for: .seconds(1))
             }
         }
         defer { pinger.cancel() }
@@ -125,6 +136,11 @@ final class RelayClient {
                               headers: headers, body: r.body, remoteIP: "relay")
         let res = await handler(req)
         send(ws, RelayFrames.responseFrames(id: r.id, status: res.status, headers: res.headers, body: res.body))
+    }
+
+    private static func pinFrame(_ pin: String) -> String? {
+        guard let d = try? JSONSerialization.data(withJSONObject: ["t": "pin", "pin": pin]) else { return nil }
+        return String(decoding: d, as: UTF8.self)
     }
 
     private func send(_ ws: URLSessionWebSocketTask, _ frames: [String]) {

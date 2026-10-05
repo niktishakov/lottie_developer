@@ -37,6 +37,12 @@ final class CompanionServer {
         return "http://\(addresses.first ?? "<iphone-ip>"):\(Self.port)"
     }
 
+    /// Короткий адрес для ПК: только PIN, без адреса айфона.
+    var pairURL: String {
+        if relay?.state == .online, let host = RelayClient.baseURL.host() { return "\(host)/pair" }
+        return "\(viewerURL)/pair"
+    }
+
     static func command(mcpURL: String, token: String) -> String {
         "claude mcp add -s user --transport http lottie-developer \(mcpURL) --header \"Authorization: Bearer \(token)\""
     }
@@ -60,7 +66,8 @@ final class CompanionServer {
         let server = HTTPServer(port: Self.port) { req in await routes.handle(req) }
         do { try server.start(); http = server; isRunning = true; error = nil }
         catch { self.error = error.localizedDescription; isRunning = false }
-        let relay = self.relay ?? RelayClient { req in await routes.handle(req) }
+        let relay = self.relay ?? RelayClient(handler: { req in await routes.handle(req) },
+                                              pin: { [auth] in auth.pin })
         self.relay = relay
         relay.connect()
     }
