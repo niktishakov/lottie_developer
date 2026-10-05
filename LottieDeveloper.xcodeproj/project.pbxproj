@@ -122,6 +122,7 @@
 		D1A390644F61C9A855C97294 /* DeveloperRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A8FA3EA6B2294AD518601F /* DeveloperRootView.swift */; };
 		D5E6F75B4041C0505107DAB1 /* EditorToolsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 682FD1FF9105EED92EBA0251 /* EditorToolsTests.swift */; };
 		D8A0D9F942108088FDAF2D5F /* ProjectModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AF62EDD0B0FFE46B32C221A /* ProjectModels.swift */; };
+		DB4BFB8449B3EC7B1D8AE175 /* FilmStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 707F9A1C9A3429652620EDCE /* FilmStrip.swift */; };
 		DBCFE7ED71AE9C5C28B6666B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9A6A5CA82266E5FBEEEFA228 /* Assets.xcassets */; };
 		DC0ECFA67371CD32DF5BE5FC /* CanonicalizationResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12FAB8B7AA6DD84CC5E28B48 /* CanonicalizationResultView.swift */; };
 		DCA5879EC6D30BA8E2C2B9B1 /* AnimationSpecSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB16A07A4680BA538D0602D0 /* AnimationSpecSchema.swift */; };
@@ -215,6 +216,7 @@
 		682FD1FF9105EED92EBA0251 /* EditorToolsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorToolsTests.swift; sourceTree = "<group>"; };
 		6CFB1EF0178CD394407CB18D /* PipelineEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineEnums.swift; sourceTree = "<group>"; };
 		6DF1CB8BA12C83362C1422D9 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		707F9A1C9A3429652620EDCE /* FilmStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmStrip.swift; sourceTree = "<group>"; };
 		70A9CC870838DD4765EE0CE2 /* QAReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QAReportView.swift; sourceTree = "<group>"; };
 		70B3B9C6F47B279A03F8879F /* BackgroundSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundSheet.swift; sourceTree = "<group>"; };
 		769C1C108BFE4605E17525AA /* PurchaseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseStore.swift; sourceTree = "<group>"; };
@@ -539,6 +541,7 @@
 				D53B73B54CFFB67D1259988D /* ClaudeConnectView.swift */,
 				E7A8FA3EA6B2294AD518601F /* DeveloperRootView.swift */,
 				E96D05D73572132D1722BC93 /* DevLottiePlayer.swift */,
+				707F9A1C9A3429652620EDCE /* FilmStrip.swift */,
 				3F16DD063FA9D1DE465FD049 /* FullscreenHero.swift */,
 				14709B243246534742ACBDFE /* LottieImport.swift */,
 				1F84AD6F5F7E995D48BCD24C /* ProjectPlayerView.swift */,
@@ -898,6 +901,7 @@
 				20334F1ED860D04C71ECEBA9 /* CompanionServer.swift in Sources */,
 				F3FDEBE85A8BE14D0E9542A0 /* DevLottiePlayer.swift in Sources */,
 				D1A390644F61C9A855C97294 /* DeveloperRootView.swift in Sources */,
+				DB4BFB8449B3EC7B1D8AE175 /* FilmStrip.swift in Sources */,
 				B4CFD6F4D3BC889E8A210D5E /* FrameRenderer.swift in Sources */,
 				7979AD967F75EB7474298AF9 /* FullscreenHero.swift in Sources */,
 				3BF7424FF68BB991AD644F90 /* GateResultsCard.swift in Sources */,

@@ -148,45 +148,45 @@ struct ProjectPlayerView: View {
 
     // MARK: - Transport
 
+    /// Лента кадров сверху, под ней воспроизведение, время, скорость, повтор, фон и «•••».
     private var transport: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 12) {
+            FilmStrip(url: currentURL, aspect: player.aspect, frame: player.frame,
+                      start: player.startFrame, end: player.endFrame, markers: commentFrames,
+                      background: background, backgroundHex: backgroundHex) { player.seek($0.rounded()) }
+            HStack(spacing: 10) {
                 Button { player.toggle() } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title3).foregroundStyle(.white)
                         .frame(width: 44, height: 44).background(Circle().fill(.tint))
                 }
                 .buttonStyle(.plain)
-                Scrubber(frame: player.frame, start: player.startFrame, end: player.endFrame,
-                         markers: commentFrames) { player.seek($0.rounded()) }
-                Text(timeText).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
-                    .frame(minWidth: 58, alignment: .trailing)
-            }
-            HStack(spacing: 8) {
+                .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
+                (Text(String(format: "%.2f", max(0, player.frame - player.startFrame) / max(player.framerate, 1)))
+                    .font(.headline.monospacedDigit())
+                 + Text(" / " + seconds(player.endFrame)).font(.subheadline.monospacedDigit()).foregroundColor(.secondary))
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
                 Menu {
                     Picker("Speed", selection: $player.speed) {
                         ForEach([0.25, 0.5, 1.0, 1.5, 2.0], id: \.self) { s in Text(Self.speedText(s)).tag(s) }
                     }
                 } label: { Chip(text: Self.speedText(player.speed)) }
-                Button { player.loop.toggle() } label: { Chip(text: "Loop", on: player.loop) }
-                    .buttonStyle(.plain)
-                Button { choosingBackground = true } label: {
-                    HStack(spacing: 6) {
-                        if background == .custom {
-                            Circle().fill(Color(hex: backgroundHex) ?? .white).frame(width: 14, height: 14)
-                                .overlay(Circle().strokeBorder(.secondary.opacity(0.6), lineWidth: 0.5))
-                        }
-                        Chip(text: background == .custom ? backgroundHex : background.rawValue)
-                    }
+                Button { player.loop.toggle() } label: {
+                    IconChip(systemName: "repeat", on: player.loop)
                 }
                 .buttonStyle(.plain)
-                Spacer()
+                .accessibilityLabel(player.loop ? "Loop on" : "Loop off")
+                Button { choosingBackground = true } label: { BackgroundChip(kind: background, hex: backgroundHex) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Background")
                 Menu {
                     Picker("Engine", selection: $player.engine) {
                         ForEach(DevEngineChoice.allCases) { Text($0.rawValue).tag($0) }
                     }
                     Text("Engine in use: \(player.activeEngine)")
-                } label: { Chip(text: "•••") }
+                } label: { IconChip(systemName: "ellipsis") }
+                .accessibilityLabel("More")
             }
         }
         .devCard()
@@ -360,6 +360,31 @@ struct Scrubber: View {
             })
         }
         .frame(height: 34)
+    }
+}
+
+/// Круглая кнопка с иконкой; включённая — в цвете приложения.
+private struct IconChip: View {
+    let systemName: String
+    var on = false
+    var body: some View {
+        Image(systemName: systemName).font(.subheadline.weight(.semibold))
+            .foregroundStyle(on ? Color.accentColor : Color.primary)
+            .frame(width: 34, height: 34)
+            .background(Circle().fill(on ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.18)))
+    }
+}
+
+/// Кнопка фона: кружок с выбранным фоном (мозаика или цвет).
+private struct BackgroundChip: View {
+    let kind: DevBackground
+    let hex: String
+    var body: some View {
+        DevBackgroundView(kind: kind, customHex: hex)
+            .frame(width: 20, height: 20).clipShape(Circle())
+            .overlay(Circle().strokeBorder(.secondary.opacity(0.6), lineWidth: 0.5))
+            .frame(width: 34, height: 34)
+            .background(Circle().fill(Color.secondary.opacity(0.18)))
     }
 }
 
