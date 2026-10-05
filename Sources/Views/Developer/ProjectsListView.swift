@@ -196,7 +196,7 @@ struct ProjectInfo {
         note = text
         durationText = previewURL.flatMap(LottieDuration.text(for:))
         isNew = SeenVersions.isNew(project)
-        imported = latest?.source == "import"
+        imported = latest?.source == "file"
         _ = store.feedbackRevision
         openComments = store.feedback(projectID: project.id).filter { !$0.resolved }.count
     }

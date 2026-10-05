@@ -18,6 +18,9 @@ struct ProjectPlayerView: View {
     @AppStorage("player.backgroundHex") private var backgroundHex = "#FFFFFF"
     @State private var choosingBackground = false
     @State private var fullscreen = false
+    /// Пока открыт полный экран (и пока идёт переход), в холсте застывший кадр: zoom-переход увеличивает картинку, а не пустоту.
+    @State private var stillProgress: Double?
+    @Namespace private var heroNS
     @State private var newComment = ""
     @State private var composing = false
     @State private var appliedCommandAt: Date?
@@ -112,8 +115,12 @@ struct ProjectPlayerView: View {
     private var canvas: some View {
         ZStack {
             DevBackgroundView(kind: background, customHex: backgroundHex)
-            // Вид Lottie один: на весь экран он переезжает, здесь в это время только фон.
-            if !fullscreen { DevLottieCanvas(controller: player) }
+            // Вид Lottie один: на весь экран он переезжает, здесь в это время его застывший кадр.
+            if let p = stillProgress {
+                DevLottieStill(url: currentURL, progress: p)
+            } else {
+                DevLottieCanvas(controller: player)
+            }
             if let err = player.loadError {
                 Text(err).font(.callout).foregroundStyle(.red).padding()
             }
@@ -123,7 +130,7 @@ struct ProjectPlayerView: View {
         // Форма анимации, но не выше 60% экрана: вертикальный экран не вытесняет панель управления.
         .aspectRatio(player.aspect, contentMode: .fit)
         .overlay(alignment: .topTrailing) {
-            Button { fullscreen = true } label: {
+            Button { stillProgress = progress; fullscreen = true } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.white)
                     .frame(width: 36, height: 36).background(Circle().fill(.black.opacity(0.45)))
@@ -132,10 +139,15 @@ struct ProjectPlayerView: View {
             .padding(10)
         }
         .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
+        .heroSource(id: "canvas", in: heroNS)
         .frame(maxWidth: .infinity)
         .onTapGesture { player.toggle() }
-        .fullScreenCover(isPresented: $fullscreen) {
-            FullscreenPlayer(player: player, background: background, backgroundHex: backgroundHex) { fullscreen = false }
+        .fullScreenCover(isPresented: $fullscreen, onDismiss: { stillProgress = nil }) {
+            FullscreenPlayer(player: player, background: background, backgroundHex: backgroundHex) {
+                stillProgress = progress
+                fullscreen = false
+            }
+                .heroZoom(sourceID: "canvas", in: heroNS)
         }
     }
 
@@ -187,6 +199,12 @@ struct ProjectPlayerView: View {
 
     private var timeText: String { seconds(player.frame) }
 
+    /// 0…1 — текущий момент для застывшего кадра.
+    private var progress: Double {
+        let span = player.endFrame - player.startFrame
+        return span > 0 ? min(max((player.frame - player.startFrame) / span, 0), 1) : 0
+    }
+
     /// Кадр → время от начала, «2.77 s». Дизайнеру понятнее секунды, чем номер кадра.
     private func seconds(_ frame: Double) -> String {
         String(format: "%.2f s", max(0, frame - player.startFrame) / max(player.framerate, 1))
@@ -201,9 +219,9 @@ struct ProjectPlayerView: View {
 
     private func claudeNote(_ v: AnimationVersion) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: v.source == "import" ? "square.and.arrow.down" : "sparkle").foregroundStyle(.tint)
+            Image(systemName: v.source == "file" ? "square.and.arrow.down" : "sparkle").foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 3) {
-                Text("\(v.source == "import" ? "Imported" : "Agent") · \(v.label)").font(.subheadline.weight(.semibold))
+                Text("\(v.source == "file" ? "Imported" : "Agent") · \(v.label)").font(.subheadline.weight(.semibold))
                 if !v.note.isEmpty { Text(v.note).font(.subheadline).foregroundStyle(.secondary) }
                 if !v.prompt.isEmpty, v.prompt != v.note {
                     Text(v.prompt).font(.footnote).foregroundStyle(.tertiary)
@@ -370,14 +388,14 @@ private struct Chip: View {
 #endif
 
 #if os(iOS)
-/// Анимация на весь экран: выбранный фон, тап — пауза/воспроизведение, внизу шкала, свайп вниз или ✕ — выход.
+/// Анимация на весь экран: выбранный фон, тап — пауза/воспроизведение, внизу шкала.
+/// Выход — ✕, на iOS 18 ещё и свайп вниз (встроен в zoom-переход).
 private struct FullscreenPlayer: View {
     let player: DevPlayerController
     let background: DevBackground
     let backgroundHex: String
     let onClose: () -> Void
     @State private var showControls = true
-    @State private var drag: CGFloat = 0
 
     var body: some View {
         ZStack {
@@ -417,10 +435,6 @@ private struct FullscreenPlayer: View {
                 .padding()
             }
         }
-        .offset(y: max(drag, 0))
-        .gesture(DragGesture().onChanged { drag = $0.translation.height }.onEnded { v in
-            if v.translation.height > 120 { onClose() } else { withAnimation { drag = 0 } }
-        })
         .statusBarHidden()
         .task(id: player.isPlaying) {
             // Во время воспроизведения управление прячется через 2 с.
@@ -428,6 +442,19 @@ private struct FullscreenPlayer: View {
             try? await Task.sleep(for: .seconds(2))
             withAnimation { showControls = false }
         }
+    }
+}
+#endif
+
+#if os(iOS)
+/// Hero-переход холста в полный экран (zoom, iOS 18+). На iOS 17 — обычное появление снизу.
+private extension View {
+    @ViewBuilder func heroSource(id: String, in ns: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) { matchedTransitionSource(id: id, in: ns) { $0.clipShape(RoundedRectangle(cornerRadius: 24)) } } else { self }
+    }
+
+    @ViewBuilder func heroZoom(sourceID: String, in ns: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) { navigationTransition(.zoom(sourceID: sourceID, in: ns)) } else { self }
     }
 }
 #endif

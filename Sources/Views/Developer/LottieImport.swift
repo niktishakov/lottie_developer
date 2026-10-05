@@ -26,7 +26,7 @@ enum LottieImport {
         let project = store.createProjectFromLottie(name: name, lottieData: json, sourceLabel: url.lastPathComponent)
         let layers = (obj["layers"] as? [Any])?.count ?? 0
         store.addVersion(projectID: project.id, prompt: "", compiledData: json, layerCount: layers,
-                         compilerWarnings: 0, specJSON: nil, note: "Imported \(url.lastPathComponent)", source: "import")
+                         compilerWarnings: 0, specJSON: nil, note: "Imported \(url.lastPathComponent)", source: "file")
         return store.project(project.id) ?? project
     }
 

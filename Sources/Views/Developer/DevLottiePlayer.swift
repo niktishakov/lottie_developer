@@ -164,18 +164,23 @@ struct DevLottieStill: UIViewRepresentable {
     func makeUIView(context: Context) -> DevLottieHost { DevLottieHost() }
 
     func updateUIView(_ host: DevLottieHost, context: Context) {
-        guard context.coordinator.url != url else { return }
+        // Тот же файл — только сдвигаем кадр.
+        if context.coordinator.url == url {
+            if let v = context.coordinator.view, v.currentProgress != progress { v.currentProgress = progress }
+            return
+        }
         context.coordinator.url = url
         guard let url, let anim = LottieAnimation.filepath(url.path) else { host.show(nil); return }
         let v = LottieAnimationView(animation: anim, configuration: LottieConfiguration(renderingEngine: .mainThread))
         v.contentMode = fill ? .scaleAspectFill : .scaleAspectFit
         v.clipsToBounds = true
         v.currentProgress = progress
+        context.coordinator.view = v
         host.show(v)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
-    final class Coordinator { var url: URL?? = .none }
+    final class Coordinator { var url: URL?? = .none; var view: LottieAnimationView? }
 }
 
 /// Фон под анимацией.
