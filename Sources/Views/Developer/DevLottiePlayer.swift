@@ -177,14 +177,17 @@ struct DevLottieStill: UIViewRepresentable {
 
 /// Фон под анимацией.
 enum DevBackground: String, CaseIterable, Identifiable {
-    case checker = "Checker", light = "Light", dark = "Dark"
+    case checker = "Mosaic", light = "Light", dark = "Dark", custom = "Color"
     var id: String { rawValue }
 }
 
 struct DevBackgroundView: View {
     let kind: DevBackground
+    /// Цвет для .custom, "#RRGGBB".
+    var customHex = "#FFFFFF"
     var body: some View {
         switch kind {
+        case .custom: Color(hex: customHex) ?? .white
         case .light: Color.white
         case .dark: Color(white: 0.08)
         case .checker:

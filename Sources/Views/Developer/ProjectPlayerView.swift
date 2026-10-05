@@ -12,7 +12,9 @@ struct ProjectPlayerView: View {
     @State private var selectedVersionID: UUID?
     @State private var didPickInitial = false
     @State private var player = DevPlayerController()
-    @State private var background: DevBackground = .checker
+    @AppStorage("player.background") private var background: DevBackground = .checker
+    @AppStorage("player.backgroundHex") private var backgroundHex = "#FFFFFF"
+    @State private var choosingBackground = false
     @State private var newComment = ""
     @State private var composing = false
     @State private var appliedCommandAt: Date?
@@ -62,6 +64,9 @@ struct ProjectPlayerView: View {
             if let project { SeenVersions.markSeen(project) }
         }
         .sheet(isPresented: $composing) { commentSheet }
+        .sheet(isPresented: $choosingBackground) {
+            BackgroundSheet(kind: $background, customHex: $backgroundHex, lottieURL: currentURL)
+        }
         .onChange(of: command?.issuedAt) { _, _ in applyCommand() }
         .onChange(of: versions.first?.id) { old, new in
             // Пришла новая версия от Claude — показываем её, если смотрели последнюю.
@@ -99,7 +104,7 @@ struct ProjectPlayerView: View {
 
     private var canvas: some View {
         ZStack {
-            DevBackgroundView(kind: background)
+            DevBackgroundView(kind: background, customHex: backgroundHex)
             DevLottieCanvas(controller: player)
             if let err = player.loadError {
                 Text(err).font(.callout).foregroundStyle(.red).padding()
@@ -134,11 +139,16 @@ struct ProjectPlayerView: View {
                 } label: { Chip(text: Self.speedText(player.speed)) }
                 Button { player.loop.toggle() } label: { Chip(text: "Loop", on: player.loop) }
                     .buttonStyle(.plain)
-                Menu {
-                    Picker("Background", selection: $background) {
-                        ForEach(DevBackground.allCases) { Text($0.rawValue).tag($0) }
+                Button { choosingBackground = true } label: {
+                    HStack(spacing: 6) {
+                        if background == .custom {
+                            Circle().fill(Color(hex: backgroundHex) ?? .white).frame(width: 14, height: 14)
+                                .overlay(Circle().strokeBorder(.secondary.opacity(0.6), lineWidth: 0.5))
+                        }
+                        Chip(text: background == .custom ? backgroundHex : background.rawValue)
                     }
-                } label: { Chip(text: background.rawValue) }
+                }
+                .buttonStyle(.plain)
                 Spacer()
                 Menu {
                     Picker("Engine", selection: $player.engine) {

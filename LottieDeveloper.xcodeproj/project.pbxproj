@@ -110,6 +110,7 @@
 		C5F18471AE5FCE7E22652D01 /* MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F373B8D0B6FE472C3328F1C8 /* MCPServer.swift */; };
 		C78D374FF6D1A9AF99134D33 /* FrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D245BE4D8C29DE1E7CA0ACDF /* FrameRenderer.swift */; };
 		C87A5937D588E3B5921A5C52 /* FrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D245BE4D8C29DE1E7CA0ACDF /* FrameRenderer.swift */; };
+		CA1F0A1CE22D86820CAE7CF8 /* BackgroundSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B3B9C6F47B279A03F8879F /* BackgroundSheet.swift */; };
 		CC50607ECCA9D2183DC7D924 /* LottieCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 454AC4DF6BDC424B83701A42 /* LottieCanvas.swift */; };
 		CC9AC5D933581ABCA6CB2232 /* LottieImageLayers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F13224D1B9ECBAAD20EA8C /* LottieImageLayers.swift */; };
 		CE2365DB9CBFE246A2CC37BE /* ProjectModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AF62EDD0B0FFE46B32C221A /* ProjectModels.swift */; };
@@ -210,6 +211,7 @@
 		6CFB1EF0178CD394407CB18D /* PipelineEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineEnums.swift; sourceTree = "<group>"; };
 		6DF1CB8BA12C83362C1422D9 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		70A9CC870838DD4765EE0CE2 /* QAReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QAReportView.swift; sourceTree = "<group>"; };
+		70B3B9C6F47B279A03F8879F /* BackgroundSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundSheet.swift; sourceTree = "<group>"; };
 		769C1C108BFE4605E17525AA /* PurchaseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseStore.swift; sourceTree = "<group>"; };
 		79528051C0F2D3AEB67F24CD /* PromptSpecInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptSpecInputView.swift; sourceTree = "<group>"; };
 		7CB257DB5B46F59853B63D69 /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
@@ -527,6 +529,7 @@
 		90DAA21630F232D342DCDD89 /* Developer */ = {
 			isa = PBXGroup;
 			children = (
+				70B3B9C6F47B279A03F8879F /* BackgroundSheet.swift */,
 				D53B73B54CFFB67D1259988D /* ClaudeConnectView.swift */,
 				E7A8FA3EA6B2294AD518601F /* DeveloperRootView.swift */,
 				E96D05D73572132D1722BC93 /* DevLottiePlayer.swift */,
@@ -875,6 +878,7 @@
 				EF1E174D47D273A212B98F02 /* AppDebugFlags.swift in Sources */,
 				220FE0F29A1B4D7562CB6172 /* AssetBundle.swift in Sources */,
 				DE6954EA4933C64CDA0A2F47 /* AssetFiles.swift in Sources */,
+				CA1F0A1CE22D86820CAE7CF8 /* BackgroundSheet.swift in Sources */,
 				DC0ECFA67371CD32DF5BE5FC /* CanonicalizationResultView.swift in Sources */,
 				1DB6EFD00BD37709D73E16BA /* CanonicalizationService.swift in Sources */,
 				BB9324EC45039DD4F0EF8911 /* CheckerboardBackground.swift in Sources */,
