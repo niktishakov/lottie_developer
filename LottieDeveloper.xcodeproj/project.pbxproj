@@ -67,6 +67,7 @@
 		75657492ECE18F2410C9839D /* SyntaxGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21EDA6BA9CB162AF555CBDB6 /* SyntaxGate.swift */; };
 		775C7C7DF2C82570F8C413C4 /* SKILL.md in Resources */ = {isa = PBXBuildFile; fileRef = 8D08A84A19D6C78A0766B75A /* SKILL.md */; };
 		792B9245BCCB5B8039F6B793 /* PurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 769C1C108BFE4605E17525AA /* PurchaseStore.swift */; };
+		7979AD967F75EB7474298AF9 /* FullscreenHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F16DD063FA9D1DE465FD049 /* FullscreenHero.swift */; };
 		7AD4C137362519A89904118E /* en.lproj in Resources */ = {isa = PBXBuildFile; fileRef = CB0E9FAF07269BDC49513A3B /* en.lproj */; };
 		86DE4F0B617208344AC9105D /* LottieAnimationUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F457F0D1FC6B946F568AF6 /* LottieAnimationUIView.swift */; };
 		88A27AD57DD2DBD992BDA61E /* MotionSemanticGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C747BE8CB8E54ECBCB08BE2E /* MotionSemanticGate.swift */; };
@@ -200,6 +201,7 @@
 		3DA34E272FFE143DAC8BFAEA /* PlaybackState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackState.swift; sourceTree = "<group>"; };
 		3E336CA1751BB063600CFE4C /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		3EF0D319D568A9C27471EA4C /* PipelineRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineRunView.swift; sourceTree = "<group>"; };
+		3F16DD063FA9D1DE465FD049 /* FullscreenHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenHero.swift; sourceTree = "<group>"; };
 		43D262E4CB635F802A40DC80 /* RollbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollbackService.swift; sourceTree = "<group>"; };
 		454AC4DF6BDC424B83701A42 /* LottieCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieCanvas.swift; sourceTree = "<group>"; };
 		45AC48CACC8779BB46B9E22A /* Exporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exporter.swift; sourceTree = "<group>"; };
@@ -537,6 +539,7 @@
 				D53B73B54CFFB67D1259988D /* ClaudeConnectView.swift */,
 				E7A8FA3EA6B2294AD518601F /* DeveloperRootView.swift */,
 				E96D05D73572132D1722BC93 /* DevLottiePlayer.swift */,
+				3F16DD063FA9D1DE465FD049 /* FullscreenHero.swift */,
 				14709B243246534742ACBDFE /* LottieImport.swift */,
 				1F84AD6F5F7E995D48BCD24C /* ProjectPlayerView.swift */,
 				346F97EE1E9B8E1E2B0C76FC /* ProjectsListView.swift */,
@@ -896,6 +899,7 @@
 				F3FDEBE85A8BE14D0E9542A0 /* DevLottiePlayer.swift in Sources */,
 				D1A390644F61C9A855C97294 /* DeveloperRootView.swift in Sources */,
 				B4CFD6F4D3BC889E8A210D5E /* FrameRenderer.swift in Sources */,
+				7979AD967F75EB7474298AF9 /* FullscreenHero.swift in Sources */,
 				3BF7424FF68BB991AD644F90 /* GateResultsCard.swift in Sources */,
 				EB2C2C8241BD9C873D05C3EC /* HTTPServer.swift in Sources */,
 				054B2CFDCA189DE91E66AF72 /* HTTPTypes.swift in Sources */,

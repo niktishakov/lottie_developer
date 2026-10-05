@@ -17,15 +17,10 @@ struct ProjectPlayerView: View {
     @AppStorage("player.background") private var background: DevBackground = .checker
     @AppStorage("player.backgroundHex") private var backgroundHex = "#FFFFFF"
     @State private var choosingBackground = false
-    @State private var fullscreen = false
-    @State private var showFullscreenControls = true
-    /// 0 — холст на своём месте, 1 — на весь экран. Анимируется только это число: рамка и скругление считаются из него.
-    @State private var expanded = false
-    /// Где холст в плеере (глобальные координаты) — откуда растёт и куда возвращается полный экран.
+    /// Полный экран живёт на корне приложения (DeveloperRootView), выше шапки и вкладок.
+    @Environment(FullscreenHero.self) private var hero
+    /// Где холст на экране — откуда растёт и куда возвращается полный экран.
     @State private var canvasRect: CGRect = .zero
-    @State private var sourceRect: CGRect = .zero
-    /// Шапка и панель вкладок прячутся, только когда анимация уже на весь экран: иначе страница под ней прыгает.
-    @State private var barsHidden = false
     @State private var newComment = ""
     @State private var composing = false
     @State private var appliedCommandAt: Date?
@@ -52,15 +47,6 @@ struct ProjectPlayerView: View {
     }
 
     @ViewBuilder private var content: some View {
-        ZStack {
-            page
-            if fullscreen { fullscreenLayer }
-        }
-        .toolbar(barsHidden ? .hidden : .visible, for: .navigationBar, .tabBar)
-        .statusBarHidden(barsHidden)
-    }
-
-    @ViewBuilder private var page: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 canvas
@@ -126,23 +112,15 @@ struct ProjectPlayerView: View {
 
     // MARK: - Canvas
 
-    /// Холст: фон + живая анимация. Один и тот же вид в плеере и на весь экран — matchedGeometryEffect
-    /// плавно меняет ему рамку и скругление, без наложения двух картинок.
-    private func canvasCore(cornerRadius: CGFloat) -> some View {
-        ZStack {
-            DevBackgroundView(kind: background, customHex: backgroundHex)
-            DevLottieCanvas(controller: player).aspectRatio(player.aspect, contentMode: .fit)
-            if let err = player.loadError {
-                Text(err).font(.callout).foregroundStyle(.red).padding()
-            }
-        }
-        // Скругление по самому холсту (UIKit-вид Lottie иначе выходит за маску).
-        .mask(RoundedRectangle(cornerRadius: cornerRadius))
-    }
-
     private var canvas: some View {
         Group {
-            if fullscreen { Color.clear } else { canvasCore(cornerRadius: 24) }
+            // Пока открыт полный экран, вид Lottie там, здесь пусто.
+            if hero.isShowing(player) {
+                Color.clear.transition(.identity)
+            } else {
+                PlayerCanvas(player: player, background: background, backgroundHex: backgroundHex)
+                    .transition(.identity)
+            }
         }
         .background(GeometryReader { g in
             Color.clear
@@ -152,97 +130,20 @@ struct ProjectPlayerView: View {
         // Форма анимации, но не выше 60% экрана: вертикальный экран не вытесняет панель управления.
         .aspectRatio(player.aspect, contentMode: .fit)
         .overlay(alignment: .topTrailing) {
-            if !fullscreen {
-                Button { setFullscreen(true) } label: {
+            if !hero.isShowing(player) {
+                Button { hero.open(player, from: canvasRect, background: background, hex: backgroundHex) } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.subheadline.weight(.semibold)).foregroundStyle(.white)
                         .frame(width: 36, height: 36).background(Circle().fill(.black.opacity(0.45)))
                 }
                 .accessibilityLabel("Full screen")
                 .padding(10)
+                .transition(.opacity)
             }
         }
         .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
         .frame(maxWidth: .infinity)
         .onTapGesture { player.toggle() }
-    }
-
-    private static let heroSpring = Animation.spring(duration: 0.42, bounce: 0.1)
-
-    /// Открытие: слой встаёт ровно на место холста (живой вид Lottie переезжает в него), потом рамка растёт до экрана.
-    /// Закрытие: рамка сжимается обратно, после этого вид возвращается в холст. Наложения двух картинок нет.
-    private func setFullscreen(_ on: Bool) {
-        showFullscreenControls = true
-        if on {
-            sourceRect = canvasRect
-            expanded = false
-            fullscreen = true
-            Task { @MainActor in
-                withAnimation(Self.heroSpring) { expanded = true } completion: { barsHidden = true }
-            }
-        } else {
-            barsHidden = false
-            withAnimation(Self.heroSpring, completionCriteria: .logicallyComplete) { expanded = false } completion: {
-                fullscreen = false
-            }
-        }
-    }
-
-    // MARK: - Полный экран
-
-    /// Тап — пауза/воспроизведение, внизу шкала, ✕ или свайп вниз — выход. Управление прячется через 2 с воспроизведения.
-    private var fullscreenLayer: some View {
-        GeometryReader { g in
-            let full = g.frame(in: .global)
-            let r = expanded ? full : sourceRect
-            ZStack(alignment: .topLeading) {
-                Color.black.opacity(expanded ? 1 : 0)
-                canvasCore(cornerRadius: expanded ? 0 : 24)
-                    .frame(width: r.width, height: r.height)
-                    .offset(x: r.minX - full.minX, y: r.minY - full.minY)
-            }
-        }
-        .ignoresSafeArea()
-        .contentShape(Rectangle())
-            .onTapGesture { player.toggle(); withAnimation { showFullscreenControls = true } }
-            .gesture(DragGesture(minimumDistance: 20).onEnded { v in
-                if v.translation.height > 100 { setFullscreen(false) }
-            })
-            .overlay(alignment: .topTrailing) {
-                if showFullscreenControls && expanded {
-                    Button { setFullscreen(false) } label: {
-                        Image(systemName: "xmark").font(.headline).foregroundStyle(.white)
-                            .frame(width: 44, height: 44).background(Circle().fill(.black.opacity(0.5)))
-                    }
-                    .accessibilityLabel("Close full screen")
-                    .padding()
-                    .transition(.opacity)
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if showFullscreenControls && expanded {
-                    HStack(spacing: 12) {
-                        Button { player.toggle() } label: {
-                            Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                                .font(.title3).foregroundStyle(.white).frame(width: 44, height: 44)
-                        }
-                        Scrubber(frame: player.frame, start: player.startFrame, end: player.endFrame, markers: []) {
-                            player.seek($0.rounded())
-                        }
-                        Text(timeText).font(.subheadline.monospacedDigit()).foregroundStyle(.white)
-                            .frame(minWidth: 58, alignment: .trailing)
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 8)
-                    .background(Capsule().fill(.black.opacity(0.55)))
-                    .padding()
-                    .transition(.opacity)
-                }
-            }
-            .task(id: player.isPlaying) {
-                guard player.isPlaying else { showFullscreenControls = true; return }
-                try? await Task.sleep(for: .seconds(2))
-                withAnimation { showFullscreenControls = false }
-            }
     }
 
     // MARK: - Transport
@@ -431,7 +332,7 @@ struct ProjectPlayerView: View {
 
 #if os(iOS)
 /// Шкала кадров с метками комментариев. Тянется пальцем, тап — переход к кадру.
-private struct Scrubber: View {
+struct Scrubber: View {
     let frame: Double
     let start: Double
     let end: Double

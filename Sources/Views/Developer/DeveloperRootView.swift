@@ -9,6 +9,8 @@ struct DeveloperRootView: View {
     enum Tab: Hashable { case projects, claude }
 
     @State private var server = CompanionServer()
+    /// Полный экран анимации — поверх всего, включая шапку и вкладки.
+    @State private var hero = FullscreenHero()
     @State private var tab: Tab = .claude
     @State private var path: [UUID] = []
     @State private var command: ProjectStore.UICommand?
@@ -38,6 +40,9 @@ struct DeveloperRootView: View {
             .tabItem { Label("Agent", systemImage: "antenna.radiowaves.left.and.right") }
             .tag(Tab.claude)
         }
+        .environment(hero)
+        // Слой полного экрана выше шапки и вкладок: растущая анимация их накрывает, их самих не трогаем.
+        .overlay { if hero.isPresented { FullscreenHeroLayer(hero: hero).transition(.identity) } }
         .task {
             server.start()
             if server.store.projects.isEmpty == false { tab = .projects }
