@@ -39,15 +39,32 @@ struct ClaudeConnectView: View {
                 Button("Try again") { server.stop(); server.start() }
                     .buttonStyle(.borderedProminent)
             }
+            relayRow
             Text("iPhone address").font(.caption).foregroundStyle(.secondary)
             Text(server.viewerURL)
                 .font(.title3.monospaced()).textSelection(.enabled)
-            if server.addresses.isEmpty {
+            if server.addresses.isEmpty, server.relay?.state != .online {
                 Text("No Wi-Fi address. Connect the iPhone to the same Wi-Fi as your PC.")
                     .font(.callout).foregroundStyle(.orange)
             }
         }
         .devCard()
+    }
+
+    /// Посредник в интернете: с ним Claude подключается с любого ПК, без общей Wi-Fi сети.
+    private var relayRow: some View {
+        let state = server.relay?.state ?? .off
+        let (color, text): (Color, String) = switch state {
+        case .online: (.green, "Online: works from any network")
+        case .connecting: (.orange, "Connecting to the internet relay…")
+        case .failed(let message): (.red, message)
+        case .off: (.gray, "Internet relay is off. Same Wi-Fi only.")
+        }
+        return Label {
+            Text(text).font(.callout)
+        } icon: {
+            Image(systemName: "globe").foregroundStyle(color)
+        }
     }
 
     private var statusColor: Color {

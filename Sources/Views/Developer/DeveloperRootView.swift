@@ -11,6 +11,7 @@ struct DeveloperRootView: View {
     @State private var path: [UUID] = []
     @State private var command: ProjectStore.UICommand?
     @State private var lastCommandAt: Date?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView(selection: $tab) {
@@ -39,6 +40,13 @@ struct DeveloperRootView: View {
             UIApplication.shared.isIdleTimerDisabled = running
         }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active: server.resumeRelay()
+            case .background: server.pauseRelay()
+            default: break
+            }
+        }
     }
 
     /// Live-sync с MCP: перечитываем проекты и выполняем UI-команды (show_in_app), как ContentView на macOS.

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0149B17350BA3EDB59AFB95B /* ChecksumService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF2D1812087D1A07DBDD5DA /* ChecksumService.swift */; };
+		025E19D6F88835FDC42CED4B /* RelayFramesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB9C9D0D0AC63294EABA679 /* RelayFramesTests.swift */; };
 		054B2CFDCA189DE91E66AF72 /* HTTPTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00CAD993588044AA4E115FB /* HTTPTypes.swift */; };
 		0A365BA7140F241E2EEE9E71 /* LottieOverrides.swift in Sources */ = {isa = PBXBuildFile; fileRef = 052EA62BC9AA94D4D36FB0D9 /* LottieOverrides.swift */; };
 		0B2267AE2C2B8C8C7E64CDE9 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB257DB5B46F59853B63D69 /* ProjectStore.swift */; };
@@ -35,8 +36,10 @@
 		2A458AC5AE701FA235B83AAD /* LottieDeveloper.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 2D77551CC12D526334282FE0 /* LottieDeveloper.storekit */; };
 		2E2AB2966B5955FB3FFDDCDA /* LottieOverrides.swift in Sources */ = {isa = PBXBuildFile; fileRef = 052EA62BC9AA94D4D36FB0D9 /* LottieOverrides.swift */; };
 		2EDE92A283A7AF38FF1E26E1 /* PipelineOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00E525636060B514282E4A3 /* PipelineOrchestrator.swift */; };
+		3178021FDC3A4EFE651E223B /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49A5925A3090827C699D471B /* RelayClient.swift */; };
 		331E65A684A5283BF2352A5C /* FeedbackPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C916981ABA1B9D2E6E6B15AA /* FeedbackPanel.swift */; };
 		3564E1AE189ADC6897807610 /* LegalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE73F10F98ABAF464580906 /* LegalView.swift */; };
+		3665012A437480A4B59C0AA5 /* RelayFrames.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEEE2F1ACDFB4530F8F766F2 /* RelayFrames.swift */; };
 		3901B2880416B36879391B2F /* SVGToLottie.swift in Sources */ = {isa = PBXBuildFile; fileRef = 586C0A782A122199111F978A /* SVGToLottie.swift */; };
 		3A8E8003F91CC82CF5F46997 /* ReleaseCandidateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 555915C7173D710F7D33D037 /* ReleaseCandidateService.swift */; };
 		3BF7424FF68BB991AD644F90 /* GateResultsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804C3678E066DFAB34B52851 /* GateResultsCard.swift */; };
@@ -67,6 +70,7 @@
 		7AD4C137362519A89904118E /* en.lproj in Resources */ = {isa = PBXBuildFile; fileRef = CB0E9FAF07269BDC49513A3B /* en.lproj */; };
 		86DE4F0B617208344AC9105D /* LottieAnimationUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F457F0D1FC6B946F568AF6 /* LottieAnimationUIView.swift */; };
 		88A27AD57DD2DBD992BDA61E /* MotionSemanticGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C747BE8CB8E54ECBCB08BE2E /* MotionSemanticGate.swift */; };
+		8B5CC78107716E422261D07D /* RelayFrames.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEEE2F1ACDFB4530F8F766F2 /* RelayFrames.swift */; };
 		8BE32D05A64FA6A6E2131A12 /* PipelineTransitionRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 382BF227E873F1AB3E410501 /* PipelineTransitionRules.swift */; };
 		963AB6F8E8F1518FB8B48B0C /* SVGToLottie.swift in Sources */ = {isa = PBXBuildFile; fileRef = 586C0A782A122199111F978A /* SVGToLottie.swift */; };
 		97D1F18BB8601726E5EF0357 /* PlayerPanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32E09C768EBBDE396AE485BD /* PlayerPanels.swift */; };
@@ -81,6 +85,7 @@
 		9F2DE87F09177BB5DDC9F2AC /* AnimationSpecSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB16A07A4680BA538D0602D0 /* AnimationSpecSchema.swift */; };
 		A3AA3A9BE40EF991DA840927 /* LottieMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B937F72048FFB6A6CC63C1 /* LottieMerge.swift */; };
 		A5CC1AA353592C2890C26ACC /* PipelineRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF0D319D568A9C27471EA4C /* PipelineRunView.swift */; };
+		A6DD1ECEF312467A450B05A4 /* RelayFrames.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEEE2F1ACDFB4530F8F766F2 /* RelayFrames.swift */; };
 		AAC3898FCF2C381CF6C9DBEA /* AssetFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 887D0D1E484444B421230A6E /* AssetFiles.swift */; };
 		AAF2A31B12BF72202CDA1E8C /* ru.lproj in Resources */ = {isa = PBXBuildFile; fileRef = 02E820002D2D9AA2F8156F90 /* ru.lproj */; };
 		AB6A9B54B628538A14E97510 /* ProjectsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346F97EE1E9B8E1E2B0C76FC /* ProjectsListView.swift */; };
@@ -194,6 +199,7 @@
 		43D262E4CB635F802A40DC80 /* RollbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollbackService.swift; sourceTree = "<group>"; };
 		454AC4DF6BDC424B83701A42 /* LottieCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieCanvas.swift; sourceTree = "<group>"; };
 		45AC48CACC8779BB46B9E22A /* Exporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exporter.swift; sourceTree = "<group>"; };
+		49A5925A3090827C699D471B /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
 		4DA2F96D3E38F3DEA6095D7B /* viewer */ = {isa = PBXFileReference; lastKnownFileType = folder; name = viewer; path = Sources/Companion/Resources/viewer; sourceTree = SOURCE_ROOT; };
 		4F6CCE24D9F0BD953ED69615 /* AppDebugFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDebugFlags.swift; sourceTree = "<group>"; };
 		555915C7173D710F7D33D037 /* ReleaseCandidateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseCandidateService.swift; sourceTree = "<group>"; };
@@ -241,6 +247,7 @@
 		DC5CB9EF86693DE7580F33C0 /* LottieDeveloperMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieDeveloperMacApp.swift; sourceTree = "<group>"; };
 		DCE14400D9D4116EB4EF82E6 /* AnimationSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationSpec.swift; sourceTree = "<group>"; };
 		DE631FD15EAD0E5C992EB845 /* AnimationItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationItem.swift; sourceTree = "<group>"; };
+		DEEE2F1ACDFB4530F8F766F2 /* RelayFrames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayFrames.swift; sourceTree = "<group>"; };
 		E3F457F0D1FC6B946F568AF6 /* LottieAnimationUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieAnimationUIView.swift; sourceTree = "<group>"; };
 		E7A8FA3EA6B2294AD518601F /* DeveloperRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperRootView.swift; sourceTree = "<group>"; };
 		E8A97C5D8F44BBE00AFF359F /* PipelineStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineStatusView.swift; sourceTree = "<group>"; };
@@ -251,6 +258,7 @@
 		F32B195E68678ABD015B4AF9 /* IssueResolutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueResolutionService.swift; sourceTree = "<group>"; };
 		F373B8D0B6FE472C3328F1C8 /* MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPServer.swift; sourceTree = "<group>"; };
 		F7B937F72048FFB6A6CC63C1 /* LottieMerge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieMerge.swift; sourceTree = "<group>"; };
+		FAB9C9D0D0AC63294EABA679 /* RelayFramesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayFramesTests.swift; sourceTree = "<group>"; };
 		FB16A07A4680BA538D0602D0 /* AnimationSpecSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationSpecSchema.swift; sourceTree = "<group>"; };
 		FBE73F10F98ABAF464580906 /* LegalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalView.swift; sourceTree = "<group>"; };
 		FE6590A62D7586A1AAC7B1B7 /* LottieDeveloperMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LottieDeveloperMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -305,6 +313,7 @@
 				01F13224D1B9ECBAAD20EA8C /* LottieImageLayers.swift */,
 				F7B937F72048FFB6A6CC63C1 /* LottieMerge.swift */,
 				052EA62BC9AA94D4D36FB0D9 /* LottieOverrides.swift */,
+				DEEE2F1ACDFB4530F8F766F2 /* RelayFrames.swift */,
 				2534C7FBEFEFBB33B8CDC18D /* SVGDocument.swift */,
 			);
 			path = Shared;
@@ -560,6 +569,7 @@
 			children = (
 				682FD1FF9105EED92EBA0251 /* EditorToolsTests.swift */,
 				B40884352487A3077902C735 /* LottieCompilerTests.swift */,
+				FAB9C9D0D0AC63294EABA679 /* RelayFramesTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -571,6 +581,7 @@
 				58EC988122AE5CC001AC5DB9 /* CompanionServer.swift */,
 				0B784D676F5B07B340B42359 /* HTTPServer.swift */,
 				D00CAD993588044AA4E115FB /* HTTPTypes.swift */,
+				49A5925A3090827C699D471B /* RelayClient.swift */,
 			);
 			name = Companion;
 			path = Sources/Companion;
@@ -847,6 +858,7 @@
 			files = (
 				D5E6F75B4041C0505107DAB1 /* EditorToolsTests.swift in Sources */,
 				4B69A227B371565F21ECC2C9 /* LottieCompilerTests.swift in Sources */,
+				025E19D6F88835FDC42CED4B /* RelayFramesTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -913,6 +925,8 @@
 				B2F96164738FB52F5D25ECD5 /* QAReportBuilder.swift in Sources */,
 				4F01CA4CD9EB87D9ECE00753 /* QAReportView.swift in Sources */,
 				44256F3A715A39832863AC2F /* RangeSlider.swift in Sources */,
+				3178021FDC3A4EFE651E223B /* RelayClient.swift in Sources */,
+				8B5CC78107716E422261D07D /* RelayFrames.swift in Sources */,
 				3A8E8003F91CC82CF5F46997 /* ReleaseCandidateService.swift in Sources */,
 				59CD5F739BF1AC48B7901372 /* ReleaseCandidateView.swift in Sources */,
 				C373F804C741B9D149FA7256 /* RevisionDiffService.swift in Sources */,
@@ -954,6 +968,7 @@
 				97D1F18BB8601726E5EF0357 /* PlayerPanels.swift in Sources */,
 				D8A0D9F942108088FDAF2D5F /* ProjectModels.swift in Sources */,
 				B0D1ECDBD793FDCDFA2C5A87 /* ProjectStore.swift in Sources */,
+				3665012A437480A4B59C0AA5 /* RelayFrames.swift in Sources */,
 				24381E5AA00D41021235E850 /* SVGDocument.swift in Sources */,
 				3901B2880416B36879391B2F /* SVGToLottie.swift in Sources */,
 				BE99482CA8C98AC534A16F8F /* WorkspaceSetup.swift in Sources */,
@@ -977,6 +992,7 @@
 				4DFBFF6EF4B1470351645EE3 /* MCPTools.swift in Sources */,
 				5B50611EDF74A0A1FA3747A8 /* ProjectModels.swift in Sources */,
 				0B2267AE2C2B8C8C7E64CDE9 /* ProjectStore.swift in Sources */,
+				A6DD1ECEF312467A450B05A4 /* RelayFrames.swift in Sources */,
 				CE7BDCEFA7D953C2B34FEA14 /* SVGDocument.swift in Sources */,
 				963AB6F8E8F1518FB8B48B0C /* SVGToLottie.swift in Sources */,
 				71B3E86E1ADB46D7E211B771 /* main.swift in Sources */,

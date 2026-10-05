@@ -106,9 +106,12 @@ final class CompanionRoutes: @unchecked Sendable {
         case .wrong:
             return .json(["error": "Wrong PIN"], status: 403)
         case .ok:
-            let host = req.headers["host"] ?? "<iphone-ip>:\(CompanionServer.port)"
             let token = auth.token
-            let cmd = "claude mcp add -s user --transport http lottie-developer http://\(host)/mcp --header \"Authorization: Bearer \(token)\""
+            // Через посредника — его https-адрес, по Wi-Fi — адрес айфона в сети.
+            let relayBase = req.remoteIP == "relay" ? req.headers["x-relay-base"] : nil
+            let mcpURL = relayBase.map { "\($0)/mcp" }
+                ?? "http://\(req.headers["host"] ?? "<iphone-ip>:\(CompanionServer.port)")/mcp"
+            let cmd = CompanionServer.command(mcpURL: mcpURL, token: token)
             var r = HTTPResponse.json(["token": token, "mcpCommand": cmd])
             r.headers["Set-Cookie"] = "lottie_token=\(token); Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly"
             return r

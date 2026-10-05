@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lottie-relay",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "durable_objects": {
+    "bindings": [{ "name": "DEVICE", "class_name": "DeviceSession" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DeviceSession"] }],
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 }
+}
