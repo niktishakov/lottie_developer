@@ -28,7 +28,7 @@ struct DeveloperRootView: View {
             NavigationStack {
                 ClaudeConnectView(server: server)
             }
-            .tabItem { Label("Claude", systemImage: "antenna.radiowaves.left.and.right") }
+            .tabItem { Label("Agent", systemImage: "antenna.radiowaves.left.and.right") }
             .tag(Tab.claude)
         }
         .task {

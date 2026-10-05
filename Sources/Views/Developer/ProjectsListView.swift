@@ -34,8 +34,8 @@ struct ProjectsListView: View {
 
     private var startCard: some View {
         VStack(spacing: 4) {
-            Text(projects.isEmpty ? "Ask Claude to make an animation" : "Ask Claude to start a project")
-            Text("Connect Claude on the Claude tab, then describe what should move.").font(.footnote)
+            Text(projects.isEmpty ? "Ask your agent to make an animation" : "Ask your agent to start a project")
+            Text("Connect an agent on the Agent tab, then describe what should move.").font(.footnote)
         }
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
@@ -50,7 +50,7 @@ struct ClaudeStatusPill: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle().fill(online ? Color.green : Color.gray).frame(width: 8, height: 8)
-            Text(online ? "Claude online" : "Offline").font(.footnote.weight(.semibold))
+            Text(online ? "Agent online" : "Offline").font(.footnote.weight(.semibold))
         }
         .foregroundStyle(online ? Color.green : Color.secondary)
         .padding(.horizontal, 6)
@@ -73,7 +73,7 @@ private struct ProjectHeroCard: View {
             .frame(height: 210)
             .clipped()
             .overlay(alignment: .topLeading) {
-                if info.isNew { Badge(text: "New from Claude", fill: .blue).padding(12) }
+                if info.isNew { Badge(text: "New from agent", fill: .blue).padding(12) }
             }
             .overlay(alignment: .bottomTrailing) {
                 if let d = info.durationText { Badge(text: d, fill: .black.opacity(0.6)).padding(12) }

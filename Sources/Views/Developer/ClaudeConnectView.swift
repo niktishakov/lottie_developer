@@ -23,12 +23,12 @@ struct ClaudeConnectView: View {
                 }
                 .font(.callout).tint(.secondary)
                 .padding(.horizontal, 4)
-                Label("Keep this app open on screen while Claude works. If it's closed, Claude sees “iPhone is offline”.", systemImage: "iphone")
+                Label("Keep this app open on screen while the agent works. If it's closed, the agent sees “iPhone is offline”.", systemImage: "iphone")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             .padding()
         }
-        .navigationTitle("Claude")
+        .navigationTitle("Agent")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { server.refreshAddresses() } label: { Image(systemName: "arrow.clockwise") }
@@ -56,8 +56,8 @@ struct ClaudeConnectView: View {
     private func statusCard(now: Date) -> some View {
         let s = status(now: now)
         let (title, detail, color, icon): (String, String, Color, String) = switch s {
-        case .connected(let t): ("Claude connected", "Last request \(Self.ago(t, now: now)) ago · works from any network", .green, "bolt.horizontal.circle.fill")
-        case .ready: ("Ready for Claude", "Online. Your computer can be on any network.", .green, "checkmark.circle.fill")
+        case .connected(let t): ("Agent connected", "Last request \(Self.ago(t, now: now)) ago · works from any network", .green, "bolt.horizontal.circle.fill")
+        case .ready: ("Ready for agent", "Online. Your computer can be on any network.", .green, "checkmark.circle.fill")
         case .connecting: ("Connecting…", "Connecting to the internet.", .orange, "arrow.triangle.2.circlepath")
         case .wifiOnly: ("Wi-Fi only", relayMessage, .orange, "wifi")
         case .error(let e): ("Server error", e, .red, "exclamationmark.triangle.fill")
@@ -108,7 +108,7 @@ struct ClaudeConnectView: View {
                 Text("Activity").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).textCase(.uppercase)
                     .padding(.bottom, 8)
                 if server.activity.isEmpty {
-                    Text("Claude hasn't done anything yet. Ask it to make an animation.")
+                    Text("The agent hasn't done anything yet. Ask it to make an animation.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 ForEach(Array(server.activity.prefix(6).enumerated()), id: \.element.id) { i, item in
@@ -135,7 +135,7 @@ struct ClaudeConnectView: View {
             step(1, "On your computer open \(server.pairURL) in a browser.")
             step(2, "Enter the PIN shown above.")
             step(3, "Copy the command from the page. Paste it into PowerShell (Windows) or Terminal (Mac) and press Enter.")
-            step(4, "Quit Claude completely and open it again. On Windows also close it in the tray.")
+            step(4, "Restart your agent app (Claude, Cursor, VS Code…). On Windows also close it in the tray.")
         }
         .devCard()
     }

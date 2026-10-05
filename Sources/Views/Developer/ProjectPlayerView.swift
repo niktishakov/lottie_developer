@@ -167,9 +167,9 @@ struct ProjectPlayerView: View {
 
     private func claudeNote(_ v: AnimationVersion) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "sparkle").foregroundStyle(Color(red: 0.85, green: 0.47, blue: 0.34))
+            Image(systemName: "sparkle").foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Claude · \(v.label)").font(.subheadline.weight(.semibold))
+                Text("Agent · \(v.label)").font(.subheadline.weight(.semibold))
                 if !v.note.isEmpty { Text(v.note).font(.subheadline).foregroundStyle(.secondary) }
                 if !v.prompt.isEmpty, v.prompt != v.note {
                     Text(v.prompt).font(.footnote).foregroundStyle(.tertiary)
@@ -210,7 +210,7 @@ struct ProjectPlayerView: View {
             let items = feedback
             let _ = feedbackTick
             if items.isEmpty {
-                Text("Pause on a frame and leave a comment. Claude reads them and makes a fix.")
+                Text("Pause on a moment and leave a comment. The agent reads it and makes a fix.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             ForEach(items) { item in
@@ -231,7 +231,7 @@ struct ProjectPlayerView: View {
             }
             Text(item.text).font(.callout)
             if let reply = item.reply, !reply.isEmpty {
-                Text("Claude: \(reply)").font(.caption).foregroundStyle(.secondary)
+                Text("Agent: \(reply)").font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(10)
