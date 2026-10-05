@@ -2,7 +2,7 @@
 import SwiftUI
 import UIKit
 
-/// Экран подключения Claude Code (Windows/ПК) к iPhone по Wi-Fi.
+/// Экран подключения Claude на ПК к iPhone: через посредника в интернете, если он доступен, иначе по Wi-Fi.
 struct ClaudeConnectView: View {
     let server: CompanionServer
     @State private var copied = false
@@ -11,11 +11,11 @@ struct ClaudeConnectView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 statusCard
-                pinCard
                 stepsCard
+                pinCard
                 commandCard
                 activityCard
-                Label("Keep this app open while working with Claude.", systemImage: "iphone")
+                Label("Keep this app open on screen while Claude works. If it is closed, Claude sees “iPhone is offline”.", systemImage: "iphone")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             .padding()
@@ -40,11 +40,11 @@ struct ClaudeConnectView: View {
                     .buttonStyle(.borderedProminent)
             }
             relayRow
-            Text("iPhone address").font(.caption).foregroundStyle(.secondary)
+            Text(isOnline ? "Address for Claude" : "iPhone address on Wi-Fi").font(.caption).foregroundStyle(.secondary)
             Text(server.viewerURL)
                 .font(.title3.monospaced()).textSelection(.enabled)
             if server.addresses.isEmpty, server.relay?.state != .online {
-                Text("No Wi-Fi address. Connect the iPhone to the same Wi-Fi as your PC.")
+                Text("No internet relay and no Wi-Fi address. Check the iPhone's internet connection.")
                     .font(.callout).foregroundStyle(.orange)
             }
         }
@@ -55,10 +55,10 @@ struct ClaudeConnectView: View {
     private var relayRow: some View {
         let state = server.relay?.state ?? .off
         let (color, text): (Color, String) = switch state {
-        case .online: (.green, "Online: works from any network")
-        case .connecting: (.orange, "Connecting to the internet relay…")
-        case .failed(let message): (.red, message)
-        case .off: (.gray, "Internet relay is off. Same Wi-Fi only.")
+        case .online: (.green, "Online. Your PC can be on any network.")
+        case .connecting: (.orange, "Connecting to the internet…")
+        case .failed(let message): (.red, "\(message) Until then the PC must be on the same Wi-Fi.")
+        case .off: (.gray, "Internet connection is off. The PC must be on the same Wi-Fi.")
         }
         return Label {
             Text(text).font(.callout)
@@ -67,16 +67,18 @@ struct ClaudeConnectView: View {
         }
     }
 
+    private var isOnline: Bool { server.relay?.state == .online }
+
     private var statusColor: Color {
         server.error != nil ? .red : (server.isRunning ? .green : .gray)
     }
     private var statusText: String {
-        server.error != nil ? "Server error" : (server.isRunning ? "Server running" : "Server stopped")
+        server.error != nil ? "Server error" : (server.isRunning ? "Ready for Claude" : "Server stopped")
     }
 
     private var pinCard: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("PIN").font(.caption).foregroundStyle(.secondary)
+            Text("PIN for the pairing page").font(.caption).foregroundStyle(.secondary)
             Text(server.pin.map(String.init).joined(separator: " "))
                 .font(.system(size: 52, weight: .bold, design: .monospaced))
                 .minimumScaleFactor(0.5).lineLimit(1)
@@ -89,10 +91,13 @@ struct ClaudeConnectView: View {
     private var stepsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("How to connect").font(.headline)
-            step(1, "On your PC open \(server.viewerURL)/pair in a browser.")
-            step(2, "Enter the PIN shown above.")
-            step(3, "Copy the command from the page (or below) into Claude Code.")
-            step(4, "Start a new Claude session.")
+            if !isOnline {
+                Text("The PC must be on the same Wi-Fi as this iPhone.").font(.callout).foregroundStyle(.orange)
+            }
+            step(1, "On your PC open this page in a browser: \(server.viewerURL)/pair")
+            step(2, "Enter the PIN shown below.")
+            step(3, "Copy the command from the page. Paste it into PowerShell (Windows) or Terminal (Mac) and press Enter.")
+            step(4, "Quit Claude completely and open it again. On Windows also close it in the tray.")
         }
         .devCard()
     }
@@ -107,7 +112,9 @@ struct ClaudeConnectView: View {
 
     private var commandCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Claude Code command").font(.headline)
+            Text("Or copy the command here").font(.headline)
+            Text("Handy on a Mac with the same Apple ID: it pastes on the Mac right away.")
+                .font(.callout).foregroundStyle(.secondary)
             Text(server.mcpCommand)
                 .font(.caption.monospaced()).textSelection(.enabled)
                 .padding(10).frame(maxWidth: .infinity, alignment: .leading)
