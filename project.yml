@@ -36,6 +36,17 @@ targets:
         NSBonjourServices: [_lottiedev._tcp]
         NSAppTransportSecurity: { NSAllowsArbitraryLoads: true, NSAllowsLocalNetworking: true }
         UIFileSharingEnabled: true
+        # Готовый Lottie (.json / .lottie) из Файлов или AirDrop открывается в приложении новым проектом.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Lottie animation
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.json, com.nikapps.lottie.dotlottie]
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.nikapps.lottie.dotlottie
+            UTTypeDescription: dotLottie animation
+            UTTypeConformsTo: [public.data, public.zip-archive]
+            UTTypeTagSpecification: { public.filename-extension: [lottie] }
         LSSupportsOpeningDocumentsInPlace: true
     settings:
       base:

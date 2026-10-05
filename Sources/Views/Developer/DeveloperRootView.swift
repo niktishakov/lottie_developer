@@ -16,7 +16,8 @@ struct DeveloperRootView: View {
     var body: some View {
         TabView(selection: $tab) {
             NavigationStack(path: $path) {
-                ProjectsListView(store: server.store, claudeOnline: server.relay?.state == .online)
+                ProjectsListView(store: server.store, claudeOnline: server.relay?.state == .online,
+                                 onOpen: { open($0) })
                     .navigationDestination(for: UUID.self) { id in
                         ProjectPlayerView(store: server.store, projectID: id,
                                           command: command?.projectID == id ? command : nil)
@@ -40,12 +41,25 @@ struct DeveloperRootView: View {
             UIApplication.shared.isIdleTimerDisabled = running
         }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        // Файл из Файлов / AirDrop / «Открыть в Lottie Dev» → новый проект.
+        .onOpenURL { url in
+            guard ["json", "lottie"].contains(url.pathExtension.lowercased()) else { return }
+            if let p = try? LottieImport.importFile(url, into: server.store) { open(p.id) }
+        }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active: server.resumeRelay()
             case .background: server.pauseRelay()
             default: break
             }
+        }
+    }
+
+    private func open(_ id: UUID) {
+        tab = .projects
+        Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            path = [id]
         }
     }
 

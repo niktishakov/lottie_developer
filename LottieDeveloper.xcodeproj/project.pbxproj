@@ -84,6 +84,7 @@
 		9E3F76C05C3B47A494878D3F /* PipelineStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8A97C5D8F44BBE00AFF359F /* PipelineStatusView.swift */; };
 		9F2DE87F09177BB5DDC9F2AC /* AnimationSpecSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB16A07A4680BA538D0602D0 /* AnimationSpecSchema.swift */; };
 		A3AA3A9BE40EF991DA840927 /* LottieMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B937F72048FFB6A6CC63C1 /* LottieMerge.swift */; };
+		A3FE2EA4B802BCB1023059A2 /* LottieImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14709B243246534742ACBDFE /* LottieImport.swift */; };
 		A5CC1AA353592C2890C26ACC /* PipelineRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF0D319D568A9C27471EA4C /* PipelineRunView.swift */; };
 		A6DD1ECEF312467A450B05A4 /* RelayFrames.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEEE2F1ACDFB4530F8F766F2 /* RelayFrames.swift */; };
 		AAC3898FCF2C381CF6C9DBEA /* AssetFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 887D0D1E484444B421230A6E /* AssetFiles.swift */; };
@@ -175,6 +176,7 @@
 		120066EC9701A9514C8E445A /* PublishSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishSheet.swift; sourceTree = "<group>"; };
 		12FAB8B7AA6DD84CC5E28B48 /* CanonicalizationResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalizationResultView.swift; sourceTree = "<group>"; };
 		1342279CF870CE6946C522F7 /* WorkspaceSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSetup.swift; sourceTree = "<group>"; };
+		14709B243246534742ACBDFE /* LottieImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieImport.swift; sourceTree = "<group>"; };
 		14DFA9187CB8DC61B5333CCD /* CompanionRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionRoutes.swift; sourceTree = "<group>"; };
 		18F57BFE09AF7A8CA679365C /* AnimationPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationPlayerView.swift; sourceTree = "<group>"; };
 		19E2C16C628A31CB7CF8B577 /* RevisionDiffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevisionDiffService.swift; sourceTree = "<group>"; };
@@ -533,6 +535,7 @@
 				D53B73B54CFFB67D1259988D /* ClaudeConnectView.swift */,
 				E7A8FA3EA6B2294AD518601F /* DeveloperRootView.swift */,
 				E96D05D73572132D1722BC93 /* DevLottiePlayer.swift */,
+				14709B243246534742ACBDFE /* LottieImport.swift */,
 				1F84AD6F5F7E995D48BCD24C /* ProjectPlayerView.swift */,
 				346F97EE1E9B8E1E2B0C76FC /* ProjectsListView.swift */,
 			);
@@ -901,6 +904,7 @@
 				9D62E6780445334588C2E5D2 /* LottieCompiler.swift in Sources */,
 				B277B78F5C95A3A6F58754DA /* LottieDeveloperApp.swift in Sources */,
 				CC9AC5D933581ABCA6CB2232 /* LottieImageLayers.swift in Sources */,
+				A3FE2EA4B802BCB1023059A2 /* LottieImport.swift in Sources */,
 				F288801CBD4A92D5201E64B4 /* LottieMerge.swift in Sources */,
 				2E2AB2966B5955FB3FFDDCDA /* LottieOverrides.swift in Sources */,
 				E0BFC8CF9783883DC9A270B9 /* MCPServer.swift in Sources */,

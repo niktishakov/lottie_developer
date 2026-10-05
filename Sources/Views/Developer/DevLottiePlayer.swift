@@ -25,6 +25,8 @@ final class DevPlayerController {
     private(set) var startFrame: Double = 0
     private(set) var endFrame: Double = 0
     private(set) var framerate: Double = 30
+    /// Ширина / высота композиции — холст плеера повторяет форму анимации.
+    private(set) var aspect: Double = 1
     private(set) var activeEngine = "—"
     private(set) var loadError: String?
     /// Меняется при пересоздании view — сигнал representable'у заменить subview.
@@ -60,6 +62,7 @@ final class DevPlayerController {
         startFrame = Double(animation?.startFrame ?? 0)
         endFrame = Double(animation?.endFrame ?? 0)
         framerate = Double(animation?.framerate ?? 30)
+        if let size = animation?.size, size.width > 0, size.height > 0 { aspect = size.width / size.height }
         isPlaying = false
         viewGeneration += 1
         seek(min(max(resume, startFrame), endFrame))

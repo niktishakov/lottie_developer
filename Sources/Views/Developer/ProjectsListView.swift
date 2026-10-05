@@ -1,11 +1,16 @@
 #if os(iOS)
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Список проектов: свежий проект — большой карточкой, остальные — строками.
 /// Видно, что нового сделал Claude: метка «New from Claude», заметка версии, длительность, открытые комментарии.
 struct ProjectsListView: View {
     let store: ProjectStore
     var claudeOnline = false
+    /// Открыть проект (после импорта).
+    var onOpen: (UUID) -> Void = { _ in }
+    @State private var importing = false
+    @State private var importError: String?
 
     private var projects: [AnimationProject] {
         store.projects.sorted { $0.updatedAt > $1.updatedAt }
@@ -28,14 +33,33 @@ struct ProjectsListView: View {
         }
         .navigationTitle("Projects")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { importing = true } label: { Label("Import Lottie", systemImage: "plus") }
+            }
             ToolbarItem(placement: .topBarTrailing) { ClaudeStatusPill(online: claudeOnline) }
         }
+        .fileImporter(isPresented: $importing, allowedContentTypes: Self.lottieTypes, allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            var last: UUID?
+            for url in urls {
+                do { last = try LottieImport.importFile(url, into: store).id }
+                catch { importError = error.localizedDescription }
+            }
+            if let last { onOpen(last) }
+        }
+        .alert("Can't import", isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(importError ?? "") }
     }
+
+    static let lottieTypes: [UTType] = [.json] + [UTType(filenameExtension: "lottie")].compactMap { $0 }
 
     private var startCard: some View {
         VStack(spacing: 4) {
             Text(projects.isEmpty ? "Ask your agent to make an animation" : "Ask your agent to start a project")
             Text("Connect an agent on the Agent tab, then describe what should move.").font(.footnote)
+            Button { importing = true } label: { Label("Import a ready Lottie (.json, .lottie)", systemImage: "square.and.arrow.down") }
+                .font(.footnote.weight(.semibold)).padding(.top, 8)
         }
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
@@ -73,7 +97,7 @@ private struct ProjectHeroCard: View {
             .frame(height: 210)
             .clipped()
             .overlay(alignment: .topLeading) {
-                if info.isNew { Badge(text: "New from agent", fill: .blue).padding(12) }
+                if info.isNew { Badge(text: info.imported ? "Imported" : "New from agent", fill: .blue).padding(12) }
             }
             .overlay(alignment: .bottomTrailing) {
                 if let d = info.durationText { Badge(text: d, fill: .black.opacity(0.6)).padding(12) }
@@ -155,6 +179,7 @@ struct ProjectInfo {
     let durationText: String?
     let isNew: Bool
     let openComments: Int
+    let imported: Bool
 
     init(store: ProjectStore, project: AnimationProject) {
         let latest = project.versions.max(by: { $0.index < $1.index })
@@ -165,6 +190,7 @@ struct ProjectInfo {
         note = text
         durationText = previewURL.flatMap(LottieDuration.text(for:))
         isNew = SeenVersions.isNew(project)
+        imported = latest?.source == "import"
         _ = store.feedbackRevision
         openComments = store.feedback(projectID: project.id).filter { !$0.resolved }.count
     }

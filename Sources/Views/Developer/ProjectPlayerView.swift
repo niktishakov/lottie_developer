@@ -110,8 +110,12 @@ struct ProjectPlayerView: View {
                 Text(err).font(.callout).foregroundStyle(.red).padding()
             }
         }
-        .aspectRatio(1, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+        // Скругление по самому холсту (UIKit-вид Lottie иначе выходит за маску).
+        .mask(RoundedRectangle(cornerRadius: 24))
+        // Форма анимации, но не выше 60% экрана: вертикальный экран не вытесняет панель управления.
+        .aspectRatio(player.aspect, contentMode: .fit)
+        .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
+        .frame(maxWidth: .infinity)
         .onTapGesture { player.toggle() }
     }
 
@@ -177,9 +181,9 @@ struct ProjectPlayerView: View {
 
     private func claudeNote(_ v: AnimationVersion) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "sparkle").foregroundStyle(.tint)
+            Image(systemName: v.source == "import" ? "square.and.arrow.down" : "sparkle").foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Agent · \(v.label)").font(.subheadline.weight(.semibold))
+                Text("\(v.source == "import" ? "Imported" : "Agent") · \(v.label)").font(.subheadline.weight(.semibold))
                 if !v.note.isEmpty { Text(v.note).font(.subheadline).foregroundStyle(.secondary) }
                 if !v.prompt.isEmpty, v.prompt != v.note {
                     Text(v.prompt).font(.footnote).foregroundStyle(.tertiary)
