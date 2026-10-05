@@ -5,6 +5,10 @@ export interface Env {
   DEVICE: DurableObjectNamespace<DeviceSession>;
   QUOTA: DurableObjectNamespace<RegistrationQuota>;
   PINS: DurableObjectNamespace<PinIndex>;
+  USAGE: DurableObjectNamespace<DailyUsage>;
+  /// Только для проверки на wrangler dev: занизить лимиты (--var LIMIT_GLOBAL:300 --var LIMIT_DEVICE:50).
+  LIMIT_GLOBAL?: string;
+  LIMIT_DEVICE?: string;
   REGISTER_LIMIT: RateLimit;
   PAIR_LIMIT: RateLimit;
   IP_LIMIT: RateLimit;
@@ -14,6 +18,38 @@ export interface Env {
 export const REGISTRATIONS_PER_DAY = 300;
 /// Зарегистрированный, но ни разу не подключившийся айфон удаляется через неделю.
 const UNUSED_TTL_MS = 7 * 24 * 3600 * 1000;
+
+/// Дневной бюджет запросов к Durable Objects (бесплатный план — 100 000 в сутки, сброс в 00:00 UTC).
+/// 90 000 — потолок на весь посредник с запасом на регистрации и вход по PIN; 15 000 — на один айфон.
+export const GLOBAL_PER_DAY = 90_000;
+export const DEVICE_PER_DAY = 15_000;
+/// Айфон отчитывается в общий счётчик пачками: +1 запрос на каждые 100 потраченных.
+const REPORT_EVERY = 100;
+export const globalCap = (env: Env) => Number(env.LIMIT_GLOBAL) || GLOBAL_PER_DAY;
+const deviceCap = (env: Env) => Number(env.LIMIT_DEVICE) || DEVICE_PER_DAY;
+const reportEvery = (env: Env) => (env.LIMIT_GLOBAL ? 10 : REPORT_EVERY);
+
+export const utcDay = () => new Date().toISOString().slice(0, 10);
+/// Ближайшая полночь UTC, мс.
+export const nextResetMs = () => { const d = new Date(); d.setUTCHours(24, 0, 0, 0); return d.getTime(); };
+
+/// Общий счётчик посредника за сутки.
+export class DailyUsage extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS usage (day TEXT PRIMARY KEY, total INTEGER NOT NULL)");
+  }
+
+  /// Добавить потраченное, вернуть сумму за сегодня.
+  async add(n: number): Promise<number> {
+    const day = utcDay();
+    this.ctx.storage.sql.exec("INSERT INTO usage (day, total) VALUES (?, ?) ON CONFLICT(day) DO UPDATE SET total = total + excluded.total", day, n);
+    this.ctx.storage.sql.exec("DELETE FROM usage WHERE day < ?", new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
+    return this.ctx.storage.sql.exec<{ total: number }>("SELECT total FROM usage WHERE day = ?", day).toArray()[0]?.total ?? 0;
+  }
+
+  async today(): Promise<number> { return this.add(0); }
+}
 
 /// Неверных PIN в минуту на весь посредник, после этого вход по PIN закрыт до конца минуты (защита от перебора).
 export const PIN_FAILS_PER_MIN = 60;
@@ -92,6 +128,8 @@ export class DeviceSession extends DurableObject<Env> {
   private pending = new Map<string, Pending>();
   private windowStart = 0;
   private windowCount = 0;
+  /// Сколько запросов к этому объекту потрачено сегодня (HTTP + сообщения айфона). Ping не считается — на него отвечает Cloudflare.
+  private usage: { day: string; count: number; unreported: number; globalBlocked: boolean } | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -153,6 +191,9 @@ export class DeviceSession extends DurableObject<Env> {
     const ws = this.ctx.getWebSockets()[0];
     if (!ws) return json({ error: "iPhone is offline. Open Lottie Developer on the iPhone and keep it on screen." }, 503);
     if (!this.allow()) return json({ error: "Too many requests. Wait a minute." }, 429);
+    const u = this.spend(1);
+    if (u.globalBlocked) return limitReached("The relay has used today's free limit.");
+    if (u.count > deviceCap(this.env)) return limitReached("This iPhone has used today's limit.");
 
     const body = new Uint8Array(await req.arrayBuffer());
     if (body.length > MAX_BODY) return json({ error: "Body is larger than 100 MB" }, 413);
@@ -176,6 +217,32 @@ export class DeviceSession extends DurableObject<Env> {
     return response;
   }
 
+  private loadUsage() {
+    const day = utcDay();
+    if (!this.usage || this.usage.day !== day) {
+      const saved = this.ctx.storage.kv.get<{ day: string; count: number }>("usage");
+      this.usage = { day, count: saved?.day === day ? saved.count : 0, unreported: 0, globalBlocked: false };
+    }
+    return this.usage;
+  }
+
+  /// Учесть потраченное; раз в REPORT_EVERY — сохранить и отправить в общий счётчик.
+  private spend(n: number) {
+    const u = this.loadUsage();
+    u.count += n;
+    u.unreported += n;
+    if (u.unreported >= reportEvery(this.env)) {
+      const delta = u.unreported;
+      u.unreported = 0;
+      this.ctx.storage.kv.put("usage", { day: u.day, count: u.count });
+      const day = u.day;
+      this.ctx.waitUntil(this.env.USAGE.get(this.env.USAGE.idFromName("global")).add(delta).then((total) => {
+        if (this.usage?.day === day) this.usage.globalBlocked = total >= globalCap(this.env);
+      }).catch(() => {}));
+    }
+    return u;
+  }
+
   private pins() { return this.env.PINS.get(this.env.PINS.idFromName("global")); }
 
   private allow(): boolean {
@@ -196,6 +263,7 @@ export class DeviceSession extends DurableObject<Env> {
 
   async webSocketMessage(_ws: WebSocket, message: string | ArrayBuffer) {
     if (typeof message !== "string") return;
+    this.spend(1);
     let f: Frame | { t: "pin"; pin: string };
     try { f = JSON.parse(message); } catch { return; }
     // Айфон сообщает свой текущий PIN для короткого входа.
@@ -244,4 +312,14 @@ function equal(a: string, b: string): boolean {
   let r = 0;
   for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return r === 0;
+}
+
+/// 503 с понятным текстом и временем сброса; заголовок x-relay-blocked-until подхватывает Worker и до сброса отвечает сам.
+export function limitReached(what: string): Response {
+  const reset = nextResetMs();
+  const hours = Math.max(1, Math.ceil((reset - Date.now()) / 3_600_000));
+  const r = json({ error: `${what} It resets at 00:00 UTC (in about ${hours} h).` }, 503);
+  r.headers.set("retry-after", String(Math.ceil((reset - Date.now()) / 1000)));
+  if (what.startsWith("The relay")) r.headers.set("x-relay-blocked-until", String(reset));
+  return r;
 }

@@ -2,9 +2,12 @@
 // Адрес айфона: /d/<deviceId>/mcp. Браузер после /d/<deviceId>/ ходит по обычным путям, айфон выбирается по cookie.
 
 import { PAIR_HTML } from "./pair-page";
-import { DeviceSession, PinIndex, RegistrationQuota, json, sha256, type Env } from "./session";
+import { DailyUsage, DeviceSession, globalCap, PinIndex, RegistrationQuota, json, limitReached, sha256, type Env } from "./session";
 
-export { DeviceSession, PinIndex, RegistrationQuota };
+export { DailyUsage, DeviceSession, PinIndex, RegistrationQuota };
+
+/// Посредник исчерпал дневной лимит — до этого момента отвечаем сами, не тратя запросы к Durable Objects (на каждый isolate).
+let blockedUntil = 0;
 
 const DEVICE_RE = /^[a-z2-7]{20}$/;
 const COOKIE = "lottie_device";
@@ -16,6 +19,11 @@ export default {
 
     if (req.method === "OPTIONS") return cors();
     if (p === "/health") return json({ ok: true });
+    // Сколько потрачено за сутки (без секретов): для проверки лимитов.
+    if (p === "/usage") {
+      const total = await env.USAGE.get(env.USAGE.idFromName("global")).today();
+      return json({ day: new Date().toISOString().slice(0, 10), used: total, cap: globalCap(env), freePlan: 100_000, blocked: Date.now() < blockedUntil });
+    }
     const ip = req.headers.get("cf-connecting-ip") ?? "unknown";
     if (p === "/register" && req.method === "POST") {
       if (!(await env.REGISTER_LIMIT.limit({ key: ip })).success) return json({ error: "Too many registrations. Wait a minute." }, 429);
@@ -37,6 +45,7 @@ export default {
       const id = m[1];
       if (!DEVICE_RE.test(id)) return json({ error: "Bad device id" }, 400);
       const rest = m[2] ?? "/";
+      if (Date.now() < blockedUntil && rest !== "/connect") return limitReached("The relay has used today's free limit.");
       const stub = env.DEVICE.get(env.DEVICE.idFromName(id));
       if (rest === "/connect") {
         const r = new Request("https://device/__connect", req);
@@ -44,6 +53,8 @@ export default {
         return stub.fetch(r);
       }
       const res = await stub.fetch(inner(req, url, rest));
+      const until = Number(res.headers.get("x-relay-blocked-until") ?? 0);
+      if (until > blockedUntil) blockedUntil = until;
       return withDeviceCookie(res, id);
     }
 

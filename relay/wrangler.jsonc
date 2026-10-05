@@ -8,13 +8,15 @@
     "bindings": [
       { "name": "DEVICE", "class_name": "DeviceSession" },
       { "name": "QUOTA", "class_name": "RegistrationQuota" },
-      { "name": "PINS", "class_name": "PinIndex" }
+      { "name": "PINS", "class_name": "PinIndex" },
+      { "name": "USAGE", "class_name": "DailyUsage" }
     ]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["DeviceSession"] },
     { "tag": "v2", "new_sqlite_classes": ["RegistrationQuota"] },
-    { "tag": "v3", "new_sqlite_classes": ["PinIndex"] }
+    { "tag": "v3", "new_sqlite_classes": ["PinIndex"] },
+    { "tag": "v4", "new_sqlite_classes": ["DailyUsage"] }
   ],
   // Лимиты на IP считает Cloudflare: не тратят запросы Durable Objects.
   "ratelimits": [
