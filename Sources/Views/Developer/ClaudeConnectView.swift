@@ -1,14 +1,20 @@
 #if os(iOS)
 import SwiftUI
+import Inject
 import UIKit
 
 /// Экран Claude: подключён ли Claude, PIN для нового компьютера, что Claude сейчас делает. Инструкции свёрнуты.
 struct ClaudeConnectView: View {
+    @ObserveInjection private var inject
     let server: CompanionServer
     @State private var copied = false
     @State private var showSetup = false
 
     var body: some View {
+        content.enableInjection()
+    }
+
+    @ViewBuilder private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in statusCard(now: ctx.date) }

@@ -1,10 +1,12 @@
 #if os(iOS)
 import SwiftUI
+import Inject
 import UIKit
 
 /// Выбор фона под анимацией: клетка, светлый, тёмный или свой цвет.
 /// Для сплошного фона показывает контраст с основными цветами анимации (WCAG): видно, что потеряется на этом фоне.
 struct BackgroundSheet: View {
+    @ObserveInjection private var inject
     @Binding var kind: DevBackground
     @Binding var customHex: String
     let lottieURL: URL?
@@ -18,6 +20,10 @@ struct BackgroundSheet: View {
     }
 
     var body: some View {
+        content.enableInjection()
+    }
+
+    @ViewBuilder private var content: some View {
         NavigationStack {
             List {
                 Section {

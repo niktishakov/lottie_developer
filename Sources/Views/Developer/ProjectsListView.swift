@@ -1,10 +1,12 @@
 #if os(iOS)
 import SwiftUI
+import Inject
 import UniformTypeIdentifiers
 
 /// Список проектов: свежий проект — большой карточкой, остальные — строками.
 /// Видно, что нового сделал Claude: метка «New from Claude», заметка версии, длительность, открытые комментарии.
 struct ProjectsListView: View {
+    @ObserveInjection private var inject
     let store: ProjectStore
     var claudeOnline = false
     /// Открыть проект (после импорта).
@@ -17,6 +19,10 @@ struct ProjectsListView: View {
     }
 
     var body: some View {
+        content.enableInjection()
+    }
+
+    @ViewBuilder private var content: some View {
         ScrollView {
             VStack(spacing: 14) {
                 if let first = projects.first {

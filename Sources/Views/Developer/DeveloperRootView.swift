@@ -1,9 +1,11 @@
 #if os(iOS)
 import SwiftUI
+import Inject
 import UIKit
 
 /// Корень iPhone-версии Lottie Developer: проекты + подключение Claude. Владеет сервером.
 struct DeveloperRootView: View {
+    @ObserveInjection private var inject
     enum Tab: Hashable { case projects, claude }
 
     @State private var server = CompanionServer()
@@ -14,6 +16,10 @@ struct DeveloperRootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        content.enableInjection()
+    }
+
+    @ViewBuilder private var content: some View {
         TabView(selection: $tab) {
             NavigationStack(path: $path) {
                 ProjectsListView(store: server.store, claudeOnline: server.relay?.state == .online,

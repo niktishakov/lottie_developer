@@ -1,9 +1,11 @@
 #if os(iOS)
 import SwiftUI
+import Inject
 
 /// Плеер проекта на настоящем lottie-ios. Сверху крупная анимация, под ней одна панель управления
 /// (шкала с метками комментариев, скорость, повтор, фон, остальное в «•••»), заметка Claude и кнопка комментария.
 struct ProjectPlayerView: View {
+    @ObserveInjection private var inject
     let store: ProjectStore
     let projectID: UUID
     var command: ProjectStore.UICommand?
@@ -15,6 +17,7 @@ struct ProjectPlayerView: View {
     @AppStorage("player.background") private var background: DevBackground = .checker
     @AppStorage("player.backgroundHex") private var backgroundHex = "#FFFFFF"
     @State private var choosingBackground = false
+    @State private var fullscreen = false
     @State private var newComment = ""
     @State private var composing = false
     @State private var appliedCommandAt: Date?
@@ -37,6 +40,10 @@ struct ProjectPlayerView: View {
     }
 
     var body: some View {
+        content.enableInjection()
+    }
+
+    @ViewBuilder private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 canvas
@@ -105,7 +112,8 @@ struct ProjectPlayerView: View {
     private var canvas: some View {
         ZStack {
             DevBackgroundView(kind: background, customHex: backgroundHex)
-            DevLottieCanvas(controller: player)
+            // Вид Lottie один: на весь экран он переезжает, здесь в это время только фон.
+            if !fullscreen { DevLottieCanvas(controller: player) }
             if let err = player.loadError {
                 Text(err).font(.callout).foregroundStyle(.red).padding()
             }
@@ -114,9 +122,21 @@ struct ProjectPlayerView: View {
         .mask(RoundedRectangle(cornerRadius: 24))
         // Форма анимации, но не выше 60% экрана: вертикальный экран не вытесняет панель управления.
         .aspectRatio(player.aspect, contentMode: .fit)
+        .overlay(alignment: .topTrailing) {
+            Button { fullscreen = true } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                    .frame(width: 36, height: 36).background(Circle().fill(.black.opacity(0.45)))
+            }
+            .accessibilityLabel("Full screen")
+            .padding(10)
+        }
         .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
         .frame(maxWidth: .infinity)
         .onTapGesture { player.toggle() }
+        .fullScreenCover(isPresented: $fullscreen) {
+            FullscreenPlayer(player: player, background: background, backgroundHex: backgroundHex) { fullscreen = false }
+        }
     }
 
     // MARK: - Transport
@@ -345,6 +365,69 @@ private struct Chip: View {
             .foregroundStyle(on ? Color.accentColor : Color.primary)
             .padding(.horizontal, 12).padding(.vertical, 7)
             .background(Capsule().fill(on ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.18)))
+    }
+}
+#endif
+
+#if os(iOS)
+/// Анимация на весь экран: выбранный фон, тап — пауза/воспроизведение, внизу шкала, свайп вниз или ✕ — выход.
+private struct FullscreenPlayer: View {
+    let player: DevPlayerController
+    let background: DevBackground
+    let backgroundHex: String
+    let onClose: () -> Void
+    @State private var showControls = true
+    @State private var drag: CGFloat = 0
+
+    var body: some View {
+        ZStack {
+            DevBackgroundView(kind: background, customHex: backgroundHex)
+            // Форма анимации по центру всего экрана (вместе с зонами под вырезом и полоской).
+            DevLottieCanvas(controller: player)
+                .aspectRatio(player.aspect, contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .onTapGesture { player.toggle(); withAnimation { showControls = true } }
+        .overlay(alignment: .topTrailing) {
+            if showControls {
+                Button(action: onClose) {
+                    Image(systemName: "xmark").font(.headline).foregroundStyle(.white)
+                        .frame(width: 44, height: 44).background(Circle().fill(.black.opacity(0.5)))
+                }
+                .accessibilityLabel("Close full screen")
+                .padding()
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if showControls {
+                HStack(spacing: 12) {
+                    Button { player.toggle() } label: {
+                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.title3).foregroundStyle(.white).frame(width: 44, height: 44)
+                    }
+                    Scrubber(frame: player.frame, start: player.startFrame, end: player.endFrame, markers: []) {
+                        player.seek($0.rounded())
+                    }
+                    Text(String(format: "%.2f s", max(0, player.frame - player.startFrame) / max(player.framerate, 1))).font(.subheadline.monospacedDigit()).foregroundStyle(.white).frame(minWidth: 58, alignment: .trailing)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(Capsule().fill(.black.opacity(0.55)))
+                .padding()
+            }
+        }
+        .offset(y: max(drag, 0))
+        .gesture(DragGesture().onChanged { drag = $0.translation.height }.onEnded { v in
+            if v.translation.height > 120 { onClose() } else { withAnimation { drag = 0 } }
+        })
+        .statusBarHidden()
+        .task(id: player.isPlaying) {
+            // Во время воспроизведения управление прячется через 2 с.
+            guard player.isPlaying else { showControls = true; return }
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation { showControls = false }
+        }
     }
 }
 #endif

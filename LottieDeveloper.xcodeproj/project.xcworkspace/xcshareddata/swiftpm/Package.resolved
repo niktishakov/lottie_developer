@@ -1,6 +1,15 @@
 {
-  "originHash" : "c404c96ff7b227ff3001a6019b37ddcee77952d3cebedc62d6f14f0d384a2a8b",
+  "originHash" : "65dcfd88b93cb472c2e318f4ee4d57906723aeeb4207c03bfb1c0bf03112a03f",
   "pins" : [
+    {
+      "identity" : "inject",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/krzysztofzablocki/Inject",
+      "state" : {
+        "revision" : "f53380e986a8b056e37d7ce9ca68de610b8415ef",
+        "version" : "1.6.0"
+      }
+    },
     {
       "identity" : "lottie-ios",
       "kind" : "remoteSourceControl",

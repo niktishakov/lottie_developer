@@ -129,6 +129,7 @@
 		E01D01B3912CC6C4336E490A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AF378D34C6B71B8E881DA25 /* ContentView.swift */; };
 		E0BFC8CF9783883DC9A270B9 /* MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F373B8D0B6FE472C3328F1C8 /* MCPServer.swift */; };
 		E184A4A49CCAE44353238962 /* PipelineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A92E2A8E2ADA0E60DFA11A83 /* PipelineModels.swift */; };
+		E249F25332F2264B7AB8BCC9 /* Inject in Frameworks */ = {isa = PBXBuildFile; productRef = D18CA659A99A0D0FBD711FDF /* Inject */; };
 		E26C8F1F0A1BDC94649CB06C /* viewer in Resources */ = {isa = PBXBuildFile; fileRef = 4DA2F96D3E38F3DEA6095D7B /* viewer */; };
 		EA02763EA7C76AA90A19FC19 /* MCPTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3ED4ECE2D76D09D7C68AB4 /* MCPTools.swift */; };
 		EB2C2C8241BD9C873D05C3EC /* HTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B784D676F5B07B340B42359 /* HTTPServer.swift */; };
@@ -293,6 +294,7 @@
 			files = (
 				5C30ACE719093EA118380E19 /* Lottie in Frameworks */,
 				4832898E303CF4B3A6F7404D /* ZIPFoundation in Frameworks */,
+				E249F25332F2264B7AB8BCC9 /* Inject in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -708,6 +710,7 @@
 			packageProductDependencies = (
 				0EC0BE20CEC664BB897D452A /* Lottie */,
 				1423BB27F743B13F1541652C /* ZIPFoundation */,
+				D18CA659A99A0D0FBD711FDF /* Inject */,
 			);
 			productName = LottieDeveloper;
 			productReference = 0518925C6D7D7AF5DF09C406 /* LottieDeveloper.app */;
@@ -792,6 +795,7 @@
 			mainGroup = 0BD335F98F192968D4D3E345;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				EFC64FF7307D7CC154FA2244 /* XCRemoteSwiftPackageReference "Inject" */,
 				E17FF3EDC9C82AF3DB0BB51C /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				13928DA8F085DB71F8AA084C /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 			);
@@ -1180,12 +1184,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				EMIT_FRONTEND_COMMAND_LINES = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Lottie Dev";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"-Xlinker",
+					"-interposable",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.nikapps.lottie.developer;
 				SDKROOT = iphoneos;
@@ -1357,6 +1366,14 @@
 				minimumVersion = 4.6.0;
 			};
 		};
+		EFC64FF7307D7CC154FA2244 /* XCRemoteSwiftPackageReference "Inject" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/krzysztofzablocki/Inject";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1374,6 +1391,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E17FF3EDC9C82AF3DB0BB51C /* XCRemoteSwiftPackageReference "lottie-ios" */;
 			productName = Lottie;
+		};
+		D18CA659A99A0D0FBD711FDF /* Inject */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFC64FF7307D7CC154FA2244 /* XCRemoteSwiftPackageReference "Inject" */;
+			productName = Inject;
 		};
 		F56071E7FD9FEF5F5707B215 /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;

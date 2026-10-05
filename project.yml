@@ -15,6 +15,10 @@ packages:
   ZIPFoundation:
     url: https://github.com/weichsel/ZIPFoundation.git
     from: 0.9.19
+  # Горячая перезагрузка вида в Debug (InjectionIII). В release — пустые заглушки.
+  Inject:
+    url: https://github.com/krzysztofzablocki/Inject
+    from: "1.6.0"
 targets:
   LottieDeveloper:
     type: application
@@ -54,6 +58,11 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Lottie Dev
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
+      configs:
+        # InjectionIII: подмена функций в запущенном приложении и команды компиляции в логах.
+        Debug:
+          OTHER_LDFLAGS: ["-Xlinker", "-interposable"]
+          EMIT_FRONTEND_COMMAND_LINES: "YES"
     sources:
       - path: Sources
         excludes:
@@ -92,6 +101,7 @@ targets:
         product: Lottie
       - package: ZIPFoundation
         product: ZIPFoundation
+      - package: Inject
     scheme:
       gatherCoverageData: false
       testTargets:

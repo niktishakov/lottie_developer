@@ -43,6 +43,9 @@
 | Мак-приложение | `xcodebuild -project LottieDeveloper.xcodeproj -scheme LottieDeveloperMac -derivedDataPath build/dd build`, затем `open build/dd/Build/Products/Debug/LottieDeveloperMac.app` |
 | Тесты | `xcodebuild -project LottieDeveloper.xcodeproj -scheme LottieCompilerTests -derivedDataPath build/dd test` |
 | После добавления файлов | `xcodegen generate` |
+| Горячая перезагрузка iOS (InjectionIII, ~1 с) | InjectionIII.app следит за папкой проекта (💉 → Add Directory); собрать в стандартный DerivedData: `xcodebuild -project LottieDeveloper.xcodeproj -scheme LottieDeveloper -destination 'id=<sim>' build`, поставить и запустить с консолью `xcrun simctl launch --console-pty <sim> com.nikapps.lottie.developer`, ждать `💉 InjectionIII connected`, править `.swift` |
+
+Новый экран для InjectionIII: `import Inject`, `@ObserveInjection private var inject`, `.enableInjection()` на корне `body`. Без пересборки не обновятся новый файл, новое свойство типа, `project.yml`, ресурсы. В release Inject — пустые заглушки, `-interposable` только в Debug.
 
 ## Устройство
 
