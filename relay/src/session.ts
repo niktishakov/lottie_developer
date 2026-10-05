@@ -3,6 +3,32 @@ import { MAX_BODY, requestFrames, ResponseAssembler, type Frame } from "./protoc
 
 export interface Env {
   DEVICE: DurableObjectNamespace<DeviceSession>;
+  QUOTA: DurableObjectNamespace<RegistrationQuota>;
+  REGISTER_LIMIT: RateLimit;
+  IP_LIMIT: RateLimit;
+}
+
+/// Сколько новых айфонов в сутки принимает посредник (защита бесплатного лимита от перебора).
+export const REGISTRATIONS_PER_DAY = 300;
+/// Зарегистрированный, но ни разу не подключившийся айфон удаляется через неделю.
+const UNUSED_TTL_MS = 7 * 24 * 3600 * 1000;
+
+/// Счётчик регистраций за сутки (UTC), один объект на весь посредник.
+export class RegistrationQuota extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS days (day TEXT PRIMARY KEY, count INTEGER NOT NULL)");
+  }
+
+  /// true — ещё можно регистрировать сегодня.
+  async take(): Promise<boolean> {
+    const day = new Date().toISOString().slice(0, 10);
+    const row = this.ctx.storage.sql.exec<{ count: number }>("SELECT count FROM days WHERE day = ?", day).toArray()[0];
+    if ((row?.count ?? 0) >= REGISTRATIONS_PER_DAY) return false;
+    this.ctx.storage.sql.exec("INSERT INTO days (day, count) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET count = count + 1", day);
+    this.ctx.storage.sql.exec("DELETE FROM days WHERE day < ?", new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
+    return true;
+  }
 }
 
 const TIMEOUT_MS = 120_000;
@@ -24,7 +50,9 @@ export class DeviceSession extends DurableObject<Env> {
     super(ctx, env);
     // Ping от айфона отвечает сам Cloudflare: объект не просыпается и запрос не считается.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
-    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS device (secret_hash TEXT NOT NULL, created INTEGER NOT NULL)");
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS device (secret_hash TEXT NOT NULL, created INTEGER NOT NULL, connected INTEGER NOT NULL DEFAULT 0)");
+    // Записи до v2 без колонки connected.
+    try { ctx.storage.sql.exec("ALTER TABLE device ADD COLUMN connected INTEGER NOT NULL DEFAULT 0"); } catch {}
   }
 
   /// Запоминает хэш секрета нового айфона. false — такой id уже занят.
@@ -32,7 +60,14 @@ export class DeviceSession extends DurableObject<Env> {
     const rows = this.ctx.storage.sql.exec("SELECT 1 FROM device").toArray();
     if (rows.length > 0) return false;
     this.ctx.storage.sql.exec("INSERT INTO device (secret_hash, created) VALUES (?, ?)", secretHash, Date.now());
+    await this.ctx.storage.setAlarm(Date.now() + UNUSED_TTL_MS);
     return true;
+  }
+
+  /// Неделя прошла, айфон так и не подключился — удаляем запись.
+  async alarm() {
+    const row = this.ctx.storage.sql.exec<{ connected: number }>("SELECT connected FROM device").toArray()[0];
+    if (row && row.connected === 0) await this.ctx.storage.deleteAll();
   }
 
   private secretHash(): string | null {
@@ -56,6 +91,7 @@ export class DeviceSession extends DurableObject<Env> {
 
     // Новое подключение заменяет старое (айфон переподключился).
     for (const old of this.ctx.getWebSockets()) old.close(4000, "replaced");
+    this.ctx.storage.sql.exec("UPDATE device SET connected = 1 WHERE connected = 0");
     const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server);
     return new Response(null, { status: 101, webSocket: client });

@@ -1,9 +1,9 @@
 // Посредник Lottie Developer: Claude на ПК → https → этот Worker → WebSocket → айфон.
 // Адрес айфона: /d/<deviceId>/mcp. Браузер после /d/<deviceId>/ ходит по обычным путям, айфон выбирается по cookie.
 
-import { DeviceSession, json, sha256, type Env } from "./session";
+import { DeviceSession, RegistrationQuota, json, sha256, type Env } from "./session";
 
-export { DeviceSession };
+export { DeviceSession, RegistrationQuota };
 
 const DEVICE_RE = /^[a-z2-7]{20}$/;
 const COOKIE = "lottie_device";
@@ -15,7 +15,13 @@ export default {
 
     if (req.method === "OPTIONS") return cors();
     if (p === "/health") return json({ ok: true });
-    if (p === "/register" && req.method === "POST") return register(env, url);
+    const ip = req.headers.get("cf-connecting-ip") ?? "unknown";
+    if (p === "/register" && req.method === "POST") {
+      if (!(await env.REGISTER_LIMIT.limit({ key: ip })).success) return json({ error: "Too many registrations. Wait a minute." }, 429);
+      return register(env, url);
+    }
+    // Лимит на IP до обращения к Durable Object: перебор адресов не тратит дневной лимит.
+    if (!(await env.IP_LIMIT.limit({ key: ip })).success) return json({ error: "Too many requests. Wait a minute." }, 429);
 
     const m = p.match(/^\/d\/([^/]+)(\/.*)?$/);
     if (m) {
@@ -38,6 +44,8 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 async function register(env: Env, url: URL): Promise<Response> {
+  const quota = env.QUOTA.get(env.QUOTA.idFromName("global"));
+  if (!(await quota.take())) return json({ error: "The relay is not accepting new devices today. Try again tomorrow." }, 503);
   for (let attempt = 0; attempt < 3; attempt++) {
     const deviceId = randomBase32(20);
     const secret = randomHex(32);
